@@ -1,0 +1,504 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.1 Chrome/142.0.7444.265 Electron/39.8.0 Safari/537.36" version="29.6.1">
+  <diagram name="Data Flow — 4 Layers v2" id="0">
+    <mxGraphModel dx="1317" dy="676" grid="0" gridSize="10" guides="1" tooltips="1" connect="0" arrows="1" fold="0" page="1" pageScale="1" pageWidth="1400" pageHeight="2400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="l1_bg" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#CCCCCC;strokeWidth=1.5;arcSize=3;" value="" vertex="1">
+          <mxGeometry height="340" width="1320" x="30" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_title" parent="1" style="text;html=1;fontSize=13;fontStyle=1;fontColor=#444441;strokeColor=none;fillColor=none;" value="DATA LAYER" vertex="1">
+          <mxGeometry height="20" width="200" x="50" y="44" as="geometry" />
+        </mxCell>
+        <mxCell id="rt_l1" parent="1" style="text;html=1;fontSize=10;fontStyle=2;fontColor=#3B6D11;strokeColor=none;fillColor=none;" value="real-time feed →" vertex="1">
+          <mxGeometry height="18" width="160" x="900" y="44" as="geometry" />
+        </mxCell>
+        <mxCell id="pa_raw" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCEBEB;strokeColor=#A32D2D;fontColor=#333333;fontSize=11;arcSize=6;" value="&lt;b&gt;PA-5220 TRAFFIC log&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;src/dst IP · port · bytes · packets&lt;br/&gt;session_duration · action · app · rule&lt;/font&gt;" vertex="1">
+          <mxGeometry height="64" width="220" x="60" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="pa_threat" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCEBEB;strokeColor=#A32D2D;fontColor=#333333;fontSize=11;arcSize=6;" value="&lt;b&gt;PA-5220 THREAT log&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;severity · threat_name · repeat_count&lt;br/&gt;→ weak label via vendor signature&lt;/font&gt;" vertex="1">
+          <mxGeometry height="64" width="220" x="60" y="168" as="geometry" />
+        </mxCell>
+        <mxCell id="opencti" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEDFE;strokeColor=#534AB7;fontColor=#333333;fontSize=11;arcSize=6;" value="&lt;b&gt;OpenCTI :8082&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;STIX 2.x Knowledge Graph&lt;br/&gt;indicators · malware · actor · campaign&lt;br/&gt;Elasticsearch + Redis + MinIO&lt;/font&gt;" vertex="1">
+          <mxGeometry height="80" width="220" x="330" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="misp_otx" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEDFE;strokeColor=#534AB7;fontColor=#333333;fontSize=11;arcSize=6;" value="&lt;b&gt;MISP · OTX AlienVault · MITRE ATT&amp;CK&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;IoC feeds · TTP mapping&lt;br/&gt;sync → OpenCTI (scheduled pull)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="64" width="220" x="330" y="196" as="geometry" />
+        </mxCell>
+        <mxCell id="cicids" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F1FB;strokeColor=#185FA5;fontColor=#333333;fontSize=11;arcSize=6;" value="&lt;b&gt;CICIDS-2017&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;DoS · BruteForce · PortScan · WebAttack&lt;br/&gt;Botnet · ~2.8M records · labeled CSV&lt;/font&gt;" vertex="1">
+          <mxGeometry height="64" width="220" x="600" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="unsw" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F1FB;strokeColor=#185FA5;fontColor=#333333;fontSize=11;arcSize=6;" value="&lt;b&gt;UNSW-NB15&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Fuzzers · Backdoors · DoS · Exploits · Recon&lt;br/&gt;~2.5M records · labeled CSV+PCAP&lt;/font&gt;" vertex="1">
+          <mxGeometry height="64" width="220" x="600" y="196" as="geometry" />
+        </mxCell>
+        <mxCell id="inject" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAEEDA;strokeColor=#854F0B;fontColor=#333333;fontSize=11;arcSize=6;" value="&lt;b&gt;Attack injection (Layer 3)&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Python · PA-5220 format · ≤5% inject rate&lt;br/&gt;BruteForce · PortScan · Exfil · C2 · CredStuffing&lt;/font&gt;" vertex="1">
+          <mxGeometry height="64" width="240" x="870" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="hybrid" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#185FA5;strokeColor=#0C447C;fontColor=#ffffff;fontSize=11;arcSize=6;" value="&lt;b&gt;Final Hybrid Dataset&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Train 60% · Val 20% · Test 20% · Stratified&lt;br/&gt;Normal/Anomaly/Attack + CTI context · IP anonymized&lt;/font&gt;" vertex="1">
+          <mxGeometry height="76" width="160" x="1160" y="128" as="geometry" />
+        </mxCell>
+        <mxCell id="e_pa_cti" edge="1" parent="1" source="pa_raw" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#A32D2D;strokeWidth=1.5;" target="opencti">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_threat_cti" edge="1" parent="1" source="pa_threat" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#A32D2D;strokeWidth=1.5;" target="opencti">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="440" y="186" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_misp_cti" edge="1" parent="1" source="misp_otx" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#534AB7;strokeWidth=1.5;" target="opencti">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_cti_hyb" edge="1" parent="1" source="opencti" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#534AB7;strokeWidth=1.5;" target="hybrid">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="440" y="166" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_cic_hyb" edge="1" parent="1" source="cicids" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#185FA5;strokeWidth=1.5;" target="hybrid">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="710" y="66" />
+              <mxPoint x="1120" y="66" />
+              <mxPoint x="1120" y="166" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_uns_hyb" edge="1" parent="1" source="unsw" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#185FA5;strokeWidth=1.5;" target="hybrid">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1120" y="228" />
+              <mxPoint x="1120" y="204" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_inj_hyb" edge="1" parent="1" source="inject" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#854F0B;strokeWidth=1.5;" target="hybrid">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1120" y="112" />
+              <mxPoint x="1120" y="166" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_pa_hyb_d" edge="1" parent="1" source="pa_raw" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#A32D2D;strokeWidth=1;dashed=1;" target="hybrid">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="36" y="112" />
+              <mxPoint x="36" y="290" />
+              <mxPoint x="1120" y="290" />
+              <mxPoint x="1120" y="204" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="l2_bg" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8F8F2;strokeColor=#CCCCCC;strokeWidth=1.5;arcSize=3;" value="" vertex="1">
+          <mxGeometry height="310" width="1320" x="30" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_title" parent="1" style="text;html=1;fontSize=13;fontStyle=1;fontColor=#444441;strokeColor=none;fillColor=none;" value="SERVICE LAYER" vertex="1">
+          <mxGeometry height="20" width="200" x="50" y="434" as="geometry" />
+        </mxCell>
+        <mxCell id="rt_l2" parent="1" style="text;html=1;fontSize=10;fontStyle=2;fontColor=#3B6D11;strokeColor=none;fillColor=none;" value="real-time feed →" vertex="1">
+          <mxGeometry height="18" width="160" x="900" y="434" as="geometry" />
+        </mxCell>
+        <mxCell id="enrich" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAEEDA;strokeColor=#854F0B;fontColor=#333333;fontSize=11;arcSize=6;" value="&lt;b&gt;enrich.py&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;GraphQL → OpenCTI :8082/graphql&lt;br/&gt;IoC match + graph walk&lt;br/&gt;returns: confidence · actor · campaign · mitre_phase&lt;/font&gt;" vertex="1">
+          <mxGeometry height="76" width="250" x="60" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="labelbuild" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAEEDA;strokeColor=#854F0B;fontColor=#333333;fontSize=11;arcSize=6;" value="&lt;b&gt;label_builder.py&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;conf ≥0.70 → attack · weight=conf&lt;br/&gt;conf 0.40–0.69 → suspicious · weight×0.6&lt;br/&gt;conf &lt;0.40 → normal · weight=0.3&lt;/font&gt;" vertex="1">
+          <mxGeometry height="76" width="250" x="60" y="572" as="geometry" />
+        </mxCell>
+        <mxCell id="featext" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEEEE;strokeColor=#888780;fontColor=#333333;fontSize=11;arcSize=6;" value="&lt;b&gt;feature_extractor.py&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;network (5): bytes/session · login_velocity&lt;br/&gt;geo_anomaly · failed_auth_ratio · beaconing_interval&lt;br/&gt;CTI (4): ioc_confidence · ioc_type · mitre_phase · actor_known&lt;br/&gt;MinMaxScaler.fit(X_train only) · SMOTE&lt;/font&gt;" vertex="1">
+          <mxGeometry height="92" width="290" x="370" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="chromadb" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEDFE;strokeColor=#534AB7;fontColor=#333333;fontSize=11;arcSize=6;dashed=1;" value="&lt;b&gt;ChromaDB (RAG builder)&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;ingest: MISP · OTX · MITRE ATT&amp;CK · OpenCTI paths&lt;br/&gt;embed + index TI context · M_RAG = retrieval precision@3&lt;/font&gt;" vertex="1">
+          <mxGeometry height="64" width="290" x="370" y="584" as="geometry" />
+        </mxCell>
+        <mxCell id="featmatrix" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1F5EE;strokeColor=#0F6E56;fontColor=#333333;fontSize=11;arcSize=6;" value="&lt;b&gt;feature_matrix.csv&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;9 features · y_label · sample_weight&lt;br/&gt;Train/Val/Test split · no leakage&lt;/font&gt;" vertex="1">
+          <mxGeometry height="64" width="220" x="730" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="ragstore" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1F5EE;strokeColor=#0F6E56;fontColor=#333333;fontSize=11;arcSize=6;" value="&lt;b&gt;RAG vector store&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;TI context indexed · ready for LLM&lt;/font&gt;" vertex="1">
+          <mxGeometry height="50" width="220" x="730" y="588" as="geometry" />
+        </mxCell>
+        <mxCell id="enriched_out" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#085041;strokeColor=#04342C;fontColor=#ffffff;fontSize=11;arcSize=6;" value="&lt;b&gt;Enriched dataset (ready)&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;labeled · weighted · features extracted&lt;br/&gt;→ ML training pipeline&lt;/font&gt;" vertex="1">
+          <mxGeometry height="58" width="250" x="1067" y="493" as="geometry" />
+        </mxCell>
+        <mxCell id="e_hyb_enr" edge="1" parent="1" source="hybrid" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#185FA5;strokeWidth=2;" target="enrich">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1240" y="386" />
+              <mxPoint x="185" y="386" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_enr_lab" edge="1" parent="1" source="enrich" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#854F0B;strokeWidth=1.5;" target="labelbuild">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_enr_fe" edge="1" parent="1" source="enrich" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#854F0B;strokeWidth=1.5;" target="featext">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="310" y="498" />
+              <mxPoint x="368" y="498" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_lab_fe" edge="1" parent="1" source="labelbuild" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#854F0B;strokeWidth=1.5;entryX=0.481;entryY=0.994;entryDx=0;entryDy=0;entryPerimeter=0;" target="featext">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="342" y="622" />
+              <mxPoint x="342" y="573" />
+              <mxPoint x="509" y="573" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_fe_mat" edge="1" parent="1" source="featext" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#888780;strokeWidth=1.5;" target="featmatrix">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ch_rag" edge="1" parent="1" source="chromadb" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#534AB7;strokeWidth=1.5;" target="ragstore">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_mat_out" edge="1" parent="1" source="featmatrix" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#0F6E56;strokeWidth=1.5;" target="enriched_out">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_rag_out" edge="1" parent="1" source="ragstore" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#0F6E56;strokeWidth=1.5;" target="enriched_out">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="950" y="613" />
+              <mxPoint x="950" y="543" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="l3_bg" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0EEF8;strokeColor=#CCCCCC;strokeWidth=1.5;arcSize=3;" value="" vertex="1">
+          <mxGeometry height="665" width="1320" x="30" y="790" as="geometry" />
+        </mxCell>
+        <mxCell id="l3_title" parent="1" style="text;html=1;fontSize=13;fontStyle=1;fontColor=#444441;strokeColor=none;fillColor=none;" value="ML / OUTPUT LAYER" vertex="1">
+          <mxGeometry height="20" width="240" x="50" y="804" as="geometry" />
+        </mxCell>
+        <mxCell id="rt_l3" parent="1" style="text;html=1;fontSize=10;fontStyle=2;fontColor=#3B6D11;strokeColor=none;fillColor=none;" value="real-time feed →" vertex="1">
+          <mxGeometry height="18" width="160" x="900" y="804" as="geometry" />
+        </mxCell>
+        <mxCell id="m_iso" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEDFE;strokeColor=#534AB7;fontColor=#333333;fontSize=11;arcSize=6;" value="&lt;b&gt;Isolation Forest&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;scikit-learn · unsupervised · contamination=0.1&lt;br/&gt;threshold calibrated via OpenCTI · SHAP&lt;/font&gt;" vertex="1">
+          <mxGeometry height="72" width="230" x="60" y="830" as="geometry" />
+        </mxCell>
+        <mxCell id="m_ae" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEDFE;strokeColor=#534AB7;fontColor=#333333;fontSize=11;arcSize=6;" value="&lt;b&gt;Autoencoder&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;PyTorch · reconstruction error threshold&lt;br/&gt;Integrated Gradients · anomaly detection&lt;/font&gt;" vertex="1">
+          <mxGeometry height="72" width="230" x="340" y="830" as="geometry" />
+        </mxCell>
+        <mxCell id="m_rf" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEDFE;strokeColor=#534AB7;fontColor=#333333;fontSize=11;arcSize=6;" value="&lt;b&gt;Random Forest&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;supervised · n_est=200 · depth=10&lt;br/&gt;fit(sample_weight=CTI_conf) · SHAP&lt;/font&gt;" vertex="1">
+          <mxGeometry height="72" width="230" x="620" y="830" as="geometry" />
+        </mxCell>
+        <mxCell id="m1a" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0F6E56;strokeColor=#085041;fontColor=#ffffff;fontSize=10;arcSize=8;" value="&lt;b&gt;M1a&lt;/b&gt;  Precision · Recall · F1 · AUC-ROC" vertex="1">
+          <mxGeometry height="32" width="240" x="960" y="830" as="geometry" />
+        </mxCell>
+        <mxCell id="m1b" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0F6E56;strokeColor=#085041;fontColor=#ffffff;fontSize=10;arcSize=8;" value="&lt;b&gt;M1b — MTTD&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;inject→detect (s)&lt;br/&gt;t_start: inject timestamp&lt;br/&gt;t_detect: ensemble flag time&lt;br/&gt;MTTD = t_detect − t_start&lt;/font&gt;" vertex="1">
+          <mxGeometry height="76" width="240" x="977" y="947" as="geometry" />
+        </mxCell>
+        <mxCell id="e_inject_m1b" edge="1" parent="1" source="inject" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#854F0B;strokeWidth=1.5;dashed=1;fontSize=10;fontColor=#854F0B;" target="m1b" value="t_start">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1329" y="112" />
+              <mxPoint x="1329" y="896" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_ensemble_m1b" edge="1" parent="1" source="ensemble" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#0F6E56;strokeWidth=1.5;fontSize=10;fontColor=#0F6E56;" target="m1b" value="t_detect">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="802" y="985" />
+              <mxPoint x="958" y="985" />
+              <mxPoint x="958" y="896" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ensemble" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#534AB7;strokeColor=#3C3489;fontColor=#ffffff;fontSize=11;arcSize=6;" value="&lt;b&gt;Ensemble Fusion Layer&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;weighted avg risk score · majority vote · confidence = agreement ratio&lt;/font&gt;" vertex="1">
+          <mxGeometry height="50" width="640" x="160" y="960" as="geometry" />
+        </mxCell>
+        <mxCell id="ml_out" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3C3489;strokeColor=#26215C;fontColor=#ffffff;fontSize=11;arcSize=6;" value="&lt;b&gt;ML output — risk score (0–100) + alert context + SHAP explainability&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;risk_score · anomaly_type · top_3_features · source_ip · dst_port · model_used · ensemble_confidence · timestamp&lt;/font&gt;" vertex="1">
+          <mxGeometry height="52" width="640" x="160" y="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="llm" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#854F0B;strokeColor=#633806;fontColor=#ffffff;fontSize=11;arcSize=6;" value="&lt;b&gt;Qwen3.5-35B-A3B  (LM Studio · Mac Mini M4 Pro 48 GB · local REST)&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;input: risk_score + alert_context + RAG TI context&lt;br/&gt;prompt: structured Thai template · ~40 tok/s · data residency ✓&lt;/font&gt;" vertex="1">
+          <mxGeometry height="64" width="640" x="160" y="1160" as="geometry" />
+        </mxCell>
+        <mxCell id="llm_out" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#633806;strokeColor=#412402;fontColor=#ffffff;fontSize=11;arcSize=6;" value="&lt;b&gt;LLM structured output  (JSON · ภาษาไทย)&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;priority: HIGH/MEDIUM/LOW · explanation_th · mitre_tactic · affected_asset&lt;br/&gt;remediation: [step1, step2, step3] · faithfulness_score · hallucination_rate · response_ms ~2400&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="640" x="160" y="1278" as="geometry" />
+        </mxCell>
+        <mxCell id="m2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0F6E56;strokeColor=#085041;fontColor=#ffffff;fontSize=10;arcSize=8;" value="&lt;b&gt;M2&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Faithfulness score&lt;br/&gt;Hallucination rate&lt;br/&gt;(LLM output vs ML output + RAG)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="64" width="200" x="870" y="1260" as="geometry" />
+        </mxCell>
+        <mxCell id="m3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0F6E56;strokeColor=#085041;fontColor=#ffffff;fontSize=10;arcSize=8;" value="&lt;b&gt;M3&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Expert rating 1–5&lt;br/&gt;Thai utility score&lt;br/&gt;(analyst อ่าน explanation_th แล้วให้คะแนน)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="64" width="200" x="1100" y="1260" as="geometry" />
+        </mxCell>
+        <mxCell id="m_rag" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0F6E56;strokeColor=#085041;fontColor=#ffffff;fontSize=10;arcSize=8;" value="&lt;b&gt;M_RAG&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Retrieval precision@3&lt;br/&gt;(top-3 docs ตรงกับ attack type?)&lt;br/&gt;new metric&lt;/font&gt;" vertex="1">
+          <mxGeometry height="64" width="190" x="1080" y="581" as="geometry" />
+        </mxCell>
+        <mxCell id="group_a" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0F6E56;strokeColor=#085041;fontColor=#ffffff;fontSize=11;arcSize=8;" value="&lt;b&gt;Group A — no LLM&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;raw alert · triage timer · accuracy · blinded · ≥15 analysts&lt;/font&gt;" vertex="1">
+          <mxGeometry height="52" width="290" x="160" y="1382" as="geometry" />
+        </mxCell>
+        <mxCell id="group_b" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0F6E56;strokeColor=#085041;fontColor=#ffffff;fontSize=11;arcSize=8;" value="&lt;b&gt;Group B — with LLM&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;LLM output + remediation · triage timer · accuracy · blinded · ≥15 analysts&lt;/font&gt;" vertex="1">
+          <mxGeometry height="52" width="290" x="510" y="1382" as="geometry" />
+        </mxCell>
+        <mxCell id="m4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0F6E56;strokeColor=#085041;fontColor=#ffffff;fontSize=10;arcSize=8;" value="&lt;b&gt;M4&lt;/b&gt;  Triage time · % reduction · t-test p&lt;0.05 · Cohen&#39;s d" vertex="1">
+          <mxGeometry height="28" width="280" x="877" y="1394" as="geometry" />
+        </mxCell>
+        <mxCell id="e_enr_m" edge="1" parent="1" source="enriched_out" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#534AB7;strokeWidth=2;" target="m_iso">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1280" y="752" />
+              <mxPoint x="175" y="752" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_enr_a" edge="1" parent="1" source="enriched_out" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#534AB7;strokeWidth=2;" target="m_ae">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1279" y="752" />
+              <mxPoint x="455" y="752" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_enr_r" edge="1" parent="1" source="enriched_out" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#534AB7;strokeWidth=2;" target="m_rf">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1280" y="752" />
+              <mxPoint x="735" y="752" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_i_en" edge="1" parent="1" source="m_iso" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#534AB7;" target="ensemble">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_a_en" edge="1" parent="1" source="m_ae" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#534AB7;" target="ensemble">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_r_en" edge="1" parent="1" source="m_rf" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#534AB7;" target="ensemble">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_en_mo" edge="1" parent="1" source="ensemble" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#3C3489;strokeWidth=1.5;" target="ml_out">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_mo_ll" edge="1" parent="1" source="ml_out" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#854F0B;strokeWidth=1.5;" target="llm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ll_lo" edge="1" parent="1" source="llm" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#633806;strokeWidth=1.5;" target="llm_out">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_rag_ll" edge="1" parent="1" source="ragstore" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#534AB7;dashed=1;" target="llm">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="840" y="569" />
+              <mxPoint x="1303" y="569" />
+              <mxPoint x="1303" y="1192" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_lo_ga" edge="1" parent="1" source="llm_out" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#0F6E56;strokeWidth=1.5;" target="group_a">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="305" y="1362" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_lo_gb" edge="1" parent="1" source="llm_out" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#0F6E56;strokeWidth=1.5;" target="group_b">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="655" y="1362" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_rf_m1" edge="1" parent="1" source="m_rf" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#0F6E56;dashed=1;" target="m1a">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_gb_m4" edge="1" parent="1" source="group_b" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#0F6E56;" target="m4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_chroma_mrag" edge="1" parent="1" source="chromadb" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#0F6E56;strokeWidth=1.5;" target="m_rag">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="515" y="662" />
+              <mxPoint x="1095" y="662" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_llmout_m2" edge="1" parent="1" source="llm_out" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#0F6E56;strokeWidth=1.5;" target="m2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="802" y="1292" />
+              <mxPoint x="868" y="1292" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_llmout_m3" edge="1" parent="1" source="llm_out" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#0F6E56;strokeWidth=1.5;" target="m3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="480" y="1361" />
+              <mxPoint x="1200" y="1361" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="l4_bg" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;strokeWidth=2;arcSize=3;" value="" vertex="1">
+          <mxGeometry height="538" width="1320" x="30" y="1480" as="geometry" />
+        </mxCell>
+        <mxCell id="l4_title" parent="1" style="text;html=1;fontSize=13;fontStyle=1;fontColor=#27500A;strokeColor=none;fillColor=none;" value="DASHBOARD &amp; NOTIFICATION LAYER" vertex="1">
+          <mxGeometry height="20" width="420" x="50" y="1487" as="geometry" />
+        </mxCell>
+        <mxCell id="dispatcher" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C0DD97;strokeColor=#3B6D11;fontColor=#173404;fontSize=11;arcSize=6;" value="&lt;b&gt;alert_dispatcher.py&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;รับ LLM JSON output&lt;br/&gt;route ตาม priority: HIGH → immediate&lt;br/&gt;MEDIUM → queue · LOW → digest&lt;br/&gt;trigger notification + write to event bus&lt;/font&gt;" vertex="1">
+          <mxGeometry height="84" width="260" x="60" y="1532" as="geometry" />
+        </mxCell>
+        <mxCell id="rtbus" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C0DD97;strokeColor=#3B6D11;fontColor=#173404;fontSize=11;arcSize=6;" value="&lt;b&gt;Real-time event bus&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;RabbitMQ (reuse opencti-rabbitmq) · topic routing&lt;br/&gt;L1: raw log count · L2: enrich latency&lt;br/&gt;L3: risk_score · LLM: response_ms&lt;/font&gt;" vertex="1">
+          <mxGeometry height="84" width="290" x="390" y="1532" as="geometry" />
+        </mxCell>
+        <mxCell id="tsdb" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#639922;fontColor=#173404;fontSize=11;arcSize=6;" value="&lt;b&gt;InfluxDB / Prometheus&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;metrics: risk_score · alert_count · mttd&lt;br/&gt;model_used · enrich_latency · response_ms&lt;br/&gt;retention 90 days&lt;/font&gt;" vertex="1">
+          <mxGeometry height="84" width="270" x="1050" y="1532" as="geometry" />
+        </mxCell>
+        <mxCell id="grafana" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#173404;fontSize=11;arcSize=6;" value="&lt;b&gt;Grafana Dashboard&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;panels (real-time · ALL layers):&lt;br/&gt;· L1: log ingest rate / hour&lt;br/&gt;· L2: enrich latency · IoC match rate&lt;br/&gt;· L3: risk_score trend · MTTD timeline&lt;br/&gt;· LLM: response_ms · faithfulness_score&lt;br/&gt;data source: InfluxDB + Prometheus&lt;/font&gt;" vertex="1">
+          <mxGeometry height="148" width="280" x="60" y="1682" as="geometry" />
+        </mxCell>
+        <mxCell id="kibana" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#173404;fontSize=11;arcSize=6;" value="&lt;b&gt;Kibana (Elastic Stack)&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;log search + drill-down (real-time):&lt;br/&gt;· L1: full PA-5220 log exploration&lt;br/&gt;· L2: CTI enrichment audit trail&lt;br/&gt;· L3: ML decision history + SHAP&lt;br/&gt;· LLM: Thai explanation history per alert&lt;br/&gt;index: reuse opencti-elasticsearch&lt;/font&gt;" vertex="1">
+          <mxGeometry height="148" width="280" x="390" y="1682" as="geometry" />
+        </mxCell>
+        <mxCell id="custom_dash" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#173404;fontSize=11;arcSize=6;" value="&lt;b&gt;Custom Web Dashboard&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Flask / FastAPI + React · WebSocket real-time&lt;br/&gt;· Alert queue: priority · risk_score · status&lt;br/&gt;· LLM explanation_th inline (ภาษาไทย)&lt;br/&gt;· MITRE ATT&amp;CK navigator heatmap&lt;br/&gt;· Analyst triage UI: Ack / FP / Escalate&lt;br/&gt;· A/B experiment tracker (M4 live)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="148" width="290" x="730" y="1682" as="geometry" />
+        </mxCell>
+        <mxCell id="notif_line" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C0DD97;strokeColor=#3B6D11;fontColor=#173404;fontSize=11;arcSize=6;" value="&lt;b&gt;Line Notify / Line Bot&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;HIGH priority → ส่งทันที&lt;br/&gt;ข้อความ: priority · src_ip · mitre_tactic&lt;br/&gt;explanation_th (สรุป 2 บรรทัด) + link Grafana&lt;/font&gt;" vertex="1">
+          <mxGeometry height="80" width="280" x="60" y="1899" as="geometry" />
+        </mxCell>
+        <mxCell id="notif_outlook" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C0DD97;strokeColor=#3B6D11;fontColor=#173404;fontSize=11;arcSize=6;" value="&lt;b&gt;Outlook (Microsoft Graph API)&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;MEDIUM: ส่งทันที · LOW: daily digest&lt;br/&gt;สรุปรายวัน: alert count · top attack types&lt;br/&gt;MTTD avg · remediation steps · HTML template&lt;/font&gt;" vertex="1">
+          <mxGeometry height="80" width="280" x="390" y="1899" as="geometry" />
+        </mxCell>
+        <mxCell id="feedback" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#639922;fontColor=#173404;fontSize=11;arcSize=6;dashed=1;" value="&lt;b&gt;Analyst feedback loop&lt;/b&gt;  [future work]&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;triage decision: TP / FP / FN → log&lt;br/&gt;validate A/B result (M4)&lt;br/&gt;future: active learning re-train trigger&lt;/font&gt;" vertex="1">
+          <mxGeometry height="80" width="290" x="730" y="1899" as="geometry" />
+        </mxCell>
+        <mxCell id="e_lo_disp" edge="1" parent="1" source="llm_out" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#3B6D11;strokeWidth=2;" target="dispatcher">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="41" y="1308" />
+              <mxPoint x="41" y="1574" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_l1_rt" edge="1" parent="1" source="pa_raw" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#3B6D11;dashed=1;strokeWidth=1;fontSize=10;" target="rtbus" value="L1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="35" y="112" />
+              <mxPoint x="35" y="1634" />
+              <mxPoint x="535" y="1634" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_l3_rt" edge="1" parent="1" source="ml_out" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#3B6D11;dashed=1;strokeWidth=1;fontSize=10;" target="rtbus" value="L3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="480" y="1466" />
+              <mxPoint x="535" y="1466" />
+              <mxPoint x="535" y="1530" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_rt_tsdb" edge="1" parent="1" source="rtbus" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#639922;strokeWidth=1.5;" target="tsdb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_d_grafana" edge="1" parent="1" source="dispatcher" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#3B6D11;strokeWidth=1.5;" target="grafana">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="190" y="1652" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_d_kibana" edge="1" parent="1" source="dispatcher" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#3B6D11;strokeWidth=1.5;" target="kibana">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="190" y="1652" />
+              <mxPoint x="530" y="1652" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_d_custom" edge="1" parent="1" source="dispatcher" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#3B6D11;strokeWidth=1.5;" target="custom_dash">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="190" y="1652" />
+              <mxPoint x="875" y="1652" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_ts_gr" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#639922;dashed=1;strokeWidth=1;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1200" y="1642" />
+              <mxPoint x="215" y="1642" />
+            </Array>
+            <mxPoint x="1199.997037037037" y="1616" as="sourcePoint" />
+            <mxPoint x="214.95999999999998" y="1664" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_d_line" edge="1" parent="1" source="dispatcher" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#27500A;strokeWidth=1.5;" target="notif_line">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="53" y="1574" />
+              <mxPoint x="53" y="1856" />
+              <mxPoint x="200" y="1856" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_d_outlook" edge="1" parent="1" source="dispatcher" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#27500A;strokeWidth=1.5;" target="notif_outlook">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="41" y="1574" />
+              <mxPoint x="41" y="1856" />
+              <mxPoint x="530" y="1856" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_cu_fb" edge="1" parent="1" source="custom_dash" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#639922;dashed=1;strokeWidth=1.5;" target="feedback">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="875" y="1856" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg_bg" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#111111;strokeColor=#333333;" value="" vertex="1">
+          <mxGeometry height="56" width="1320" x="24" y="2032" as="geometry" />
+        </mxCell>
+        <mxCell id="lh" parent="1" style="text;html=1;fontSize=11;fontStyle=1;fontColor=#dddddd;strokeColor=none;fillColor=none;" value="Legend" vertex="1">
+          <mxGeometry height="18" width="80" x="44" y="2038" as="geometry" />
+        </mxCell>
+        <mxCell id="lc1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCEBEB;strokeColor=#A32D2D;fontColor=#333333;fontSize=10;" value="PA-5220 / raw" vertex="1">
+          <mxGeometry height="20" width="130" x="134" y="2056" as="geometry" />
+        </mxCell>
+        <mxCell id="lc2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEDFE;strokeColor=#534AB7;fontColor=#333333;fontSize=10;" value="OpenCTI / CTI" vertex="1">
+          <mxGeometry height="20" width="130" x="274" y="2056" as="geometry" />
+        </mxCell>
+        <mxCell id="lc3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F1FB;strokeColor=#185FA5;fontColor=#333333;fontSize=10;" value="Benchmark" vertex="1">
+          <mxGeometry height="20" width="130" x="414" y="2056" as="geometry" />
+        </mxCell>
+        <mxCell id="lc4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#534AB7;strokeColor=#3C3489;fontColor=#fff;fontSize=10;" value="ML models" vertex="1">
+          <mxGeometry height="20" width="130" x="554" y="2056" as="geometry" />
+        </mxCell>
+        <mxCell id="lc5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#854F0B;strokeColor=#633806;fontColor=#fff;fontSize=10;" value="LLM / RAG" vertex="1">
+          <mxGeometry height="20" width="130" x="694" y="2056" as="geometry" />
+        </mxCell>
+        <mxCell id="lc6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0F6E56;strokeColor=#085041;fontColor=#fff;fontSize=10;" value="Metrics / eval" vertex="1">
+          <mxGeometry height="20" width="130" x="834" y="2056" as="geometry" />
+        </mxCell>
+        <mxCell id="lc7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#173404;fontSize=10;" value="Dashboard / monitor" vertex="1">
+          <mxGeometry height="20" width="150" x="974" y="2056" as="geometry" />
+        </mxCell>
+        <mxCell id="lc8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C0DD97;strokeColor=#3B6D11;fontColor=#173404;fontSize=10;" value="Notification" vertex="1">
+          <mxGeometry height="20" width="130" x="1134" y="2056" as="geometry" />
+        </mxCell>
+        <mxCell id="wBeEL3h_DgGUntYwkC-x-2" edge="1" parent="1" source="enrich" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#3B6D11;dashed=1;strokeWidth=1;fontSize=10;entryX=0.002;entryY=0.506;entryDx=0;entryDy=0;entryPerimeter=0;" target="dispatcher" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="53" y="498" />
+              <mxPoint x="53" y="1018" />
+              <mxPoint x="47" y="1018" />
+              <mxPoint x="47" y="1574" />
+            </Array>
+            <mxPoint x="60" y="498" as="sourcePoint" />
+            <mxPoint x="535" y="1532" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="l4_sub" parent="1" style="text;html=1;fontSize=10;fontStyle=2;fontColor=#3B6D11;strokeColor=none;fillColor=none;" value="real-time feeds from ALL layers · data ingest · enrichment logs · ML inference · LLM output" vertex="1">
+          <mxGeometry height="16" width="700" x="54" y="1499" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,25 @@
+dataset,source_label,technique_id,technique_name,tactic,mapping_confidence
+cicids2017,DoS Hulk,T1499.002,Endpoint DoS: Service Exhaustion Flood,Impact,high
+cicids2017,DoS GoldenEye,T1499.002,Endpoint DoS: Service Exhaustion Flood,Impact,high
+cicids2017,DoS slowloris,T1499.002,Endpoint DoS: Service Exhaustion Flood,Impact,high
+cicids2017,DoS Slowhttptest,T1499.002,Endpoint DoS: Service Exhaustion Flood,Impact,high
+cicids2017,DDoS,T1498,Network Denial of Service,Impact,high
+cicids2017,PortScan,T1046,Network Service Discovery,Discovery,high
+cicids2017,FTP-Patator,T1110.001,Brute Force: Password Guessing,Credential Access,high
+cicids2017,SSH-Patator,T1110.001,Brute Force: Password Guessing,Credential Access,high
+cicids2017,Bot,T1071.001,Application Layer Protocol: Web Protocols,Command and Control,medium
+cicids2017,Web Attack - Brute Force,T1110,Brute Force,Credential Access,high
+cicids2017,Web Attack - XSS,T1190,Exploit Public-Facing Application,Initial Access,low
+cicids2017,Web Attack - Sql Injection,T1190,Exploit Public-Facing Application,Initial Access,high
+cicids2017,Infiltration,T1190,Exploit Public-Facing Application,Initial Access,medium
+cicids2017,Heartbleed,T1190,Exploit Public-Facing Application (CVE-2014-0160),Initial Access,high
+cicids2017,BENIGN,,,,n/a
+unswnb15,DoS,T1498,Network Denial of Service,Impact,high
+unswnb15,Exploits,T1210,Exploitation of Remote Services,Lateral Movement,medium
+unswnb15,Fuzzers,T1595,Active Scanning,Reconnaissance,medium
+unswnb15,Reconnaissance,T1595,Active Scanning,Reconnaissance,high
+unswnb15,Analysis,T1595,Active Scanning,Reconnaissance,low
+unswnb15,Backdoor,T1505.003,Server Software Component: Web Shell,Persistence,medium
+unswnb15,Shellcode,T1059,Command and Scripting Interpreter,Execution,medium
+unswnb15,Worms,T1210,Exploitation of Remote Services,Lateral Movement,medium
+unswnb15,Generic,,,,low

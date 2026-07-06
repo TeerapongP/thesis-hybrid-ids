@@ -1,0 +1,22 @@
+# Credentials -- never commit (covers .env, notification/.env, observability/.env, opencti/.env)
+.env
+**/.env
+
+# Datasets -- large (8.7GB as of 2026-07-06), kept local only
+data/
+
+# Python virtual environment
+.venv/
+__pycache__/
+*.py[cod]
+
+# IDE
+.idea/
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Claude Code local/session state (not shared project config)
+.claude/settings.local.json
+.claude/scheduled_tasks.lock

@@ -1,0 +1,279 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.1 Chrome/142.0.7444.265 Electron/39.8.0 Safari/537.36" version="29.6.1">
+  <diagram name="Thesis ML+LLM Architecture v3" id="0">
+    <mxGraphModel dx="1185" dy="608" grid="0" gridSize="10" guides="1" tooltips="1" connect="0" arrows="1" fold="0" page="1" pageScale="1" pageWidth="1100" pageHeight="2200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="sec_ds" parent="1" style="text;html=1;fontSize=13;fontStyle=1;fontColor=#185FA5;strokeColor=none;fillColor=none;" value="⓪ Hybrid Dataset Strategy (Updated)" vertex="1">
+          <mxGeometry height="20" width="500" x="30" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ds_l1_label" parent="1" style="text;html=1;fontSize=10;fontStyle=1;fontColor=#791F1F;strokeColor=none;fillColor=none;" value="Layer 1 — Primary (real-world core)" vertex="1">
+          <mxGeometry height="16" width="300" x="30" y="46" as="geometry" />
+        </mxCell>
+        <mxCell id="ds_l1_raw" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCEBEB;strokeColor=#A32D2D;fontColor=#333333;fontSize=11;arcSize=4;" value="&lt;b&gt;PA-5220 Production Firewall Log (Real campus traffic)&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;TRAFFIC log: src/dst IP · port · bytes · packets · session_duration · action · app · rule&lt;br/&gt;THREAT log: severity · threat_name · repeat_count → weak label via vendor signature&lt;/font&gt;" vertex="1">
+          <mxGeometry height="56" width="1020" x="30" y="64" as="geometry" />
+        </mxCell>
+        <mxCell id="ds_l1_cti" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0F0;strokeColor=#A32D2D;fontColor=#333333;fontSize=11;arcSize=4;" value="&lt;b&gt;CTI enrichment: MISP/OTX IoC matching + OpenCTI Knowledge Graph (STIX 2.x: indicators, malware, threat actor, campaign, relationships)&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;+ MITRE ATT&amp;CK mapping (tactic, technique)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="52" width="1020" x="30" y="124" as="geometry" />
+        </mxCell>
+        <mxCell id="ds_l1_feat" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE8E8;strokeColor=#A32D2D;fontColor=#333333;fontSize=11;arcSize=4;" value="&lt;b&gt;CTI features: ATT&amp;CK tactic/technique · threat actor · IoC type · relationship context · confidence score&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;context-aware enrichment (MISP/OTX + OpenCTI correlation, graph-based) + expert review sample (20–30 records)&lt;br/&gt;Output: Enriched security log with multi-level labels: Normal / Anomaly / Attack + CTI context (TTP, actor, campaign, confidence)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="68" width="1020" x="30" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="ds_l2_label" parent="1" style="text;html=1;fontSize=10;fontStyle=1;fontColor=#0C447C;strokeColor=none;fillColor=none;" value="Layer 2 — Benchmark (generalizability proof)" vertex="1">
+          <mxGeometry height="16" width="360" x="30" y="256" as="geometry" />
+        </mxCell>
+        <mxCell id="ds_l2a" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F1FB;strokeColor=#185FA5;fontColor=#333333;fontSize=11;arcSize=4;" value="&lt;b&gt;CICIDS-2017&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;DoS · Brute Force · Port Scan&lt;br/&gt;Web Attack · Botnet · Infiltration&lt;br/&gt;~2.8M records · labeled CSV&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="498" x="30" y="274" as="geometry" />
+        </mxCell>
+        <mxCell id="ds_l2b" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F1FB;strokeColor=#185FA5;fontColor=#333333;fontSize=11;arcSize=4;" value="&lt;b&gt;UNSW-NB15&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Fuzzers · Backdoors · DoS&lt;br/&gt;Exploits · Generic · Recon&lt;br/&gt;~2.5M records · labeled CSV+PCAP&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="498" x="552" y="274" as="geometry" />
+        </mxCell>
+        <mxCell id="ds_l3_label" parent="1" style="text;html=1;fontSize=10;fontStyle=1;fontColor=#633806;strokeColor=none;fillColor=none;" value="Layer 3 — Attack injection (controlled ground truth; ≤5% of total)" vertex="1">
+          <mxGeometry height="16" width="520" x="30" y="354" as="geometry" />
+        </mxCell>
+        <mxCell id="ds_l3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAEEDA;strokeColor=#854F0B;fontColor=#333333;fontSize=11;arcSize=4;" value="&lt;b&gt;Simulated attack overlay — Python-injected in PA-5220 format&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Brute Force · Port Scan · Data Exfiltration · C2 Beacon · Credential Stuffing&lt;br/&gt;Background traffic = real (Layer 1) · Only attack events are synthetic · inject rate ≤5% · labeled&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="1020" x="30" y="372" as="geometry" />
+        </mxCell>
+        <mxCell id="ds_final" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#185FA5;strokeColor=#0C447C;fontColor=#ffffff;fontSize=11;arcSize=4;" value="&lt;b&gt;Final Hybrid Dataset&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Train/Test: Layer 1+3 (campus real+attack) · Generalize: Layer 2 (public benchmark, feature-mapped) · Validate: Layer 1 unlabeled subset&lt;br/&gt;Split: Train 60% · Val 20% · Test 20% · Stratified by label · No data leakage across layers · Privacy: src/dst IP anonymized (SHA-256)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="58" width="1020" x="30" y="446" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_l1raw_cti" edge="1" parent="1" source="ds_l1_raw" style="edgeStyle=orthogonalEdgeStyle;" target="ds_l1_cti">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_l1cti_feat" edge="1" parent="1" source="ds_l1_cti" style="edgeStyle=orthogonalEdgeStyle;" target="ds_l1_feat">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_l1_final" edge="1" parent="1" source="ds_l1_feat" style="edgeStyle=orthogonalEdgeStyle;" target="ds_final">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="7" y="214" />
+              <mxPoint x="7" y="475" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ea_l2a_final" edge="1" parent="1" source="ds_l2a" style="edgeStyle=orthogonalEdgeStyle;" target="ds_final">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="7" y="309" />
+              <mxPoint x="7" y="436" />
+              <mxPoint x="400" y="436" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ea_l2b_final" edge="1" parent="1" source="ds_l2b" style="edgeStyle=orthogonalEdgeStyle;" target="ds_final">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1081" y="309" />
+              <mxPoint x="1081" y="436" />
+              <mxPoint x="700" y="436" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ea_l3_final" edge="1" parent="1" source="ds_l3" style="edgeStyle=orthogonalEdgeStyle;" target="ds_final">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="700" y="436" />
+              <mxPoint x="650" y="446" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="div1" parent="1" style="line;strokeColor=#AAAAAA;fillColor=none;" value="" vertex="1">
+          <mxGeometry height="10" width="1020" x="30" y="516" as="geometry" />
+        </mxCell>
+        <mxCell id="sec_in" parent="1" style="text;html=1;fontSize=11;fontStyle=1;fontColor=#888888;strokeColor=none;fillColor=none;" value="① Input" vertex="1">
+          <mxGeometry height="18" width="100" x="30" y="532" as="geometry" />
+        </mxCell>
+        <mxCell id="attacks" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#A32D2D;strokeColor=#791F1F;fontColor=#ffffff;fontSize=11;arcSize=8;" value="&lt;b&gt;5 attack scenarios&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Brute Force · Port Scan&lt;br/&gt;Data Exfil · C2 Beacon&lt;br/&gt;Cred. Stuffing&lt;/font&gt;" vertex="1">
+          <mxGeometry height="62" width="140" x="30" y="552" as="geometry" />
+        </mxCell>
+        <mxCell id="dataset" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DDDDDD;strokeColor=#999999;fontColor=#333333;fontSize=12;arcSize=8;" value="&lt;b&gt;Hybrid campus dataset (from ⓪)&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;PA-5220 TRAFFIC/THREAT (real) · CICIDS-2017 + UNSW-NB15 (benchmark) · Attack overlay (synthetic in PA format)&lt;br/&gt;~50,000+ records · Normal/Anomaly/Attack · Labeled (rule-based + IoC + OpenCTI graph + expert) · Privacy: anonymized IPs&lt;/font&gt;" vertex="1">
+          <mxGeometry height="62" width="865" x="185" y="552" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_atk_ds" edge="1" parent="1" source="attacks" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#A32D2D;strokeWidth=1.5;" target="dataset">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_final_in" edge="1" parent="1" source="ds_final" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#185FA5;strokeWidth=1.5;" target="dataset">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sec_fe" parent="1" style="text;html=1;fontSize=11;fontStyle=1;fontColor=#888888;strokeColor=none;fillColor=none;" value="② Feature engineering" vertex="1">
+          <mxGeometry height="18" width="240" x="30" y="628" as="geometry" />
+        </mxCell>
+        <mxCell id="feature" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEEEE;strokeColor=#999999;fontColor=#333333;fontSize=12;arcSize=8;" value="&lt;b&gt;Feature extraction + normalization (unified schema across all layers)&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;bytes_per_session · login_velocity · geo_anomaly (MaxMind GeoIP) · hour_of_day · failed_auth_ratio · beaconing_interval · unique_dst_ports · session_duration · block_ratio&lt;br/&gt;Normalization: MinMaxScaler fit on Train only · Feature mapping: CICIDS Flow Bytes/s → bytes_per_session · SMOTE for minority classes&lt;/font&gt;" vertex="1">
+          <mxGeometry height="68" width="865" x="185" y="648" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_ds_fe" edge="1" parent="1" source="dataset" style="edgeStyle=orthogonalEdgeStyle;" target="feature">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sec_ml" parent="1" style="text;html=1;fontSize=11;fontStyle=1;fontColor=#534AB7;strokeColor=none;fillColor=none;" value="③ ML anomaly detection (3 models เปรียบเทียบ + ensemble fusion)" vertex="1">
+          <mxGeometry height="18" width="560" x="30" y="728" as="geometry" />
+        </mxCell>
+        <mxCell id="tag_m1a" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0F6E56;strokeColor=#085041;fontColor=#ffffff;fontSize=10;arcSize=8;" value="&lt;b&gt;M1a&lt;/b&gt;&lt;br/&gt;Precision · Recall&lt;br/&gt;F1 · AUC-ROC" vertex="1">
+          <mxGeometry height="46" width="140" x="30" y="748" as="geometry" />
+        </mxCell>
+        <mxCell id="m_iso" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#534AB7;strokeColor=#3C3489;fontColor=#ffffff;fontSize=12;arcSize=8;" value="&lt;b&gt;Isolation Forest&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;scikit-learn · unsupervised&lt;br/&gt;contamination=0.1&lt;br/&gt;n_estimators=100&lt;br/&gt;SHAP feature attribution&lt;/font&gt;" vertex="1">
+          <mxGeometry height="84" width="200" x="185" y="748" as="geometry" />
+        </mxCell>
+        <mxCell id="m_ae" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#534AB7;strokeColor=#3C3489;fontColor=#ffffff;fontSize=12;arcSize=8;" value="&lt;b&gt;Autoencoder&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;PyTorch · encoder-decoder&lt;br/&gt;reconstruction error threshold&lt;br/&gt;Integrated Gradients&lt;br/&gt;for attribution&lt;/font&gt;" vertex="1">
+          <mxGeometry height="84" width="200" x="485" y="748" as="geometry" />
+        </mxCell>
+        <mxCell id="m_rf" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#534AB7;strokeColor=#3C3489;fontColor=#ffffff;fontSize=12;arcSize=8;" value="&lt;b&gt;Random Forest&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;scikit-learn · supervised&lt;br/&gt;n_estimators=200, depth=10&lt;br/&gt;SHAP values built-in&lt;br/&gt;feature importance&lt;/font&gt;" vertex="1">
+          <mxGeometry height="84" width="200" x="785" y="748" as="geometry" />
+        </mxCell>
+        <mxCell id="ensemble" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3C3489;strokeColor=#26215C;fontColor=#ffffff;fontSize=11;arcSize=8;" value="&lt;b&gt;Ensemble Fusion Layer&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Weighted avg risk score · weight = per-model precision per attack type · majority vote for final label · confidence = agreement ratio across models&lt;/font&gt;" vertex="1">
+          <mxGeometry height="52" width="800" x="185" y="854" as="geometry" />
+        </mxCell>
+        <mxCell id="ml_out" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3C3489;strokeColor=#26215C;fontColor=#ffffff;fontSize=12;arcSize=8;" value="&lt;b&gt;ML output — risk score (0–100) + alert context + explainability&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;risk_score · anomaly_type · top_3_features (SHAP) · source_ip · dst_port · timestamp · model_used · ensemble_confidence&lt;/font&gt;" vertex="1">
+          <mxGeometry height="52" width="800" x="185" y="928" as="geometry" />
+        </mxCell>
+        <mxCell id="tag_m1b" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0F6E56;strokeColor=#085041;fontColor=#ffffff;fontSize=10;arcSize=8;" value="&lt;b&gt;M1b&lt;/b&gt;&lt;br/&gt;MTTD&lt;br/&gt;inject→detect (s)" vertex="1">
+          <mxGeometry height="44" width="140" x="30" y="928" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_fe_iso" edge="1" parent="1" source="feature" style="edgeStyle=orthogonalEdgeStyle;" target="m_iso">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_fe_ae" edge="1" parent="1" source="feature" style="edgeStyle=orthogonalEdgeStyle;" target="m_ae">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_fe_rf" edge="1" parent="1" source="feature" style="edgeStyle=orthogonalEdgeStyle;" target="m_rf">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_iso_ens" edge="1" parent="1" source="m_iso" style="edgeStyle=orthogonalEdgeStyle;" target="ensemble">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_ae_ens" edge="1" parent="1" source="m_ae" style="edgeStyle=orthogonalEdgeStyle;" target="ensemble">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_rf_ens" edge="1" parent="1" source="m_rf" style="edgeStyle=orthogonalEdgeStyle;" target="ensemble">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_ens_out" edge="1" parent="1" source="ensemble" style="edgeStyle=orthogonalEdgeStyle;" target="ml_out">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sec_llm" parent="1" style="text;html=1;fontSize=11;fontStyle=1;fontColor=#854F0B;strokeColor=none;fillColor=none;" value="④ LLM threat explanation" vertex="1">
+          <mxGeometry height="18" width="260" x="30" y="996" as="geometry" />
+        </mxCell>
+        <mxCell id="rag" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#854F0B;strokeColor=#633806;fontColor=#ffffff;fontSize=11;arcSize=8;dashed=1;" value="&lt;b&gt;ChromaDB (RAG)&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;MISP · OTX AlienVault&lt;br/&gt;MITRE ATT&amp;CK · TI context&lt;br/&gt;+ ใช้ label Layer 1 ด้วย&lt;br/&gt;Retrieval precision@3 → M_RAG&lt;/font&gt;" vertex="1">
+          <mxGeometry height="76" width="150" x="20" y="1018" as="geometry" />
+        </mxCell>
+        <mxCell id="llm" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#854F0B;strokeColor=#633806;fontColor=#ffffff;fontSize=12;arcSize=8;" value="&lt;b&gt;Qwen3.5-35B-A3B  (LM Studio · Mac Mini M4 Pro 48 GB · local REST API)&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Input: risk_score + alert_context + RAG TI context · Prompt: structured Thai template&lt;br/&gt;~40 tok/s · free · data residency ✓ · reproducibility: model weights + quantization level documented&lt;/font&gt;" vertex="1">
+          <mxGeometry height="72" width="800" x="185" y="1014" as="geometry" />
+        </mxCell>
+        <mxCell id="llm_out" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#633806;strokeColor=#412402;fontColor=#ffffff;fontSize=12;arcSize=8;" value="&lt;b&gt;LLM structured output  (JSON · ภาษาไทย)&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;priority: HIGH/MEDIUM/LOW · explanation_th: คำอธิบาย · mitre_tactic: Txxxx · affected_asset: hostname&lt;br/&gt;remediation: [step1, step2, step3] · faithfulness_score · hallucination_rate · response_ms: ~2400&lt;/font&gt;" vertex="1">
+          <mxGeometry height="64" width="800" x="185" y="1106" as="geometry" />
+        </mxCell>
+        <mxCell id="tag_m2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0F6E56;strokeColor=#085041;fontColor=#ffffff;fontSize=10;arcSize=8;" value="&lt;b&gt;M2&lt;/b&gt;&lt;br/&gt;Faithfulness score&lt;br/&gt;Hallucination rate" vertex="1">
+          <mxGeometry height="40" width="140" x="30" y="1106" as="geometry" />
+        </mxCell>
+        <mxCell id="tag_m3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0F6E56;strokeColor=#085041;fontColor=#ffffff;fontSize=10;arcSize=8;" value="&lt;b&gt;M3&lt;/b&gt;&lt;br/&gt;Expert rating 1–5&lt;br/&gt;Thai utility score" vertex="1">
+          <mxGeometry height="34" width="140" x="30" y="1152" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_mlout_llm" edge="1" parent="1" source="ml_out" style="edgeStyle=orthogonalEdgeStyle;" target="llm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_rag_llm" edge="1" parent="1" source="rag" style="edgeStyle=orthogonalEdgeStyle;" target="llm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_llm_out" edge="1" parent="1" source="llm" style="edgeStyle=orthogonalEdgeStyle;" target="llm_out">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sec_ab" parent="1" style="text;html=1;fontSize=11;fontStyle=1;fontColor=#0F6E56;strokeColor=none;fillColor=none;" value="⑤ A/B analyst evaluation  (≥15 analysts × 20 alerts per group)" vertex="1">
+          <mxGeometry height="18" width="500" x="30" y="1186" as="geometry" />
+        </mxCell>
+        <mxCell id="tag_m4a" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0F6E56;strokeColor=#085041;fontColor=#ffffff;fontSize=10;arcSize=8;" value="&lt;b&gt;M4&lt;/b&gt;&lt;br/&gt;Triage time (s)&lt;br/&gt;% reduction&lt;br/&gt;t-test p&lt;0.05&lt;br/&gt;Cohen&#39;s d" vertex="1">
+          <mxGeometry height="66" width="140" x="30" y="1206" as="geometry" />
+        </mxCell>
+        <mxCell id="group_a" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0F6E56;strokeColor=#085041;fontColor=#ffffff;fontSize=12;arcSize=8;" value="&lt;b&gt;Group A — no LLM&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;raw alert เท่านั้น · จับเวลา triage&lt;br/&gt;บันทึก accuracy · blinded from Group B&lt;/font&gt;" vertex="1">
+          <mxGeometry height="66" width="360" x="185" y="1206" as="geometry" />
+        </mxCell>
+        <mxCell id="group_b" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0F6E56;strokeColor=#085041;fontColor=#ffffff;fontSize=12;arcSize=8;" value="&lt;b&gt;Group B — with LLM&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;LLM output + remediation steps · จับเวลา triage&lt;br/&gt;บันทึก accuracy · blinded from Group A&lt;/font&gt;" vertex="1">
+          <mxGeometry height="66" width="360" x="625" y="1206" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_llmout_a" edge="1" parent="1" source="llm_out" style="edgeStyle=orthogonalEdgeStyle;" target="group_a">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_llmout_b" edge="1" parent="1" source="llm_out" style="edgeStyle=orthogonalEdgeStyle;" target="group_b">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sec_mt" parent="1" style="text;html=1;fontSize=11;fontStyle=1;fontColor=#0F6E56;strokeColor=none;fillColor=none;" value="⑥ Metrics" vertex="1">
+          <mxGeometry height="18" width="120" x="30" y="1288" as="geometry" />
+        </mxCell>
+        <mxCell id="mt0" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#085041;strokeColor=#04342C;fontColor=#ffffff;fontSize=11;arcSize=8;" value="&lt;b&gt;M4&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Triage time&lt;br/&gt;% reduction&lt;br/&gt;t-test p&lt;0.05&lt;br/&gt;Cohen&#39;s d&lt;/font&gt;" vertex="1">
+          <mxGeometry height="76" width="140" x="30" y="1308" as="geometry" />
+        </mxCell>
+        <mxCell id="mt1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#085041;strokeColor=#04342C;fontColor=#ffffff;fontSize=11;arcSize=8;" value="&lt;b&gt;M1a&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Precision&lt;br/&gt;Recall · F1&lt;br/&gt;AUC-ROC&lt;/font&gt;" vertex="1">
+          <mxGeometry height="76" width="148" x="185" y="1308" as="geometry" />
+        </mxCell>
+        <mxCell id="mt2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#085041;strokeColor=#04342C;fontColor=#ffffff;fontSize=11;arcSize=8;" value="&lt;b&gt;M1b&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;MTTD&lt;br/&gt;inject→detect&lt;br/&gt;(seconds)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="76" width="148" x="345" y="1308" as="geometry" />
+        </mxCell>
+        <mxCell id="mt3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#085041;strokeColor=#04342C;fontColor=#ffffff;fontSize=11;arcSize=8;" value="&lt;b&gt;M2 + M3&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Faithfulness&lt;br/&gt;Hallucination rate&lt;br/&gt;Expert rating 1–5&lt;/font&gt;" vertex="1">
+          <mxGeometry height="76" width="148" x="505" y="1308" as="geometry" />
+        </mxCell>
+        <mxCell id="mt_rag" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#085041;strokeColor=#04342C;fontColor=#ffffff;fontSize=11;arcSize=8;" value="&lt;b&gt;M_RAG&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Retrieval&lt;br/&gt;precision@3&lt;br/&gt;(new metric)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="76" width="148" x="665" y="1308" as="geometry" />
+        </mxCell>
+        <mxCell id="mt4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#085041;strokeColor=#04342C;fontColor=#ffffff;fontSize=11;arcSize=8;" value="&lt;b&gt;M4&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Analyst triage&lt;br/&gt;time % reduction&lt;br/&gt;t-test p&lt;0.05&lt;br/&gt;Cohen&#39;s d&lt;/font&gt;" vertex="1">
+          <mxGeometry height="76" width="160" x="825" y="1308" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_ga_mt1" edge="1" parent="1" source="group_a" style="edgeStyle=orthogonalEdgeStyle;" target="mt1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_gb_mt4" edge="1" parent="1" source="group_b" style="edgeStyle=orthogonalEdgeStyle;" target="mt4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sec_con" parent="1" style="text;html=1;fontSize=11;fontStyle=1;fontColor=#185FA5;strokeColor=none;fillColor=none;" value="⑦ Research contribution" vertex="1">
+          <mxGeometry height="18" width="260" x="30" y="1402" as="geometry" />
+        </mxCell>
+        <mxCell id="contrib" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#185FA5;strokeColor=#0C447C;fontColor=#ffffff;fontSize=12;arcSize=8;" value="&lt;b&gt;Research contribution&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px&#39;&gt;&quot;Hybrid ML+LLM pipeline บน real PA-5220 campus log ลด MTTD และ analyst triage time อย่างมีนัยสำคัญทางสถิติ&lt;br/&gt;พร้อม Thai-language explanation framework, OpenCTI-enriched CTI labels และ unified feature schema ข้าม dataset&quot;&lt;br/&gt;→ publishable ใน IEEE/Springer cybersecurity journal&lt;/font&gt;" vertex="1">
+          <mxGeometry height="72" width="800" x="185" y="1422" as="geometry" />
+        </mxCell>
+        <mxCell id="ea_mt1_c" edge="1" parent="1" source="mt1" style="edgeStyle=orthogonalEdgeStyle;" target="contrib">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="259" y="1408" />
+              <mxPoint x="585" y="1408" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ea_mt4_c" edge="1" parent="1" source="mt4" style="edgeStyle=orthogonalEdgeStyle;" target="contrib">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="905" y="1408" />
+              <mxPoint x="585" y="1408" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg_bg" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#111111;strokeColor=#333333;" value="" vertex="1">
+          <mxGeometry height="52" width="1020" x="30" y="1514" as="geometry" />
+        </mxCell>
+        <mxCell id="lh" parent="1" style="text;html=1;fontSize=11;fontStyle=1;fontColor=#dddddd;strokeColor=none;fillColor=none;" value="Legend" vertex="1">
+          <mxGeometry height="18" width="80" x="50" y="1520" as="geometry" />
+        </mxCell>
+        <mxCell id="lc0" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#185FA5;strokeColor=#0C447C;fontColor=#fff;fontSize=10;" value="Dataset (new)" vertex="1">
+          <mxGeometry height="20" width="110" x="50" y="1540" as="geometry" />
+        </mxCell>
+        <mxCell id="lc1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#534AB7;strokeColor=#3C3489;fontColor=#fff;fontSize=10;" value="ML layer" vertex="1">
+          <mxGeometry height="20" width="110" x="170" y="1540" as="geometry" />
+        </mxCell>
+        <mxCell id="lc2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#854F0B;strokeColor=#633806;fontColor=#fff;fontSize=10;" value="LLM / RAG" vertex="1">
+          <mxGeometry height="20" width="110" x="290" y="1540" as="geometry" />
+        </mxCell>
+        <mxCell id="lc3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0F6E56;strokeColor=#085041;fontColor=#fff;fontSize=10;" value="Metrics / eval" vertex="1">
+          <mxGeometry height="20" width="110" x="410" y="1540" as="geometry" />
+        </mxCell>
+        <mxCell id="lc4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#185FA5;strokeColor=#0C447C;fontColor=#fff;fontSize=10;" value="Contribution" vertex="1">
+          <mxGeometry height="20" width="110" x="530" y="1540" as="geometry" />
+        </mxCell>
+        <mxCell id="lc5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DDDDDD;strokeColor=#999999;fontColor=#333333;fontSize=10;" value="Data / neutral" vertex="1">
+          <mxGeometry height="20" width="110" x="650" y="1540" as="geometry" />
+        </mxCell>
+        <mxCell id="lc6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#A32D2D;strokeColor=#791F1F;fontColor=#fff;fontSize=10;" value="Attack inject" vertex="1">
+          <mxGeometry height="20" width="110" x="770" y="1540" as="geometry" />
+        </mxCell>
+        <mxCell id="lc7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F1FB;strokeColor=#185FA5;fontColor=#333333;fontSize=10;" value="Benchmark" vertex="1">
+          <mxGeometry height="20" width="110" x="890" y="1540" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

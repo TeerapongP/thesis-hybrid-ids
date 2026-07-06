@@ -1,0 +1,108 @@
+# ─────────────────────────────────────────────────────────────
+# Kafka Stack  ·  KRaft mode (no Zookeeper)
+# ─────────────────────────────────────────────────────────────
+#
+# ก่อน docker compose up ครั้งแรก ให้ generate CLUSTER_ID:
+#   docker run --rm confluentinc/cp-kafka:latest kafka-storage random-uuid
+# แล้วแทนค่าใน CLUSTER_ID ด้านล่าง
+# ─────────────────────────────────────────────────────────────
+
+services:
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    restart: unless-stopped
+    networks:
+      - soc_shared
+    ports:
+      - "3000:3000"
+    env_file:
+      - ../notification/.env
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      INFLUX_URL: ${INFLUX_DOCKER_URL:-http://host.docker.internal:8086}
+      ELASTIC_URL: ${ELASTIC_DOCKER_URL:-http://host.docker.internal:9200}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./dashboards:/var/lib/grafana/dashboards:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 6
+      start_period: 45s
+
+  kafka-broker:
+    image: confluentinc/cp-kafka:latest
+    restart: unless-stopped
+    networks:
+      - soc_shared
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-broker:29093
+
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker:29092,PLAINTEXT_HOST://127.0.0.1:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      CLUSTER_ID: n-WdP94tQ_-AzzP5F1N8_g
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_BYTES: 10737418240
+      KAFKA_MESSAGE_MAX_BYTES: 10485760
+      KAFKA_REPLICA_FETCH_MAX_BYTES: 10485760
+
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+        reservations:
+          memory: 1g
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    restart: unless-stopped
+    depends_on:
+      kafka-broker:
+        condition: service_healthy
+    networks:
+      - soc_shared
+    ports:
+      - "8083:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: soc-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-broker:29092
+
+volumes:
+  grafana-data:
+    driver: local
+  kafka-data:
+    driver: local
+
+networks:
+  soc_shared:
+    external: true

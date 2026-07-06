@@ -1,0 +1,159 @@
+{
+  "uid": "soc-main",
+  "title": "SOC Overview",
+  "tags": ["soc", "thesis"],
+  "timezone": "Asia/Bangkok",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "10s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Risk Score Trend",
+      "type": "timeseries",
+      "datasource": {"type": "influxdb", "uid": "influx-soc"},
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "targets": [
+        {
+          "refId": "A",
+          "alias": "HIGH",
+          "query": "from(bucket: \"alerts\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"soc_alert\" and r._field == \"risk_score\" and r.priority == \"HIGH\")\n  |> group()\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)"
+        },
+        {
+          "refId": "B",
+          "alias": "MEDIUM",
+          "query": "from(bucket: \"alerts\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"soc_alert\" and r._field == \"risk_score\" and r.priority == \"MEDIUM\")\n  |> group()\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)"
+        },
+        {
+          "refId": "C",
+          "alias": "LOW",
+          "query": "from(bucket: \"alerts\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"soc_alert\" and r._field == \"risk_score\" and r.priority == \"LOW\")\n  |> group()\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": [
+          {"matcher": {"id": "byFrameRefID", "options": "A"}, "properties": [{"id": "displayName", "value": "HIGH"}]},
+          {"matcher": {"id": "byFrameRefID", "options": "B"}, "properties": [{"id": "displayName", "value": "MEDIUM"}]},
+          {"matcher": {"id": "byFrameRefID", "options": "C"}, "properties": [{"id": "displayName", "value": "LOW"}]},
+          {"matcher": {"id": "byName", "options": "HIGH"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]},
+          {"matcher": {"id": "byName", "options": "MEDIUM"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]},
+          {"matcher": {"id": "byName", "options": "LOW"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]}
+        ]
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
+    },
+    {
+      "id": 2,
+      "title": "Alert Count By Priority",
+      "type": "piechart",
+      "datasource": {"type": "influxdb", "uid": "influx-soc"},
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "targets": [
+        {
+          "refId": "A",
+          "alias": "HIGH",
+          "query": "from(bucket: \"alerts\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"soc_alert\" and r._field == \"risk_score\" and r.priority == \"HIGH\")\n  |> group()\n  |> count()"
+        },
+        {
+          "refId": "B",
+          "alias": "MEDIUM",
+          "query": "from(bucket: \"alerts\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"soc_alert\" and r._field == \"risk_score\" and r.priority == \"MEDIUM\")\n  |> group()\n  |> count()"
+        },
+        {
+          "refId": "C",
+          "alias": "LOW",
+          "query": "from(bucket: \"alerts\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"soc_alert\" and r._field == \"risk_score\" and r.priority == \"LOW\")\n  |> group()\n  |> count()"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {"matcher": {"id": "byFrameRefID", "options": "A"}, "properties": [{"id": "displayName", "value": "HIGH"}]},
+          {"matcher": {"id": "byFrameRefID", "options": "B"}, "properties": [{"id": "displayName", "value": "MEDIUM"}]},
+          {"matcher": {"id": "byFrameRefID", "options": "C"}, "properties": [{"id": "displayName", "value": "LOW"}]},
+          {"matcher": {"id": "byName", "options": "HIGH"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]},
+          {"matcher": {"id": "byName", "options": "MEDIUM"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]},
+          {"matcher": {"id": "byName", "options": "LOW"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]}
+        ]
+      },
+      "options": {
+        "legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"]},
+        "pieType": "donut"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Avg Response Time",
+      "type": "gauge",
+      "datasource": {"type": "influxdb", "uid": "influx-soc"},
+      "gridPos": {"x": 0, "y": 8, "w": 6, "h": 7},
+      "targets": [
+        {
+          "refId": "A",
+          "alias": "Response Time",
+          "query": "from(bucket: \"alerts\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"soc_alert\" and r._field == \"response_ms\")\n  |> group()\n  |> mean()"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "ms", "min": 0}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 4,
+      "title": "Avg Faithfulness",
+      "type": "gauge",
+      "datasource": {"type": "influxdb", "uid": "influx-soc"},
+      "gridPos": {"x": 6, "y": 8, "w": 6, "h": 7},
+      "targets": [
+        {
+          "refId": "A",
+          "alias": "Faithfulness",
+          "query": "from(bucket: \"alerts\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"soc_alert\" and r._field == \"faithfulness_score\")\n  |> group()\n  |> mean()"
+        }
+      ],
+      "fieldConfig": {"defaults": {"min": 0, "max": 1, "unit": "percentunit"}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 5,
+      "title": "Latest Alerts",
+      "type": "table",
+      "datasource": {"type": "influxdb", "uid": "influx-soc"},
+      "gridPos": {"x": 12, "y": 8, "w": 12, "h": 7},
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "query": "from(bucket: \"alerts\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"soc_alert\" and contains(value: r._field, set: [\"risk_score\", \"response_ms\", \"faithfulness_score\"]))\n  |> filter(fn: (r) => exists r.alert_id and exists r.source_ip and exists r.dst_port)\n  |> pivot(rowKey: [\"_time\", \"alert_id\", \"source_ip\", \"dst_port\", \"priority\", \"anomaly_type\", \"mitre_tactic\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"priority\", \"source_ip\", \"dst_port\", \"risk_score\", \"anomaly_type\", \"mitre_tactic\", \"response_ms\", \"faithfulness_score\", \"alert_id\"])\n  |> sort(columns: [\"_time\"], desc: true)\n  |> limit(n: 10)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "_time"}, "properties": [{"id": "displayName", "value": "Time"}]},
+          {"matcher": {"id": "byName", "options": "priority"}, "properties": [{"id": "displayName", "value": "Priority"}]},
+          {"matcher": {"id": "byName", "options": "source_ip"}, "properties": [{"id": "displayName", "value": "Source IP"}]},
+          {"matcher": {"id": "byName", "options": "dst_port"}, "properties": [{"id": "displayName", "value": "Port"}]},
+          {"matcher": {"id": "byName", "options": "risk_score"}, "properties": [{"id": "displayName", "value": "Risk"}, {"id": "unit", "value": "short"}]},
+          {"matcher": {"id": "byName", "options": "anomaly_type"}, "properties": [{"id": "displayName", "value": "Type"}]},
+          {"matcher": {"id": "byName", "options": "mitre_tactic"}, "properties": [{"id": "displayName", "value": "MITRE"}]},
+          {"matcher": {"id": "byName", "options": "response_ms"}, "properties": [{"id": "displayName", "value": "Latency"}, {"id": "unit", "value": "ms"}]},
+          {"matcher": {"id": "byName", "options": "faithfulness_score"}, "properties": [{"id": "displayName", "value": "Faithfulness"}, {"id": "unit", "value": "percentunit"}]},
+          {"matcher": {"id": "byName", "options": "alert_id"}, "properties": [{"id": "displayName", "value": "Alert ID"}]}
+        ]
+      },
+      "options": {"showHeader": true, "cellHeight": "sm"}
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB-SOC
+    uid: influx-soc
+    type: influxdb
+    access: proxy
+    url: ${INFLUX_URL}
+    isDefault: true
+    jsonData:
+      version: Flux
+      organization: ${INFLUX_ORG}
+      defaultBucket: ${INFLUX_BUCKET}
+    secureJsonData:
+      token: ${INFLUX_TOKEN}
+
+  - name: Elasticsearch-SOC
+    uid: elastic-soc
+    type: elasticsearch
+    access: proxy
+    url: ${ELASTIC_URL}
+    isDefault: false
+    jsonData:
+      index: ${ELASTIC_ALERT_INDEX}
+      timeField: timestamp
+      esVersion: "8.0.0"
+      maxConcurrentShardRequests: 5
+      httpHeaderName1: Authorization
+    secureJsonData:
+      httpHeaderValue1: ApiKey ${ELASTIC_READER_API_KEY}

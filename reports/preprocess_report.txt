@@ -1,0 +1,230 @@
+======================================================================
+STEP 1: โหลด CICIDS-2017 (encoding=utf-8-sig)
+======================================================================
+  โหลด Monday-WorkingHours.pcap_ISCX.csv                       shape=(529918, 79)
+  โหลด Tuesday-WorkingHours.pcap_ISCX.csv                      shape=(445909, 79)
+  โหลด Wednesday-workingHours.pcap_ISCX.csv                    shape=(692703, 79)
+  โหลด Thursday-WorkingHours-Morning-WebAttacks.pcap_ISCX.csv  shape=(170366, 79)
+  โหลด Thursday-WorkingHours-Afternoon-Infilteration.pcap_ISCX.csv shape=(288602, 79)
+  โหลด Friday-WorkingHours-Morning.pcap_ISCX.csv               shape=(191033, 79)
+  โหลด Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv    shape=(286467, 79)
+  โหลด Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv        shape=(225745, 79)
+CICIDS-2017 รวมทั้งหมด shape = (2830743, 79)
+======================================================================
+STEP 2: แก้ mojibake ใน Label
+======================================================================
+  ตัวอย่าง Label ก่อนแก้ (เฉพาะที่มีตัวขีด):
+    ['Web Attack � Brute Force', 'Web Attack � Sql Injection', 'Web Attack � XSS']
+  ตัวอย่าง Label หลังแก้:
+    ['FTP-Patator', 'SSH-Patator', 'Web Attack - Brute Force', 'Web Attack - Sql Injection', 'Web Attack - XSS']
+======================================================================
+STEP 3: แก้ sentinel -1 ใน Init_Win_bytes_forward/backward
+======================================================================
+--- CICIDS-2017: แก้ sentinel -1 ใน Init_Win_bytes_forward/backward ---
+  Init_Win_bytes_forward       NaN ก่อนแก้=       0  พบ -1 (sentinel)= 1001189  NaN หลังแก้= 1001189
+  Init_Win_bytes_backward      NaN ก่อนแก้=       0  พบ -1 (sentinel)= 1441552  NaN หลังแก้= 1441552
+======================================================================
+STEP 4: ทำความสะอาดข้อมูลทั่วไป (inf -> NaN, drop duplicates, dropna)
+======================================================================
+  Inf values พบและแปลงเป็น NaN: {'Flow Bytes/s': 1509, 'Flow Packets/s': 2867}
+  Duplicate rows ที่ลบ: 308381
+  คอลัมน์ที่ยกเว้นจาก dropna (sentinel, คง NaN ไว้ ไม่ drop แถว): ['Init_Win_bytes_forward', 'Init_Win_bytes_backward']
+  แถวก่อน dropna ทั่วไป: 2522362
+  แถวหลัง dropna ทั่วไป: 2520798 (ลดลง 1564)
+  Init_Win_bytes_forward: NaN ที่ยังคงอยู่ในข้อมูล (ไม่ถูก drop) = 911012
+  Init_Win_bytes_backward: NaN ที่ยังคงอยู่ในข้อมูล (ไม่ถูก drop) = 1215625
+  รวมแถวที่หายไปจาก clean_common(): 309945 จาก 2830743 แถวเดิม (10.95%)
+  ยืนยัน: แถวลดลงจาก 2830743 เหลือ 2520798 (ลดลง 309945) — ไม่ใช่การลดลงจาก sentinel Init_Win_bytes_forward/backward เพราะสองคอลัมน์นี้ถูกยกเว้นจาก dropna แล้ว
+======================================================================
+STEP 5: ตรวจสอบคอลัมน์ Timestamp
+======================================================================
+  [WARNING] ไม่พบคอลัมน์ Timestamp ในชุดไฟล์นี้ (MachineLearningCSV ตัดออกจากการ แจกจ่ายสาธารณะแล้ว) -> ขั้นตอน simulated replay feed ใน enrich.py จะไม่มี timestamp จริงให้ใช้ ต้องตัดสินใจก่อนว่าจะ (a) ใช้ลำดับแถวเดิมในไฟล์เป็น proxy ของเวลา หรือ (b) เปลี่ยนไปใช้ชุดไฟล์ GeneratedLabelledFlows ที่มีคอลัมน์ Timestamp จริงแทน
+======================================================================
+STEP 6: จำนวนแถวต่อ attack category + LOAO usability
+======================================================================
+--- จำนวนแถวต่อ attack category (threshold LOAO = 1000 แถว) ---
+  DoS Hulk                            n=  172846  [OK สำหรับ LOAO holdout]
+  DDoS                                n=  128014  [OK สำหรับ LOAO holdout]
+  PortScan                            n=   90694  [OK สำหรับ LOAO holdout]
+  DoS GoldenEye                       n=   10286  [OK สำหรับ LOAO holdout]
+  FTP-Patator                         n=    5931  [OK สำหรับ LOAO holdout]
+  DoS slowloris                       n=    5385  [OK สำหรับ LOAO holdout]
+  DoS Slowhttptest                    n=    5228  [OK สำหรับ LOAO holdout]
+  SSH-Patator                         n=    3219  [OK สำหรับ LOAO holdout]
+  Bot                                 n=    1948  [OK สำหรับ LOAO holdout]
+  Web Attack - Brute Force            n=    1470  [OK สำหรับ LOAO holdout]
+  Web Attack - XSS                    n=     652  [เล็กเกินไป -> ใช้เชิงคุณภาพเท่านั้น พร้อมระบุ caveat เรื่องขนาด sample]
+  Infiltration                        n=      36  [เล็กเกินไป -> ใช้เชิงคุณภาพเท่านั้น พร้อมระบุ caveat เรื่องขนาด sample]
+  Web Attack - Sql Injection          n=      21  [เล็กเกินไป -> ใช้เชิงคุณภาพเท่านั้น พร้อมระบุ caveat เรื่องขนาด sample]
+  Heartbleed                          n=      11  [เล็กเกินไป -> ใช้เชิงคุณภาพเท่านั้น พร้อมระบุ caveat เรื่องขนาด sample]
+======================================================================
+STEP 7: สรุปผลลัพธ์
+======================================================================
+CICIDS-2017 หลัง preprocessing: 2520798 แถว, 79 คอลัมน์
+Label ที่มีตัวขีดเหลือ mojibake หลังแก้: 0 รายการ
+  Init_Win_bytes_forward: NaN ก่อนแก้=0  NaN หลังแก้=1001189  (เพิ่มขึ้น 1001189)
+  Init_Win_bytes_backward: NaN ก่อนแก้=0  NaN หลังแก้=1441552  (เพิ่มขึ้น 1441552)
+Attack categories ที่ใช้ทำ LOAO ได้ (10): ['DoS Hulk', 'DDoS', 'PortScan', 'DoS GoldenEye', 'FTP-Patator', 'DoS slowloris', 'DoS Slowhttptest', 'SSH-Patator', 'Bot', 'Web Attack - Brute Force']
+Attack categories ที่เล็กเกินไป (4): ['Web Attack - XSS', 'Infiltration', 'Web Attack - Sql Injection', 'Heartbleed']
+เซฟข้อมูลที่แก้แล้วไว้ที่ ./data/processed\cicids2017_clean.parquet
+======================================================================
+STEP 8: แบ่ง train/val/test (stratified by Label, 60%/20%/20%, random_state=42)
+======================================================================
+--- Train: 1512478 แถว (60.00% ของทั้งหมด 2520798 แถว) ---
+Label
+BENIGN                        83.1108
+DoS Hulk                       6.8568
+DDoS                           5.0783
+PortScan                       3.5978
+DoS GoldenEye                  0.4081
+FTP-Patator                    0.2353
+DoS slowloris                  0.2136
+DoS Slowhttptest               0.2074
+SSH-Patator                    0.1277
+Bot                            0.0773
+Web Attack - Brute Force       0.0583
+Web Attack - XSS               0.0259
+Infiltration                   0.0015
+Web Attack - Sql Injection     0.0009
+Heartbleed                     0.0005
+--- Val: 504160 แถว (20.00% ของทั้งหมด 2520798 แถว) ---
+Label
+BENIGN                        83.1109
+DoS Hulk                        6.857
+DDoS                           5.0783
+PortScan                       3.5979
+DoS GoldenEye                   0.408
+FTP-Patator                    0.2352
+DoS slowloris                  0.2136
+DoS Slowhttptest               0.2073
+SSH-Patator                    0.1277
+Bot                            0.0772
+Web Attack - Brute Force       0.0583
+Web Attack - XSS                0.026
+Infiltration                   0.0014
+Web Attack - Sql Injection     0.0008
+Heartbleed                     0.0004
+--- Test: 504160 แถว (20.00% ของทั้งหมด 2520798 แถว) ---
+Label
+BENIGN                        83.1109
+DoS Hulk                       6.8568
+DDoS                           5.0783
+PortScan                       3.5979
+DoS GoldenEye                   0.408
+FTP-Patator                    0.2352
+DoS slowloris                  0.2136
+DoS Slowhttptest               0.2075
+SSH-Patator                    0.1277
+Bot                            0.0774
+Web Attack - Brute Force       0.0583
+Web Attack - XSS               0.0258
+Infiltration                   0.0014
+Web Attack - Sql Injection     0.0008
+Heartbleed                     0.0004
+เซฟ train split ไว้ที่ ./data/processed\cicids2017_train.parquet
+เซฟ val split ไว้ที่ ./data/processed\cicids2017_val.parquet
+เซฟ test split ไว้ที่ ./data/processed\cicids2017_test.parquet
+======================================================================
+STEP 9: LOAO (Leave-One-Attack-Out) zero-day holdout ต่อ category
+======================================================================
+  Category ที่ผ่าน threshold LOAO (n>=1000), จะสร้าง holdout ให้ (10): ['DoS Hulk', 'DDoS', 'PortScan', 'DoS GoldenEye', 'FTP-Patator', 'DoS slowloris', 'DoS Slowhttptest', 'SSH-Patator', 'Bot', 'Web Attack - Brute Force']
+  [DoS Hulk] train= 1928940  zeroday_test=  591858  (BENIGN= 70.80%  DoS Hulk= 29.20%)
+    เซฟ train ไว้ที่ ./data/processed\loao\loao_dos_hulk_train.parquet
+    เซฟ zero-day test ไว้ที่ ./data/processed\loao\loao_dos_hulk_zeroday_test.parquet
+  [DDoS] train= 1973772  zeroday_test=  547026  (BENIGN= 76.60%  DDoS= 23.40%)
+    เซฟ train ไว้ที่ ./data/processed\loao\loao_ddos_train.parquet
+    เซฟ zero-day test ไว้ที่ ./data/processed\loao\loao_ddos_zeroday_test.parquet
+  [PortScan] train= 2011092  zeroday_test=  509706  (BENIGN= 82.21%  PortScan= 17.79%)
+    เซฟ train ไว้ที่ ./data/processed\loao\loao_portscan_train.parquet
+    เซฟ zero-day test ไว้ที่ ./data/processed\loao\loao_portscan_zeroday_test.parquet
+  [DoS GoldenEye] train= 2091500  zeroday_test=  429298  (BENIGN= 97.60%  DoS GoldenEye=  2.40%)
+    เซฟ train ไว้ที่ ./data/processed\loao\loao_dos_goldeneye_train.parquet
+    เซฟ zero-day test ไว้ที่ ./data/processed\loao\loao_dos_goldeneye_zeroday_test.parquet
+  [FTP-Patator] train= 2095855  zeroday_test=  424943  (BENIGN= 98.60%  FTP-Patator=  1.40%)
+    เซฟ train ไว้ที่ ./data/processed\loao\loao_ftp_patator_train.parquet
+    เซฟ zero-day test ไว้ที่ ./data/processed\loao\loao_ftp_patator_zeroday_test.parquet
+  [DoS slowloris] train= 2096401  zeroday_test=  424397  (BENIGN= 98.73%  DoS slowloris=  1.27%)
+    เซฟ train ไว้ที่ ./data/processed\loao\loao_dos_slowloris_train.parquet
+    เซฟ zero-day test ไว้ที่ ./data/processed\loao\loao_dos_slowloris_zeroday_test.parquet
+  [DoS Slowhttptest] train= 2096558  zeroday_test=  424240  (BENIGN= 98.77%  DoS Slowhttptest=  1.23%)
+    เซฟ train ไว้ที่ ./data/processed\loao\loao_dos_slowhttptest_train.parquet
+    เซฟ zero-day test ไว้ที่ ./data/processed\loao\loao_dos_slowhttptest_zeroday_test.parquet
+  [SSH-Patator] train= 2098567  zeroday_test=  422231  (BENIGN= 99.24%  SSH-Patator=  0.76%)
+    เซฟ train ไว้ที่ ./data/processed\loao\loao_ssh_patator_train.parquet
+    เซฟ zero-day test ไว้ที่ ./data/processed\loao\loao_ssh_patator_zeroday_test.parquet
+  [Bot] train= 2099838  zeroday_test=  420960  (BENIGN= 99.54%  Bot=  0.46%)
+    เซฟ train ไว้ที่ ./data/processed\loao\loao_bot_train.parquet
+    เซฟ zero-day test ไว้ที่ ./data/processed\loao\loao_bot_zeroday_test.parquet
+  [Web Attack - Brute Force] train= 2100316  zeroday_test=  420482  (BENIGN= 99.65%  Web Attack - Brute Force=  0.35%)
+    เซฟ train ไว้ที่ ./data/processed\loao\loao_web_attack_brute_force_train.parquet
+    เซฟ zero-day test ไว้ที่ ./data/processed\loao\loao_web_attack_brute_force_zeroday_test.parquet
+--- LOAO: สรุปทุก category ---
+  DoS Hulk                            train= 1928940  zeroday_test=  591858  BENIGN= 70.80%  attack= 29.20%
+  DDoS                                train= 1973772  zeroday_test=  547026  BENIGN= 76.60%  attack= 23.40%
+  PortScan                            train= 2011092  zeroday_test=  509706  BENIGN= 82.21%  attack= 17.79%
+  DoS GoldenEye                       train= 2091500  zeroday_test=  429298  BENIGN= 97.60%  attack=  2.40%
+  FTP-Patator                         train= 2095855  zeroday_test=  424943  BENIGN= 98.60%  attack=  1.40%
+  DoS slowloris                       train= 2096401  zeroday_test=  424397  BENIGN= 98.73%  attack=  1.27%
+  DoS Slowhttptest                    train= 2096558  zeroday_test=  424240  BENIGN= 98.77%  attack=  1.23%
+  SSH-Patator                         train= 2098567  zeroday_test=  422231  BENIGN= 99.24%  attack=  0.76%
+  Bot                                 train= 2099838  zeroday_test=  420960  BENIGN= 99.54%  attack=  0.46%
+  Web Attack - Brute Force            train= 2100316  zeroday_test=  420482  BENIGN= 99.65%  attack=  0.35%
+======================================================================
+STEP 1 (unswnb15): โหลด CIC-UNSW-NB15 (Data.csv + Label.csv, positional join)
+======================================================================
+  โหลด Data.csv                  shape=(447915, 76)
+  โหลด Label.csv                 shape=(447915, 1)
+CIC-UNSW-NB15 รวมทั้งหมด shape = (447915, 78)
+======================================================================
+STEP 2 (unswnb15): ตรวจสอบ attack_cat/Label ที่ derive จากรหัส Label.csv
+======================================================================
+--- CIC-UNSW-NB15: attack_cat unique values (ไม่รวม NaN) ---
+  ['Analysis', 'Backdoor', 'DoS', 'Exploits', 'Fuzzers', 'Generic', 'Reconnaissance', 'Shellcode', 'Worms']
+--- CIC-UNSW-NB15: attack_cat value_counts ---
+attack_cat
+<NA>              358332
+Exploits           30951
+Fuzzers            29613
+Reconnaissance     16735
+Generic             4632
+DoS                 4467
+Shellcode           2102
+Backdoor             452
+Analysis             385
+Worms                246
+--- CIC-UNSW-NB15: ตรวจสอบ consistency ระหว่าง attack_cat กับ Label (derive จากรหัสเดียวกันใน load_unsw()) ---
+  แถวที่ attack_cat ระบุว่าเป็นการโจมตี แต่ Label != 1 : 0 แถว
+  แถวที่ attack_cat ว่าง/NaN (ควรเป็น normal) แต่ Label != 0 : 0 แถว
+======================================================================
+STEP 3 (unswnb15): ทำความสะอาดข้อมูลทั่วไป (inf -> NaN, drop duplicates, dropna)
+======================================================================
+  Inf values พบและแปลงเป็น NaN: ไม่มี
+  Duplicate rows ที่ลบ: 141742
+  คอลัมน์ที่ยกเว้นจาก dropna (sentinel, คง NaN ไว้ ไม่ drop แถว): ไม่มี (dataset นี้ไม่มีคอลัมน์ sentinel)
+  แถวก่อน dropna ทั่วไป: 306173
+  แถวหลัง dropna ทั่วไป: 306173 (ลดลง 0)
+  รวมแถวที่หายไปจาก clean_common(): 141742 จาก 447915 แถวเดิม (31.64%)
+  unswnb15: แถวดิบ=447915  ก่อน clean_common=447915  หลัง clean_common=306173 (ลดลงรวม 141742)
+======================================================================
+STEP 4 (unswnb15): สรุปผลลัพธ์
+======================================================================
+unswnb15 หลัง preprocessing: 306173 แถว, 78 คอลัมน์
+เซฟข้อมูล unswnb15 ที่แก้แล้วไว้ที่ ./data/processed\unswnb15_clean.parquet
+======================================================================
+STEP 5 (unswnb15): แบ่ง train/val/test (stratified by Label, 60%/20%/20%, random_state=42)
+======================================================================
+--- Train: 183703 แถว (60.00% ของทั้งหมด 306173 แถว) ---
+Label
+0    73.4887
+1    26.5113
+--- Val: 61235 แถว (20.00% ของทั้งหมด 306173 แถว) ---
+Label
+0    73.489
+1    26.511
+--- Test: 61235 แถว (20.00% ของทั้งหมด 306173 แถว) ---
+Label
+0    73.489
+1    26.511
+เซฟ unswnb15 train split ไว้ที่ ./data/processed\unswnb15_train.parquet
+เซฟ unswnb15 val split ไว้ที่ ./data/processed\unswnb15_val.parquet
+เซฟ unswnb15 test split ไว้ที่ ./data/processed\unswnb15_test.parquet
