@@ -213,6 +213,12 @@ def apply_join(split_df, behavioral_df, key_cols, split_name):
 
     left = split_df.copy()
     left["_h"] = compute_row_hash(left_k, key_cols)
+    # ตำแหน่งเดิมใน cicids2017_{split}.parquet ก่อน drop -- คือ space เดียวกับที่ row_index ของ
+    # cicids2017_features_{split}.parquet (ฝั่ง Random Forest เดิม) ใช้อยู่ (feature_extractor.py
+    # ไม่ drop/reorder แถวเลย) เก็บไว้เป็น orig_row_index เพื่อให้ Fusion Layer ในอนาคต join คะแนน
+    # IF/AE (behavioral, ประชากรลดแล้ว) กับคะแนน RF (ประชากรเต็ม) ด้วย key นี้แทนการสมมติว่า
+    # row_index ตรงกันทางตำแหน่ง (position) เฉยๆ ซึ่งจะพังทันทีเพราะแถวถูก drop ไปแล้ว
+    left["orig_row_index"] = np.arange(len(left))
 
     right = behavioral_df[key_cols + BEHAVIORAL_FEATURE_COLS].copy()
     right["_h"] = compute_row_hash(right_k, key_cols)
