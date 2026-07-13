@@ -1,0 +1,8 @@
+{
+  "category": "DoS Hulk",
+  "recall": 0.9778994017796189,
+  "fpr": 0.14992877937850638,
+  "n_test_rows": 492978,
+  "n_attack_rows": 172846,
+  "n_benign_rows": 320132
+}
