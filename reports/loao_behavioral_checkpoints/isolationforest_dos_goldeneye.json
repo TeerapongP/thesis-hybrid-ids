@@ -1,0 +1,8 @@
+{
+  "category": "DoS GoldenEye",
+  "recall": 0.4528485319852226,
+  "fpr": 0.10587432346006624,
+  "n_test_rows": 429330,
+  "n_attack_rows": 10286,
+  "n_benign_rows": 419044
+}

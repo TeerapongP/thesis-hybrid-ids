@@ -1,0 +1,8 @@
+{
+  "category": "Bot",
+  "recall": 0.022587268993839837,
+  "fpr": 0.1081771842575004,
+  "n_test_rows": 420992,
+  "n_attack_rows": 1948,
+  "n_benign_rows": 419044
+}

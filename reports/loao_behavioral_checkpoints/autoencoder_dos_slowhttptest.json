@@ -1,0 +1,10 @@
+{
+  "category": "DoS Slowhttptest",
+  "recall": 0.25803366488140783,
+  "fpr": 0.009297353022594285,
+  "n_test_rows": 424272,
+  "n_attack_rows": 5228,
+  "n_benign_rows": 419044,
+  "threshold": 0.0016055001178756356,
+  "epochs_run": 30
+}
