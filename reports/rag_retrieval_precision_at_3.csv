@@ -1,0 +1,22 @@
+# Precision@3 -- RAG retrieval (src/rag_retrieval.py) vs. config/mitre_mapping.csv ground truth
+# BENIGN excluded explicitly: it is the 15th CICIDS-2017 Label value but maps to no technique_id in config/mitre_mapping.csv, so it is not part of this evaluation's query set (14 attack categories only)
+# per-category (14 rows, one per CICIDS-2017 attack Label with a known technique_id)
+category,query_text,expected_technique_id,expected_technique_name,precision_at_3,hit_at_3,n_relevant_in_top3,retrieved_chunk_ids,retrieved_technique_ids
+DoS Hulk,DoS Hulk,T1499.002,Endpoint DoS: Service Exhaustion Flood,0.6666666666666666,1,2,T1498::description|T1499.002::detection|T1499.002::description,T1498|T1499.002|T1499.002
+DoS GoldenEye,DoS GoldenEye,T1499.002,Endpoint DoS: Service Exhaustion Flood,0.6666666666666666,1,2,T1498::description|T1499.002::detection|T1499.002::description,T1498|T1499.002|T1499.002
+DoS slowloris,DoS slowloris,T1499.002,Endpoint DoS: Service Exhaustion Flood,0.6666666666666666,1,2,T1498::description|T1499.002::detection|T1499.002::description,T1498|T1499.002|T1499.002
+DoS Slowhttptest,DoS Slowhttptest,T1499.002,Endpoint DoS: Service Exhaustion Flood,0.6666666666666666,1,2,T1498::description|T1499.002::detection|T1499.002::description,T1498|T1499.002|T1499.002
+DDoS,DDoS,T1498,Network Denial of Service,0.3333333333333333,1,1,T1498::description|T1499.002::description|T1499.002::detection,T1498|T1499.002|T1499.002
+PortScan,PortScan,T1046,Network Service Discovery,0.6666666666666666,1,2,T1046::detection|mitigation::M1016|mitigation::M1031,"T1046|T1190,T1210|T1046,T1071.001"
+FTP-Patator,FTP-Patator,T1110.001,Brute Force: Password Guessing,0.3333333333333333,1,1,mitigation::M1035|T1110.001::description|T1071.001::description,T1190|T1110.001|T1071.001
+SSH-Patator,SSH-Patator,T1110.001,Brute Force: Password Guessing,0.3333333333333333,1,1,T1110.001::detection|T1059::detection|mitigation::M1037,"T1110.001|T1059|T1071.001,T1190,T1498,T1499.002"
+Bot,Bot,T1071.001,Application Layer Protocol: Web Protocols,0.0,0,0,T1046::detection|T1499.002::detection|T1498::detection,T1046|T1499.002|T1498
+Web Attack - Brute Force,Web Attack - Brute Force,T1110,Brute Force,1.0,1,3,T1110::description|T1110::detection|mitigation::M1036,"T1110|T1110|T1110,T1110.001"
+Web Attack - XSS,Web Attack - XSS,T1190,Exploit Public-Facing Application,0.3333333333333333,1,1,T1499.002::description|T1498::description|mitigation::M1016,"T1499.002|T1498|T1190,T1210"
+Web Attack - Sql Injection,Web Attack - Sql Injection,T1190,Exploit Public-Facing Application,0.6666666666666666,1,2,mitigation::M1037|T1499.002::description|T1190::description,"T1071.001,T1190,T1498,T1499.002|T1499.002|T1190"
+Infiltration,Infiltration,T1190,Exploit Public-Facing Application,0.6666666666666666,1,2,mitigation::M1031|mitigation::M1037|T1190::detection,"T1046,T1071.001|T1071.001,T1190,T1498,T1499.002|T1190"
+Heartbleed,Heartbleed,T1190,Exploit Public-Facing Application (CVE-2014-0160),0.0,0,0,T1071.001::description|T1499.002::detection|T1110::description,T1071.001|T1499.002|T1110
+#
+# aggregate (macro mean across the 14 categories -- not a single blended retrieval run)
+scope,n_categories,mean_precision_at_3,mean_hit_at_3
+aggregate_macro,14,0.5,0.8571428571428571

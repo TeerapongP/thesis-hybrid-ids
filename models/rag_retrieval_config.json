@@ -1,0 +1,83 @@
+{
+  "phase": "RAG Layer - Phase 3 (ChromaDB setup + hybrid retrieval)",
+  "source_module": "src/rag_retrieval.py",
+  "collection_name": "mitre_attack_kb",
+  "chroma_deployment": {
+    "mode": "embedded_persistent_client",
+    "reasoning": "No ChromaDB docker-compose exists anywhere in this repo (unlike opencti/observability/grafana, which each have one), nothing listens on localhost:8000, and Docker Desktop is not running on this machine. Uses chromadb.PersistentClient(path='data/chroma_db/') -- no server process, no Docker. This was a pre-resolved decision per HANDOFF_RAG_PHASE3.md, not made independently in this phase.",
+    "persistent_client_path": "data/chroma_db/",
+    "env_host_port_status": "CHROMA_HOST/CHROMA_PORT are still read from .env (load_env_config() asserts they exist) but are UNUSED in this phase -- vestigial until/unless a future phase runs Chroma as an actual server."
+  },
+  "embedding_model": {
+    "name": "BAAI/bge-m3",
+    "source": "read from .env's EMBED_MODEL at runtime -- never hardcoded (see rag_retrieval.get_embedder)",
+    "runtime": "sentence-transformers (SentenceTransformer('BAAI/bge-m3'))",
+    "dimension": 1024,
+    "normalize_embeddings": true,
+    "similarity_space": "cosine (Chroma collection created with metadata={'hnsw:space': 'cosine'})"
+  },
+  "chunking": {
+    "source_file": "data/knowledge_base/mitre_techniques.json",
+    "chunking_plan_doc": "docs/rag_chunking_plan.md (Phase 2, treated as fixed input -- not re-litigated in this phase)",
+    "total_chunks": 45,
+    "breakdown": {
+      "description": 11,
+      "detection": 11,
+      "mitigation_deduplicated": 23
+    },
+    "verification_method": "verify_chunk_counts() in src/rag_retrieval.py asserts these exact counts at every build_index() call, not just checked once manually. Independently re-confirmed at build time on 2026-07-14: description=11, detection=11, mitigation=23, total=45.",
+    "sub_technique_stub_handling": "Only the 11 top-level keys of techniques{} are iterated for chunking (build_chunks() in src/rag_retrieval.py). sub_techniques arrays (bare {technique_id, name} stubs under T1059/T1498/T1595/T1110) are never chunked. T1110.001 is chunked independently as its own top-level entry (it is both a stub under T1110 and a full top-level entry in the source JSON) -- confirmed present as its own description/detection chunk, distinct from and in addition to T1110's.",
+    "mitigation_dedup_rule": "First-occurrence description text kept per mitigation_id (verified conflict-free across sharing techniques per docs/rag_chunking_plan.md). Each deduplicated mitigation chunk's metadata carries technique_id (primary/first-seen technique) AND technique_ids (comma-separated full list of every technique_id it applies to, e.g. M1037 -> 'T1071.001,T1190,T1498,T1499.002'), so retrieval/relevance-scoring against any of its parent techniques still surfaces it."
+  },
+  "retrieval_strategy": {
+    "chosen_approach": "custom",
+    "rejected_approach": "langchain",
+    "reasoning": [
+      "The knowledge base is small (45 chunks) and static -- not a live/growing document store that would benefit from LangChain's document-loader/text-splitter/retriever-chain abstractions. Those abstractions solve problems (chunking heuristics, loader plugins, chain composition across many document types) this phase doesn't have: the chunk boundaries are already fixed by docs/rag_chunking_plan.md, and there is exactly one source file.",
+      "This repo has zero prior LangChain usage anywhere, and an established precedent (src/fusion_layer.py, src/feature_extractor.py, src/label_builder.py, ...) of small, hand-written, fully-inspectable modules over heavy framework dependencies -- every prior fusion/scoring decision in this project (e.g. fusion_layer.py's confidence_weighted strategy) was tuned and justified by looking directly at the numbers, not through a framework's default behavior.",
+      "A from-scratch weighted combination of ChromaDB's own dense query API (cosine similarity) with rank_bm25's sparse scoring is a small, auditable amount of code (see RagRetriever.retrieve in src/rag_retrieval.py) that keeps every normalization/weighting decision visible and directly tunable in one place, matching this repo's per-category evaluation culture (it needs to be possible to explain exactly why a given chunk was or wasn't retrieved, the same way isolation_forest/autoencoder/fusion_layer's per-category behavior is explained rather than treated as a black box).",
+      "LangChain's Chroma + BM25 retriever ensemble (EnsembleRetriever) would have provided roughly the same capability with less code, but at the cost of an additional heavy dependency (langchain + langchain-community + langchain-chroma, none currently installed anywhere in this repo) for a retrieval surface this small and fixed. Given the choice, minimal dependency footprint + full visibility won over marginal code-volume savings."
+    ],
+    "hybrid_combination": {
+      "method": "weighted linear combination of min-max-normalized scores over the full 45-chunk universe per query",
+      "dense_component": "ChromaDB collection.query() cosine similarity (1 - cosine distance), computed against all 45 chunks so it is comparable across the whole corpus, not just an ANN top-k subset",
+      "sparse_component": "rank_bm25.BM25Okapi over a simple lowercase + word-boundary tokenizer (src/rag_retrieval.tokenize), rebuilt in-memory from the chunks fetched back out of the persisted ChromaDB collection at every RagRetriever init -- not persisted separately, so there is exactly one on-disk source of truth (data/chroma_db/) and no risk of the BM25 corpus and the Chroma collection ever drifting out of sync across a fresh-process restart",
+      "dense_weight": 0.5,
+      "bm25_weight": 0.5,
+      "weighting_reasoning": "Equal weighting by default: diagrams/thesis_dataflow_v2.drawio's hybrid RAG node lists 'BM25 (Exact Match) + Dense Vector (Semantic)' side by side with no stated priority between them. Not tuned against config/mitre_mapping.csv (that would be leakage -- see src/rag_retrieval.py's no-leakage docstring); left at the diagram-implied parity default rather than optimized against the evaluation query set."
+    },
+    "top_k": 3,
+    "top_k_source": ".env RAG_TOP_K (read at runtime, not hardcoded)",
+    "bm25_tokenizer_fix_2026_07_14": {
+      "change": "src/rag_retrieval.tokenize's regex dropped '-' from the token character class: r\"[A-Za-z0-9_./-]+\" -> r\"[A-Za-z0-9_./]+\".",
+      "root_cause_found": "Diagnostic scoring (per-component dense/bm25 breakdown, not just the combined score) showed bm25=0.0 for EVERY chunk on the 'FTP-Patator'/'SSH-Patator' queries under the old regex. The old regex tokenized the query as one OOV compound token ('ftp-patator'), even though its constituent words ('ftp', 'ssh') appear verbatim in T1110.001's own chunked description ('SSH (22/TCP)... FTP (21/TCP)') -- BM25 could never match them because the query-side and corpus-side tokenizations of the same word differed only for hyphenated queries.",
+      "why_this_is_not_leakage": "The regex change is query-agnostic and category-agnostic -- it changes how ALL text (queries and corpus alike) is tokenized for BM25, independent of any technique_id/ground-truth label. It was verified that FTP-Patator/SSH-Patator are the ONLY 2 of the 14 evaluation queries containing a hyphen with no surrounding whitespace (the 'Web Attack - X' categories already tokenize correctly since their hyphen has spaces on both sides), so this is a general tokenizer correctness fix that happens to resolve 2 categories, not a rule written to target them.",
+      "verified_no_regression": "CORRECTED 2026-07-14 after code-reviewer caught the original wording here overclaiming isolation -- re-ran the full 14-category eval after the change and diffed reports/rag_retrieval_precision_at_3.before_tokenizer_fix.csv against the current .csv row-by-row: 4 categories' scores actually changed, not 2. FTP-Patator and SSH-Patator flipped miss->hit as intended (0.0 -> 0.33 each). Two more categories shifted WITHIN an already-hitting top-3 as a side effect: 'Web Attack - Brute Force' (0.6667 -> 1.0, gained a relevant hit) and 'Web Attack - XSS' (0.6667 -> 0.3333, lost one). Root cause of the side effect: those 2 queries have a hyphen WITH surrounding spaces (e.g. 'Web Attack - XSS'), so their real word tokens were already split correctly under the OLD regex too -- but the old regex also emitted a spurious standalone '-' token for them, which the fix removes; losing that token shifts each query's BM25 term-frequency/IDF terms enough to reorder which chunks land in the top-3, without changing hit@3 (no category flipped from hit to miss outside the 2 intentionally-fixed ones). The other 8 of the original 10 hits are byte-for-byte unchanged. See reports/rag_layer_report.txt Section 6.1's starred note for the full mechanical explanation.",
+      "rejected_alternatives": {
+        "chunk_side_enrichment_for_heartbleed": "Checked both the local data/knowledge_base/mitre_techniques.json and the live https://attack.mitre.org/techniques/T1190/ page for any mention of 'Heartbleed', 'CVE-2014-0160', or 'OpenSSL' -- neither the local snapshot nor MITRE's own current published page contains it (T1190's real procedure examples/citations reference other CVEs, e.g. CVE-2016-6662, CVE-2021-44228, never Heartbleed). Adding it anyway would be fabricating content MITRE itself doesn't publish for this technique, not 'using more of the already-fetched source data' -- rejected.",
+        "chunk_side_enrichment_for_bot": "Checked MITRE's live T1071.001 procedure-examples table for the word 'bot'/'botnet': it only appears as a substring inside unrelated malware proper nouns (e.g. 'Lokibot', 'Saint Bot') among ~300 listed software names. Including that list to make the literal string 'bot' match would be pattern-matching on coincidental substrings, not adding real semantic content about the technique -- rejected as data-dredging, not a principled fix. Separately, the literal words 'bot'/'botnet' DO already appear in this KB, but only in T1498 (DDoS) and T1595 (Active Scanning) chunks -- the wrong techniques for the 'Bot' CICIDS-2017 category -- which if anything would misdirect retrieval further, confirming this is a genuine vocabulary gap rather than an extraction omission."
+      }
+    }
+  },
+  "dependency_placement": {
+    "decision": "system Anaconda Python (same interpreter that already runs every other real pipeline script/notebook in this repo: pandas 2.3.3, numpy 2.3.5, sklearn 1.7.2, torch 2.12.1+cu130)",
+    "not_venv": "pyproject.toml / .venv were left untouched (still ipykernel-only) -- confirmed by directly checking .venv/Lib/site-packages before installing anything: it contains only ipykernel/jupyter-client and their transitive deps, matching CLAUDE.md's documented split, not assumed from the doc alone.",
+    "packages_installed_on_anaconda": ["chromadb", "rank_bm25", "sentence-transformers"],
+    "verification": "python -c \"import chromadb, rank_bm25, sentence_transformers\" run against the Anaconda interpreter (C:\\Users\\devMrX\\anaconda3\\python.exe) after install -- chromadb==1.5.9, sentence-transformers==5.6.0"
+  },
+  "evaluation": {
+    "eval_script": "src/eval_rag_precision.py",
+    "output_csv": "reports/rag_retrieval_precision_at_3.csv",
+    "query_set": "config/mitre_mapping.csv, dataset=='cicids2017', excluding BENIGN (14 rows) -- read-only, never used to influence chunking/embedding/indexing",
+    "query_text_used": "the CICIDS-2017 attack category name itself (source_label, e.g. 'DoS Hulk', 'PortScan') -- NOT technique_name, since technique_name is derived from the ground-truth technique_id and using it as the query would leak the answer into the query",
+    "n_categories": 14,
+    "mean_precision_at_3": 0.5,
+    "mean_hit_at_3": 0.8571428571428571,
+    "pre_tokenizer_fix_baseline": {
+      "mean_precision_at_3": 0.4523809523809524,
+      "mean_hit_at_3": 0.7142857142857143,
+      "note": "Recorded here, not just in git history, since this is the number the tokenizer fix above is measured against. Full before/after CSV: reports/rag_retrieval_precision_at_3.before_tokenizer_fix.csv (before) vs. reports/rag_retrieval_precision_at_3.csv (after, current)."
+    },
+    "summary": "12/14 categories now have at least one relevant chunk in the top-3 (hit@3=1), after the bm25_tokenizer_fix_2026_07_14 change above recovered FTP-Patator and SSH-Patator (both were pure query-side tokenization failures, not vocabulary gaps -- their expected technique's own chunk text already contains 'FTP'/'SSH' verbatim). The remaining 2 misses (Bot, Heartbleed) were investigated and confirmed to be genuine vocabulary/semantic gaps with no leakage-free fix available: neither the local KB nor MITRE's own live published pages for T1071.001/T1190 mention 'Bot'/'Heartbleed' in any legitimate, on-topic way (see bm25_tokenizer_fix_2026_07_14.rejected_alternatives above) -- these 2 are left as documented limitations, not forced. This is a genuine retrieval-quality finding, not a bug in the retriever or the chunking -- see reports/rag_layer_report.txt for the full per-category discussion."
+  }
+}
