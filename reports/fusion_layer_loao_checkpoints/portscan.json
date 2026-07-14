@@ -1,0 +1,19 @@
+{
+  "category": "PortScan",
+  "n_test_rows": 410826,
+  "n_attack_rows": 90694,
+  "n_benign_rows": 320132,
+  "rf_recall": 0.0013451827022735792,
+  "rf_fpr": 0.0006591031199630153,
+  "if_recall": 0.1474518711270867,
+  "if_fpr": 0.08596766333887272,
+  "ae_recall": 0.7708668710168258,
+  "ae_fpr": 0.009686629265428012,
+  "fused_recall": 0.030288662976602643,
+  "fused_fpr": 0.0019741856484200267,
+  "fusion_strategy": "confidence_weighted",
+  "confidence_threshold": 0.95,
+  "fused_decision_threshold": 0.05,
+  "ae_fold_threshold": 0.0015248454874381423,
+  "fused_recall_val_tuned_threshold": 0.030288662976602643
+}

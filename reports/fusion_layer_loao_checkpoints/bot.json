@@ -1,0 +1,19 @@
+{
+  "category": "Bot",
+  "n_test_rows": 322080,
+  "n_attack_rows": 1948,
+  "n_benign_rows": 320132,
+  "rf_recall": 0.0,
+  "rf_fpr": 0.000843402096635138,
+  "if_recall": 0.022587268993839837,
+  "if_fpr": 0.09544812764734548,
+  "ae_recall": 0.022073921971252568,
+  "ae_fpr": 0.009730361225994277,
+  "fused_recall": 0.006673511293634497,
+  "fused_fpr": 0.0022553196806317393,
+  "fusion_strategy": "confidence_weighted",
+  "confidence_threshold": 0.95,
+  "fused_decision_threshold": 0.05,
+  "ae_fold_threshold": 0.0016783570172265172,
+  "fused_recall_val_tuned_threshold": 0.006673511293634497
+}

@@ -1,0 +1,19 @@
+{
+  "category": "SSH-Patator",
+  "n_test_rows": 323351,
+  "n_attack_rows": 3219,
+  "n_benign_rows": 320132,
+  "rf_recall": 0.004349176762969867,
+  "rf_fpr": 0.001252608299076631,
+  "if_recall": 0.0,
+  "if_fpr": 0.09512950907750553,
+  "ae_recall": 0.0006213109661385523,
+  "ae_fpr": 0.009827196281533867,
+  "fused_recall": 0.9145697421559491,
+  "fused_fpr": 0.0026582784601351943,
+  "fusion_strategy": "confidence_weighted",
+  "confidence_threshold": 0.95,
+  "fused_decision_threshold": 0.05,
+  "ae_fold_threshold": 0.0021913861855864525,
+  "fused_recall_val_tuned_threshold": 0.9145697421559491
+}

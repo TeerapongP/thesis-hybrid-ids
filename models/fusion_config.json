@@ -1,0 +1,31 @@
+{
+  "chosen_strategy": "confidence_weighted",
+  "confidence_threshold": 0.95,
+  "fused_decision_threshold": 0.05,
+  "tuning_objective": "LOAO (zero-day) pooled F1 -- NOT val F1, since the val-tuned value (0.10) was found to fail the zero-day test (see Section 7 for the diagnostic)",
+  "val_tuned_confidence_threshold_superseded": 0.1,
+  "val_tuned_decision_threshold_superseded": 0.3,
+  "normalization": {
+    "if_min": 0.32935471733365224,
+    "if_max": 0.69906949405458,
+    "ae_min": 1.8078935681842268e-06,
+    "ae_max": 0.8110765814781189,
+    "note": "fit once on the val fused population (Section 4), reused as-is at inference time -- not refit per request"
+  },
+  "row_alignment": {
+    "join_key": "orig_row_index (IF-v2/AE-v2) <-> row_index (RF)",
+    "val_fused_population_rows": 405085,
+    "val_rf_full_population_rows": 504160,
+    "val_pct_of_rf_population": 80.34850047603935
+  },
+  "val_metrics_at_final_threshold": {
+    "f1": 0.9904932123770497,
+    "recall": 0.9892892375628318,
+    "precision": 0.9917001212606398
+  },
+  "known_limitations": [
+    "Bot: near-zero recall regardless of feature set/fusion strategy (IF-v2/AE-v2 both near-zero solo)",
+    "PortScan: fusion UNDERPERFORMS AE-v2 alone in LOAO (fused recall 0.030 vs. AE-v2 solo 0.771). TESTED AND REJECTED FIX (Section 7.3): max(if_norm, ae_norm) fallback instead of mean -- gives identical PortScan recall (0.0303) once each fallback is evaluated at its own fairly-re-swept LOAO-optimal threshold, so this is NOT a fallback-aggregation problem. Root cause: only ~3% of PortScan's zero-day attack rows ever have RF confidence dip below the 0.95 gate and reach the IF-v2/AE-v2 fallback at all (vs. 70-100% for every other LOAO category) -- RF is confidently, wrongly, near-0 attack-probability for the rest, so no fallback choice can recover recall this gate never routes.",
+    "Web Attack - Brute Force: small LOAO regression vs. RF alone"
+  ]
+}

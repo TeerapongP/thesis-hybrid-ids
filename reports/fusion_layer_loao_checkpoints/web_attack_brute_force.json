@@ -1,0 +1,19 @@
+{
+  "category": "Web Attack - Brute Force",
+  "n_test_rows": 321602,
+  "n_attack_rows": 1470,
+  "n_benign_rows": 320132,
+  "rf_recall": 0.8564625850340136,
+  "rf_fpr": 0.0012588557220146689,
+  "if_recall": 0.04897959183673469,
+  "if_fpr": 0.09631027201279473,
+  "ae_recall": 0.0,
+  "ae_fpr": 0.009905289068259344,
+  "fused_recall": 0.8136054421768707,
+  "fused_fpr": 0.002352154736171329,
+  "fusion_strategy": "confidence_weighted",
+  "confidence_threshold": 0.95,
+  "fused_decision_threshold": 0.05,
+  "ae_fold_threshold": 0.0012961316388100386,
+  "fused_recall_val_tuned_threshold": 0.8136054421768707
+}
