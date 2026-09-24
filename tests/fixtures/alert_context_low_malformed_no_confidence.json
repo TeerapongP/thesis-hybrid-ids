@@ -1,0 +1,16 @@
+{
+  "source_ip": "192.168.9.12",
+  "dst_ip": "192.168.9.1",
+  "affected_asset": "WS-LIB03.campus.local",
+  "dst_port": 445,
+  "timestamp": "2026-07-15T09:10:04+07:00",
+  "rf_predicted_label": "BENIGN",
+  "fused_score": 0.08,
+  "fused_prediction": 0,
+  "rag_top_chunk": {
+    "technique_id": "T1046",
+    "chunk_type": "detection",
+    "tactic": "discovery",
+    "document": "Behavioral Detection Strategy for Network Service Discovery Across Platforms - Analytic 1057: Detects processes performing network enumeration by correlating process creation, socket connections, and sequential destination IP probing within a time window."
+  }
+}

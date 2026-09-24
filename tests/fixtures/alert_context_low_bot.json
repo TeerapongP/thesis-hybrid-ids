@@ -1,0 +1,18 @@
+{
+  "source_ip": "192.168.5.44",
+  "dst_ip": "192.168.5.1",
+  "affected_asset": "WS-FIN12.campus.local",
+  "dst_port": 3389,
+  "timestamp": "2026-07-15T08:47:19+07:00",
+  "rf_predicted_label": "Bot",
+  "fused_score": 0.12,
+  "fused_prediction": 0,
+  "confidence": 0.20,
+  "model_used": "if_ae_fallback",
+  "rag_top_chunk": {
+    "technique_id": "T1046",
+    "chunk_type": "detection",
+    "tactic": "discovery",
+    "document": "Behavioral Detection Strategy for Network Service Discovery Across Platforms - Analytic 1057: Detects processes performing network enumeration by correlating process creation, socket connections, and sequential destination IP probing within a time window."
+  }
+}

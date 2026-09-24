@@ -9,7 +9,7 @@ deduplicated mitigation chunks) into an embedded ChromaDB PersistentClient colle
 exposes a hybrid BM25 (sparse/exact) + dense-vector (semantic, BAAI/bge-m3) retriever on top
 of it.
 
-Design precedent: mirrors src/fusion_layer.py's pattern of code-extracting a decided strategy
+Design precedent: mirrors src/modeling/fusion_layer.py's pattern of code-extracting a decided strategy
 into a standalone, importable module with a JSON config sidecar (models/rag_retrieval_config.json)
 recording the chosen approach and the reasoning behind it, rather than leaving the reasoning
 in a notebook cell or code comment.
@@ -45,7 +45,7 @@ import chromadb
 from dotenv import dotenv_values
 from rank_bm25 import BM25Okapi
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 ENV_PATH = ROOT / ".env"
 MITRE_JSON_PATH = ROOT / "data" / "knowledge_base" / "mitre_techniques.json"
 CHROMA_DB_DIR = ROOT / "data" / "chroma_db"

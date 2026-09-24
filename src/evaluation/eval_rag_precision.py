@@ -1,7 +1,7 @@
 """
 eval_rag_precision.py
 ======================
-Precision@3 evaluation of the hybrid RAG retriever (src/rag_retrieval.py) against
+Precision@3 evaluation of the hybrid RAG retriever (src/rag/rag_retrieval.py) against
 config/mitre_mapping.csv's CICIDS-2017 attack categories as ground truth.
 
 This is the evaluation query set ONLY -- config/mitre_mapping.csv is never read by
@@ -39,9 +39,9 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from rag_retrieval import RagRetriever, load_env_config
+from src.rag.rag_retrieval import RagRetriever, load_env_config
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 MAPPING_CSV = ROOT / "config" / "mitre_mapping.csv"
 OUTPUT_CSV = ROOT / "reports" / "rag_retrieval_precision_at_3.csv"
 
@@ -126,7 +126,7 @@ def write_report_csv(results: list[dict], output_path: Path = OUTPUT_CSV) -> Non
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8", newline="") as f:
         f.write(
-            "# Precision@3 -- RAG retrieval (src/rag_retrieval.py) vs. config/mitre_mapping.csv ground truth\n"
+            "# Precision@3 -- RAG retrieval (src/rag/rag_retrieval.py) vs. config/mitre_mapping.csv ground truth\n"
         )
         f.write(
             "# BENIGN excluded explicitly: it is the 15th CICIDS-2017 Label value but maps to no technique_id "

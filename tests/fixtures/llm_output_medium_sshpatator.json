@@ -1,0 +1,14 @@
+{
+  "priority": "MEDIUM",
+  "explanation_th": "ตรวจพบความพยายามล็อกอิน SSH ล้มเหลวซ้ำหลายครั้งจากต้นทาง 203.0.113.44 ไปยัง AUTH-SVR01.campus.local ที่พอร์ต 22 เมื่อเวลา 2026-07-15T10:22:05+07:00 โมเดล Random Forest จำแนกเป็น SSH-Patator และ Fusion Layer ให้คะแนนรวม fused_score=0.55 ด้วยความมั่นใจปานกลาง (confidence=0.55) ซึ่งตรงกับเทคนิค MITRE ATT&CK T1110.001 ในกลวิธี credential-access",
+  "technique_id": "T1110.001",
+  "mitre_tactic": "credential-access",
+  "affected_asset": "AUTH-SVR01.campus.local",
+  "remediation": [
+    "ตรวจสอบบัญชีผู้ใช้บน AUTH-SVR01.campus.local ที่มีความพยายามล็อกอินล้มเหลวย้อนหลัง 24 ชั่วโมง",
+    "พิจารณาจำกัดจำนวนครั้งการล็อกอิน (account lockout / rate limiting) สำหรับ SSH บนเซิร์ฟเวอร์นี้",
+    "บล็อกต้นทาง 203.0.113.44 ชั่วคราวหากพบความพยายามต่อเนื่อง"
+  ],
+  "confidence": 0.55,
+  "response_ms": 2100
+}

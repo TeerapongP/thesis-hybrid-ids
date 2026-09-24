@@ -111,10 +111,20 @@ def fuse(rf_attack_probability, if_anomaly_score, ae_reconstruction_error):
     fused_prediction : np.ndarray of int
         Binary prediction (1 = attack, 0 = BENIGN) at `FUSED_DECISION_THRESHOLD`.
     """
+    fused_score, fused_prediction, _, _ = fuse_with_metadata(
+        rf_attack_probability, if_anomaly_score, ae_reconstruction_error
+    )
+    return fused_score, fused_prediction
+
+
+def fuse_with_metadata(rf_attack_probability, if_anomaly_score, ae_reconstruction_error):
+    """Return scores plus the exact confidence and branch used for each row."""
     rf_norm = np.asarray(rf_attack_probability)
     if_norm = normalize_if_score(if_anomaly_score)
     ae_norm = normalize_ae_score(ae_reconstruction_error)
-
-    fused_score = fuse_confidence_weighted(rf_norm, if_norm, ae_norm, confidence_threshold=CONFIDENCE_THRESHOLD)
+    confidence = np.abs(rf_norm - 0.5) * 2
+    use_rf = confidence >= CONFIDENCE_THRESHOLD
+    fused_score = np.where(use_rf, rf_norm, (if_norm + ae_norm) / 2)
     fused_prediction = (fused_score > FUSED_DECISION_THRESHOLD).astype(int)
-    return fused_score, fused_prediction
+    model_used = np.where(use_rf, "random_forest", "if_ae_fallback")
+    return fused_score, fused_prediction, confidence, model_used

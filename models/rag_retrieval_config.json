@@ -1,6 +1,6 @@
 {
   "phase": "RAG Layer - Phase 3 (ChromaDB setup + hybrid retrieval)",
-  "source_module": "src/rag_retrieval.py",
+  "source_module": "src/rag/rag_retrieval.py",
   "collection_name": "mitre_attack_kb",
   "chroma_deployment": {
     "mode": "embedded_persistent_client",
@@ -25,8 +25,8 @@
       "detection": 11,
       "mitigation_deduplicated": 23
     },
-    "verification_method": "verify_chunk_counts() in src/rag_retrieval.py asserts these exact counts at every build_index() call, not just checked once manually. Independently re-confirmed at build time on 2026-07-14: description=11, detection=11, mitigation=23, total=45.",
-    "sub_technique_stub_handling": "Only the 11 top-level keys of techniques{} are iterated for chunking (build_chunks() in src/rag_retrieval.py). sub_techniques arrays (bare {technique_id, name} stubs under T1059/T1498/T1595/T1110) are never chunked. T1110.001 is chunked independently as its own top-level entry (it is both a stub under T1110 and a full top-level entry in the source JSON) -- confirmed present as its own description/detection chunk, distinct from and in addition to T1110's.",
+    "verification_method": "verify_chunk_counts() in src/rag/rag_retrieval.py asserts these exact counts at every build_index() call, not just checked once manually. Independently re-confirmed at build time on 2026-07-14: description=11, detection=11, mitigation=23, total=45.",
+    "sub_technique_stub_handling": "Only the 11 top-level keys of techniques{} are iterated for chunking (build_chunks() in src/rag/rag_retrieval.py). sub_techniques arrays (bare {technique_id, name} stubs under T1059/T1498/T1595/T1110) are never chunked. T1110.001 is chunked independently as its own top-level entry (it is both a stub under T1110 and a full top-level entry in the source JSON) -- confirmed present as its own description/detection chunk, distinct from and in addition to T1110's.",
     "mitigation_dedup_rule": "First-occurrence description text kept per mitigation_id (verified conflict-free across sharing techniques per docs/rag_chunking_plan.md). Each deduplicated mitigation chunk's metadata carries technique_id (primary/first-seen technique) AND technique_ids (comma-separated full list of every technique_id it applies to, e.g. M1037 -> 'T1071.001,T1190,T1498,T1499.002'), so retrieval/relevance-scoring against any of its parent techniques still surfaces it."
   },
   "retrieval_strategy": {
@@ -34,8 +34,8 @@
     "rejected_approach": "langchain",
     "reasoning": [
       "The knowledge base is small (45 chunks) and static -- not a live/growing document store that would benefit from LangChain's document-loader/text-splitter/retriever-chain abstractions. Those abstractions solve problems (chunking heuristics, loader plugins, chain composition across many document types) this phase doesn't have: the chunk boundaries are already fixed by docs/rag_chunking_plan.md, and there is exactly one source file.",
-      "This repo has zero prior LangChain usage anywhere, and an established precedent (src/fusion_layer.py, src/feature_extractor.py, src/label_builder.py, ...) of small, hand-written, fully-inspectable modules over heavy framework dependencies -- every prior fusion/scoring decision in this project (e.g. fusion_layer.py's confidence_weighted strategy) was tuned and justified by looking directly at the numbers, not through a framework's default behavior.",
-      "A from-scratch weighted combination of ChromaDB's own dense query API (cosine similarity) with rank_bm25's sparse scoring is a small, auditable amount of code (see RagRetriever.retrieve in src/rag_retrieval.py) that keeps every normalization/weighting decision visible and directly tunable in one place, matching this repo's per-category evaluation culture (it needs to be possible to explain exactly why a given chunk was or wasn't retrieved, the same way isolation_forest/autoencoder/fusion_layer's per-category behavior is explained rather than treated as a black box).",
+      "This repo has zero prior LangChain usage anywhere, and an established precedent (src/modeling/fusion_layer.py, src/features/feature_extractor.py, src/labeling/label_builder.py, ...) of small, hand-written, fully-inspectable modules over heavy framework dependencies -- every prior fusion/scoring decision in this project (e.g. fusion_layer.py's confidence_weighted strategy) was tuned and justified by looking directly at the numbers, not through a framework's default behavior.",
+      "A from-scratch weighted combination of ChromaDB's own dense query API (cosine similarity) with rank_bm25's sparse scoring is a small, auditable amount of code (see RagRetriever.retrieve in src/rag/rag_retrieval.py) that keeps every normalization/weighting decision visible and directly tunable in one place, matching this repo's per-category evaluation culture (it needs to be possible to explain exactly why a given chunk was or wasn't retrieved, the same way isolation_forest/autoencoder/fusion_layer's per-category behavior is explained rather than treated as a black box).",
       "LangChain's Chroma + BM25 retriever ensemble (EnsembleRetriever) would have provided roughly the same capability with less code, but at the cost of an additional heavy dependency (langchain + langchain-community + langchain-chroma, none currently installed anywhere in this repo) for a retrieval surface this small and fixed. Given the choice, minimal dependency footprint + full visibility won over marginal code-volume savings."
     ],
     "hybrid_combination": {
@@ -44,7 +44,7 @@
       "sparse_component": "rank_bm25.BM25Okapi over a simple lowercase + word-boundary tokenizer (src/rag_retrieval.tokenize), rebuilt in-memory from the chunks fetched back out of the persisted ChromaDB collection at every RagRetriever init -- not persisted separately, so there is exactly one on-disk source of truth (data/chroma_db/) and no risk of the BM25 corpus and the Chroma collection ever drifting out of sync across a fresh-process restart",
       "dense_weight": 0.5,
       "bm25_weight": 0.5,
-      "weighting_reasoning": "Equal weighting by default: diagrams/thesis_dataflow_v2.drawio's hybrid RAG node lists 'BM25 (Exact Match) + Dense Vector (Semantic)' side by side with no stated priority between them. Not tuned against config/mitre_mapping.csv (that would be leakage -- see src/rag_retrieval.py's no-leakage docstring); left at the diagram-implied parity default rather than optimized against the evaluation query set."
+      "weighting_reasoning": "Equal weighting by default: diagrams/thesis_dataflow_v2.drawio's hybrid RAG node lists 'BM25 (Exact Match) + Dense Vector (Semantic)' side by side with no stated priority between them. Not tuned against config/mitre_mapping.csv (that would be leakage -- see src/rag/rag_retrieval.py's no-leakage docstring); left at the diagram-implied parity default rather than optimized against the evaluation query set."
     },
     "top_k": 3,
     "top_k_source": ".env RAG_TOP_K (read at runtime, not hardcoded)",
@@ -66,7 +66,7 @@
     "verification": "python -c \"import chromadb, rank_bm25, sentence_transformers\" run against the Anaconda interpreter (C:\\Users\\devMrX\\anaconda3\\python.exe) after install -- chromadb==1.5.9, sentence-transformers==5.6.0"
   },
   "evaluation": {
-    "eval_script": "src/eval_rag_precision.py",
+    "eval_script": "src/evaluation/eval_rag_precision.py",
     "output_csv": "reports/rag_retrieval_precision_at_3.csv",
     "query_set": "config/mitre_mapping.csv, dataset=='cicids2017', excluding BENIGN (14 rows) -- read-only, never used to influence chunking/embedding/indexing",
     "query_text_used": "the CICIDS-2017 attack category name itself (source_label, e.g. 'DoS Hulk', 'PortScan') -- NOT technique_name, since technique_name is derived from the ground-truth technique_id and using it as the query would leak the answer into the query",

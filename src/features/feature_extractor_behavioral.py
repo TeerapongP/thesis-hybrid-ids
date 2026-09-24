@@ -46,7 +46,7 @@ Output:
     กับ data/features/cicids2017_features_*.parquet เดิมโดยตั้งใจ -- แยกกันชัดเจนตามที่ user ขอ)
   - reports/feature_extractor_behavioral_report.txt
 
-รันจาก repo root เสมอ: `python src/feature_extractor_behavioral.py`
+รันจาก repo root เสมอ: `python -m src.features.feature_extractor_behavioral`
 """
 
 import os

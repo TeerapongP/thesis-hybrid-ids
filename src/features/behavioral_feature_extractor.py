@@ -60,7 +60,7 @@ Output:
   - data/processed/behavioral/cicids2017_behavioral_labeled.parquet
   - reports/behavioral_feature_extractor_report.txt
 
-รันจาก repo root เสมอ: `python src/behavioral_feature_extractor.py`
+รันจาก repo root เสมอ: `python -m src.features.behavioral_feature_extractor`
 """
 
 import os
@@ -71,8 +71,7 @@ import pandas as pd
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from label_builder import apply_mitre_mapping  # noqa: E402  (reuse pipeline เดิม, logic เดียวกัน)
+from src.labeling.label_builder import apply_mitre_mapping
 
 # ----------------------------------------------------------------------------
 # CONFIG — สคริปต์นี้อยู่ใน src/ แต่ยังต้องรันจาก repo root เสมอ path ด้านล่างจึงอ้างอิงจาก repo root

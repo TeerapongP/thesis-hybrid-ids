@@ -17,7 +17,7 @@ OpenCTI connector ในอนาคต ไม่ใช่ไฟล์นี้)
 ผลลัพธ์: print รายงานออกจอ, เซฟรายงานเป็น ./reports/label_builder_report.txt, เซฟข้อมูลที่ต่อ
 MITRE mapping แล้วเป็น ./data/processed/cicids2017_labeled.parquet และ
 ./data/processed/unswnb15_labeled.parquet — รันจาก repo root เสมอ เช่น
-`python src/label_builder.py`
+`python -m src.labeling.label_builder`
 """
 
 import os

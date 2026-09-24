@@ -18,7 +18,7 @@ CICIDS-2017 ส่วน UNSW-NB15 ไม่มีคอลัมน์ไหน
 ยกเว้น attack_cat ซึ่งเป็นคอลัมน์อ้างอิง ไม่ใช่ label หลัก จึงไม่อยู่ใน intersection)
 
 รันหลัง feature_extractor.py (ต้องมีไฟล์ *_features_{train,val,test}.parquet ครบทั้ง 6 ไฟล์แล้ว):
-    python src/build_cross_dataset_eval.py
+    python -m src.evaluation.build_cross_dataset_eval
 """
 
 import os

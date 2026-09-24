@@ -1,0 +1,26 @@
+{
+  "phase": "Dashboard and Notification Layer",
+  "rabbitmq": {"vhost": "soc", "exchange": "soc.alerts", "routing_key": "alert.<PRIORITY>"},
+  "influxdb": {
+    "measurement": "soc_alert",
+    "tags": ["alert_id", "source_ip", "dst_port", "priority", "anomaly_type", "mitre_tactic"],
+    "fields": ["risk_score", "response_ms"]
+  },
+  "elasticsearch": {"index_pattern": "soc-alerts-*", "write_index": "soc-alerts-YYYY.MM.dd"},
+  "model_used": "Copied from fusion_layer.fuse_with_metadata; never inferred from generic confidence",
+  "notifications": {
+    "HIGH": "LINE Messaging API push; requires LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID",
+    "MEDIUM": "Immediate Gmail API message",
+    "LOW": "SQLite-backed daily Gmail digest"
+  },
+  "low_digest": {
+    "database": "data/notification/low_priority_digest.db",
+    "mttd": "Average detected_at - ingested_at; N/A when either timestamp is missing",
+    "invocation": "python -m src.notifications.alert_dispatcher --flush-digest",
+    "delivery": "Rows are acknowledged only after Gmail returns status=sent"
+  },
+  "verification": {
+    "offline_tests": "python -m unittest discover -s tests -p test_*.py",
+    "live_services": "RabbitMQ, InfluxDB, Elasticsearch, LINE, and Gmail require configured reachable services"
+  }
+}

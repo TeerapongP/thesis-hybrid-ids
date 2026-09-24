@@ -53,8 +53,8 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 # ----------------------------------------------------------------------------
-# CONFIG — สคริปต์นี้อยู่ใน src/ แต่ยังต้องรันจาก repo root เสมอ (เช่น
-# `python src/feature_extractor.py`) path ด้านล่างจึงอ้างอิงจาก repo root
+# CONFIG — สคริปต์นี้อยู่ใน src/features/ แต่ยังต้องรันจาก repo root เสมอ (เช่น
+# `python -m src.features.feature_extractor`) path ด้านล่างจึงอ้างอิงจาก repo root
 # PROCESSED_DATA_DIR = input (labeled + train/val/test จาก preprocess_pipeline.py/label_builder.py)
 # FEATURES_DATA_DIR = output ของไฟล์นี้เอง (คนละโฟลเดอร์กับ input โดยตั้งใจ)
 # ----------------------------------------------------------------------------

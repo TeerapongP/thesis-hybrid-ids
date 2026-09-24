@@ -41,7 +41,7 @@ Output:
     impute/CTI-encode/scale/SMOTE ของ feature_extractor.py ซึ่งเป็น Phase 2 แยกต่างหาก)
   - reports/behavioral_join_validation_report.txt
 
-รันจาก repo root เสมอ: `python src/validate_behavioral_join.py`
+รันจาก repo root เสมอ: `python -m src.features.validate_behavioral_join`
 """
 
 import os

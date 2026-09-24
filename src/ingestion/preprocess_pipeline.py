@@ -23,7 +23,7 @@ preprocess_pipeline.py
 
 ผลลัพธ์: print รายงานออกจอ, เซฟรายงานเป็น ./reports/preprocess_report.txt, และเซฟ CICIDS-2017
 ที่แก้แล้วเป็น ./data/processed/cicids2017_clean.parquet ให้ขั้นตอนถัดไป (label_builder.py /
-feature_extractor.py) เอาไปใช้ต่อ — รันจาก repo root เสมอ เช่น `python src/preprocess_pipeline.py`
+feature_extractor.py) เอาไปใช้ต่อ — รันจาก repo root เสมอ เช่น `python -m src.ingestion.preprocess_pipeline`
 """
 
 import os
@@ -37,8 +37,8 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 # ----------------------------------------------------------------------------
-# CONFIG — สคริปต์นี้อยู่ใน src/ แต่ยังต้องรันจาก repo root เสมอ (เช่น
-# `python src/preprocess_pipeline.py`) path ด้านล่างจึงอ้างอิงจาก repo root
+# CONFIG — สคริปต์นี้อยู่ใน src/ingestion/ แต่ยังต้องรันจาก repo root เสมอ (เช่น
+# `python -m src.ingestion.preprocess_pipeline`) path ด้านล่างจึงอ้างอิงจาก repo root
 # RAW_DATA_DIR = ต้นฉบับ CSV ที่ไม่แตะเลย, PROCESSED_DATA_DIR = ผลลัพธ์ clean/split/LOAO
 # ----------------------------------------------------------------------------
 RAW_DATA_DIR = "./data/raw"

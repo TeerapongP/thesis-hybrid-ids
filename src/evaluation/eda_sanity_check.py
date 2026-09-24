@@ -11,8 +11,8 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 # ----------------------------------------------------------------------------
-# CONFIG: แก้ path ตรงนี้ให้ตรงกับตำแหน่งไฟล์จริงบนเครื่อง — สคริปต์นี้อยู่ใน src/ แต่ยังต้อง
-# รันจาก repo root เสมอ (เช่น `python src/eda_sanity_check.py`) path ด้านล่างจึงอ้างอิงจาก
+# CONFIG: แก้ path ตรงนี้ให้ตรงกับตำแหน่งไฟล์จริงบนเครื่อง — สคริปต์นี้อยู่ใน src/evaluation/ แต่ยังต้อง
+# รันจาก repo root เสมอ (เช่น `python -m src.evaluation.eda_sanity_check`) path ด้านล่างจึงอ้างอิงจาก
 # repo root ไม่ใช่จากตำแหน่งไฟล์ .py เอง
 # ----------------------------------------------------------------------------
 DATA_DIR = "./data/raw"
