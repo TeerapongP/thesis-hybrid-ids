@@ -1,36 +1,10 @@
-"""Fusion Layer LOAO re-run with train-fold-fitted score normalization.
-
-notebooks/08_fusion_layer.ipynb S7.1 min-max normalizes each fold's IF-v2/AE-v2 scores using
-the *zero-day test set's* own score range, so the held-out attacks help define the scale they
-are then detected on, and the transform cannot be reproduced at inference time on a stream.
-
-This script re-runs the identical 10-fold joint LOAO loop with one change: the min-max
-constants are fit on the **train fold** and applied to the test fold. Everything else -- the
-population, split function, per-model feature views, imputation conventions, hyperparameters --
-is copied from that notebook unchanged, so the two runs are directly comparable.
-
-Notes:
-  * Normalization is fit on the whole train fold (not BENIGN-only): the direct analogue of
-    feature_extractor.py fitting its MinMaxScaler on the full train split.
-  * Transformed test scores are NOT clipped to [0, 1]. Out-of-range values are expected and
-    are the project's established precedent (CLAUDE.md records val legitimately landing outside
-    [0, 1] for the same reason). Clipping would flatten the ranking among the highest-scoring
-    rows, which is exactly where detections live.
-  * Raw (pre-normalization) test scores are persisted alongside the normalized ones, so any
-    alternative normalization can be evaluated later without retraining.
-
-Writes to new paths; nothing produced by 08_fusion_layer.ipynb is modified.
-
-Run from the repo root:
-    python -m src.evaluation.fusion_loao_trainnorm
-
-Resumable: each category is checkpointed on completion, so re-running skips finished folds.
-"""
 
 import json
+import hashlib
 import os
 import re
 import time
+import uuid
 from pathlib import Path
 
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
@@ -62,8 +36,6 @@ CATEGORIES = [
 RF_SENTINEL_COLS = ["Init_Win_bytes_forward", "Init_Win_bytes_backward"]
 LOAO_BENIGN_HOLDOUT_SIZE = 0.2
 
-# Pinned from 02_random_forest.ipynb S1/S7 and 06_behavioral_v2_retrain.ipynb, via
-# 08_fusion_layer.ipynb S7.1. Not re-tuned here -- only the normalization changes.
 RF_N_ESTIMATORS = 200
 RF_MAX_DEPTH = None
 RF_CLASS_WEIGHT = "balanced"
@@ -74,6 +46,7 @@ IF_CONTAMINATION = 0.20
 IF_N_ESTIMATORS_LOAO = 100
 AE_CHOSEN_PERCENTILE = 99
 BENIGN_INTERNAL_VAL_FRAC = 0.10
+LOAO_METRIC_SCOPE = "component_models_only_no_fusion"
 
 
 class Autoencoder(nn.Module):
@@ -102,8 +75,6 @@ class Autoencoder(nn.Module):
 
 
 def compute_reconstruction_error(model, X, device, batch_size=200_000):
-    """Batched so a full train fold (~1.6M x 92) fits in VRAM -- 08_fusion_layer.ipynb only ever
-    scored test folds in one shot, which no longer holds now that train folds are scored too."""
     model.eval()
     errors = np.empty(len(X), dtype=np.float32)
     with torch.no_grad():
@@ -219,28 +190,79 @@ def slugify_category(cat):
     return re.sub(r"[\s\-]+", "_", cat.strip().lower())
 
 
-def save_checkpoint(result, scores_df):
+def _sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def compute_run_signature(input_paths, config_path, settings, code_path=None, dependency_lock_path=None):
+    file_paths = list(input_paths) + [config_path]
+    if code_path is not None:
+        file_paths.append(code_path)
+    if dependency_lock_path is not None:
+        file_paths.append(dependency_lock_path)
+    file_hashes = {Path(path).name: _sha256_file(path) for path in sorted(map(Path, file_paths))}
+    signature_payload = {"files": file_hashes, "settings": settings}
+    serialized = json.dumps(signature_payload, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def checkpoint_directory(signature, base_dir=None):
+    return Path(base_dir or CHECKPOINT_DIR) / signature
+
+
+def results_path(signature):
+    return RESULTS_CSV.with_name(
+        f"{RESULTS_CSV.stem}_{signature[:12]}_{uuid.uuid4().hex[:8]}{RESULTS_CSV.suffix}"
+    )
+
+
+def save_checkpoint(result, scores_df, signature, base_dir=None):
     slug = slugify_category(result["category"])
+    directory = checkpoint_directory(signature, base_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    checkpoint_id = uuid.uuid4().hex
+    result_path = directory / f"{slug}_{checkpoint_id}.json"
+    result_tmp = result_path.with_suffix(".json.tmp")
+    result_with_signature = dict(result)
+    result_with_signature["run_signature"] = signature
+    with open(result_tmp, "w", encoding="utf-8") as f:
+        json.dump(result_with_signature, f, indent=2)
+    result_tmp.replace(result_path)
 
-    path = CHECKPOINT_DIR / f"{slug}.json"
-    tmp = path.with_suffix(".json.tmp")
-    with open(tmp, "w") as f:
-        json.dump(result, f, indent=2)
-    tmp.replace(path)
-
-    sp = CHECKPOINT_DIR / f"{slug}_scores.parquet"
-    sp_tmp = sp.with_suffix(".parquet.tmp")
-    scores_df.to_parquet(sp_tmp, index=False)
-    sp_tmp.replace(sp)
+    scores_path = directory / f"{slug}_{checkpoint_id}_scores.parquet"
+    scores_tmp = scores_path.with_suffix(".parquet.tmp")
+    scores_with_signature = scores_df.copy()
+    scores_with_signature["run_signature"] = signature
+    scores_with_signature.to_parquet(scores_tmp, index=False)
+    scores_tmp.replace(scores_path)
 
 
-def load_checkpoint(cat):
+def load_checkpoint(cat, signature, base_dir=None):
     slug = slugify_category(cat)
-    path = CHECKPOINT_DIR / f"{slug}.json"
-    sp = CHECKPOINT_DIR / f"{slug}_scores.parquet"
-    if path.exists() and sp.exists():
-        with open(path) as f:
-            return json.load(f)
+    directory = checkpoint_directory(signature, base_dir)
+    if not directory.exists():
+        return None
+    for path in sorted(directory.glob(f"{slug}_*.json"), reverse=True):
+        scores_path = path.with_name(f"{path.stem}_scores.parquet")
+        if not scores_path.exists():
+            continue
+        try:
+            with open(path, encoding="utf-8") as f:
+                result = json.load(f)
+            score_signatures = pd.read_parquet(scores_path, columns=["run_signature"])["run_signature"]
+        except Exception:
+            continue
+        if (
+            result.get("category") == cat
+            and result.get("run_signature") == signature
+            and not score_signatures.empty
+            and score_signatures.eq(signature).all()
+        ):
+            return result
     return None
 
 
@@ -248,7 +270,6 @@ def run_fold(cat, joint_full_df, rf_raw_feature_cols, ae_config):
     train_df_fold, test_df_fold = build_loao_split(joint_full_df, cat)
     y_true_fold = (test_df_fold["Label"] != "BENIGN").astype(int).to_numpy()
 
-    # ---- RF view: canonical 80-feature contract, fold-local scale, capped SMOTE ----
     rf_train_fold, rf_test_fold = add_missing_flags_and_impute_fold(train_df_fold, test_df_fold)
     rf_scaler = MinMaxScaler().fit(rf_train_fold[rf_raw_feature_cols])
     rf_train_fold[rf_raw_feature_cols] = rf_scaler.transform(rf_train_fold[rf_raw_feature_cols])
@@ -270,7 +291,6 @@ def run_fold(cat, joint_full_df, rf_raw_feature_cols, ae_config):
         (rf_fold_model.predict(X_rf_test) != "BENIGN").astype(int), y_true_fold
     )
 
-    # ---- IF-v2/AE-v2 view: 92 features, impute+flag, fresh scaler ----
     ifae_train_fold, ifae_test_fold = add_missing_flags_and_impute_fold(train_df_fold, test_df_fold)
     fold_feature_cols = [
         c for c in ifae_train_fold.columns
@@ -290,7 +310,7 @@ def run_fold(cat, joint_full_df, rf_raw_feature_cols, ae_config):
     if_fold_model = IsolationForest(
         n_estimators=IF_N_ESTIMATORS_LOAO, contamination=IF_CONTAMINATION, random_state=RANDOM_STATE, n_jobs=-1,
     ).fit(X_ifae_train)
-    if_raw_train = -if_fold_model.score_samples(X_ifae_train)  # THE FIX: train is scored too
+    if_raw_train = -if_fold_model.score_samples(X_ifae_train)
     if_raw_test = -if_fold_model.score_samples(X_ifae_test)
     if_recall, if_fpr = compute_binary_metrics((if_fold_model.predict(X_ifae_test) == -1).astype(int), y_true_fold)
 
@@ -315,7 +335,6 @@ def run_fold(cat, joint_full_df, rf_raw_feature_cols, ae_config):
     ae_fold_threshold = float(np.percentile(ae_internal_val_errors, AE_CHOSEN_PERCENTILE))
     ae_recall, ae_fpr = compute_binary_metrics((ae_raw_test > ae_fold_threshold).astype(int), y_true_fold)
 
-    # ---- THE FIX: min-max constants fit on the TRAIN fold, applied to test, not clipped ----
     if_min, if_max = float(if_raw_train.min()), float(if_raw_train.max())
     ae_min, ae_max = float(ae_raw_train.min()), float(ae_raw_train.max())
     if_norm_test = (if_raw_test - if_min) / (if_max - if_min)
@@ -323,6 +342,7 @@ def run_fold(cat, joint_full_df, rf_raw_feature_cols, ae_config):
 
     result = {
         "category": cat,
+        "evaluation_scope": LOAO_METRIC_SCOPE,
         "n_test_rows": len(test_df_fold),
         "n_attack_rows": int(y_true_fold.sum()),
         "n_benign_rows": int((y_true_fold == 0).sum()),
@@ -351,19 +371,50 @@ def run_fold(cat, joint_full_df, rf_raw_feature_cols, ae_config):
 
 
 def main():
-    CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
     print(f"ROOT: {ROOT}  |  DEVICE: {DEVICE}")
+    print(f"LOAO metric scope: {LOAO_METRIC_SCOPE}; fused zero-day metrics are not computed")
 
     torch.manual_seed(RANDOM_STATE)
     np.random.seed(RANDOM_STATE)
 
-    with open(MODELS_DIR / "autoencoder_behavioral_v2_config.json") as f:
+    ae_config_path = MODELS_DIR / "autoencoder_behavioral_v2_config.json"
+    with open(ae_config_path, encoding="utf-8") as f:
         ae_config = json.load(f)
 
-    joint_full_df = pd.concat([
-        pd.read_parquet(BEHAVIORAL_PROCESSED_DIR / f"cicids2017_behavioral_{split}.parquet")
+    input_paths = [
+        BEHAVIORAL_PROCESSED_DIR / f"cicids2017_behavioral_{split}.parquet"
         for split in ("train", "val", "test")
-    ], ignore_index=True)
+    ]
+    settings = {
+        "random_state": RANDOM_STATE,
+        "categories": CATEGORIES,
+        "rf_sentinel_cols": RF_SENTINEL_COLS,
+        "loao_benign_holdout_size": LOAO_BENIGN_HOLDOUT_SIZE,
+        "rf_n_estimators": RF_N_ESTIMATORS,
+        "rf_max_depth": RF_MAX_DEPTH,
+        "rf_class_weight": RF_CLASS_WEIGHT,
+        "smote_flat_cap": SMOTE_FLAT_CAP,
+        "smote_target_multiplier": SMOTE_TARGET_MULTIPLIER,
+        "smote_random_state": SMOTE_RANDOM_STATE,
+        "if_contamination": IF_CONTAMINATION,
+        "if_n_estimators": IF_N_ESTIMATORS_LOAO,
+        "ae_chosen_percentile": AE_CHOSEN_PERCENTILE,
+        "benign_internal_val_frac": BENIGN_INTERNAL_VAL_FRAC,
+        "device_type": DEVICE.type,
+    }
+    run_signature = compute_run_signature(
+        input_paths,
+        ae_config_path,
+        settings,
+        code_path=Path(__file__),
+        dependency_lock_path=ROOT / "uv.lock",
+    )
+    active_checkpoint_dir = checkpoint_directory(run_signature)
+    active_checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    print(f"Run signature: {run_signature}")
+    print(f"Signature-scoped checkpoints: {active_checkpoint_dir}")
+
+    joint_full_df = pd.concat([pd.read_parquet(path) for path in input_paths], ignore_index=True)
     assert joint_full_df.shape == (2_026_398, 92), f"unexpected joint population: {joint_full_df.shape}"
     print(f"Joint LOAO population: {joint_full_df.shape[0]:,} rows x {joint_full_df.shape[1]} columns")
 
@@ -375,7 +426,7 @@ def main():
 
     loop_start = time.perf_counter()
     for cat in CATEGORIES:
-        cached = load_checkpoint(cat)
+        cached = load_checkpoint(cat, run_signature)
         if cached is not None:
             print(f"{cat:30s}  SKIPPED (checkpoint): RF={cached['rf_recall']:.4f} "
                   f"IF={cached['if_recall']:.4f} AE={cached['ae_recall']:.4f}")
@@ -383,7 +434,7 @@ def main():
 
         fold_start = time.perf_counter()
         result, scores_df = run_fold(cat, joint_full_df, rf_raw_feature_cols, ae_config)
-        save_checkpoint(result, scores_df)
+        save_checkpoint(result, scores_df, run_signature)
         if DEVICE.type == "cuda":
             torch.cuda.synchronize()
         print(f"{cat:30s}  RF={result['rf_recall']:.4f} IF={result['if_recall']:.4f} "
@@ -392,11 +443,12 @@ def main():
 
     print(f"\nFull loop wall-clock: {time.perf_counter() - loop_start:.1f}s (device={DEVICE})")
 
-    results = [load_checkpoint(cat) for cat in CATEGORIES]
+    results = [load_checkpoint(cat, run_signature) for cat in CATEGORIES]
     assert all(r is not None for r in results), "a fold failed silently -- missing checkpoint"
-    pd.DataFrame(results).to_csv(RESULTS_CSV, index=False)
-    print("Saved:", RESULTS_CSV)
-    print("Per-fold scores (incl. raw, pre-normalization):", CHECKPOINT_DIR)
+    active_results_path = results_path(run_signature)
+    pd.DataFrame(results).to_csv(active_results_path, index=False)
+    print("Saved:", active_results_path)
+    print("Per-fold scores (incl. raw, pre-normalization):", active_checkpoint_dir)
 
 
 if __name__ == "__main__":

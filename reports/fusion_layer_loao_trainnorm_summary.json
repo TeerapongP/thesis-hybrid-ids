@@ -1,0 +1,22 @@
+{
+  "source_signature": "68d8a1c08c18dd189faf73e487481845cb6f5b1d9930d70b9149c15c439af562",
+  "normalization": "train_fold_fitted",
+  "pooled_rows": 3626341,
+  "pooled_attack_rows": 425021,
+  "nested_pooled_f1": {
+    "fusion: confidence_weighted": 0.8280983275109729,
+    "fusion: weighted_average": 0.7456917973671131,
+    "fusion: max_score": 0.566158049320991,
+    "RF solo": 0.832728322273604,
+    "IF-v2 solo": 0.4409651738394248,
+    "AE-v2 solo": 0.889611376961998
+  },
+  "tuned_on_all_pooled_f1": {
+    "fusion: confidence_weighted": 0.8771805677989639,
+    "fusion: weighted_average": 0.7456917973671131,
+    "fusion: max_score": 0.6501401169495984,
+    "RF solo": 0.8430572628559722,
+    "IF-v2 solo": 0.5480547509946024,
+    "AE-v2 solo": 0.892801303974216
+  }
+}
