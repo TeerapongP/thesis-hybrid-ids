@@ -1,0 +1,19 @@
+{
+  "category": "DoS slowloris",
+  "n_test_rows": 325517,
+  "n_attack_rows": 5385,
+  "n_benign_rows": 320132,
+  "rf_recall": 0.6922934076137419,
+  "rf_fpr": 0.0012401134532005547,
+  "if_recall": 0.5821727019498607,
+  "if_fpr": 0.0970287256506691,
+  "ae_recall": 0.5847725162488394,
+  "ae_fpr": 0.009483588019941773,
+  "fused_recall": 0.9654596100278552,
+  "fused_fpr": 0.002514587732560319,
+  "fusion_strategy": "confidence_weighted",
+  "confidence_threshold": 0.95,
+  "fused_decision_threshold": 0.05,
+  "ae_fold_threshold": 0.0015483360039070249,
+  "fused_recall_val_tuned_threshold": 0.9654596100278552
+}

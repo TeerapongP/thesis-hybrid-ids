@@ -1,0 +1,14 @@
+{
+  "priority": "HIGH",
+  "explanation_th": "ตรวจพบปริมาณการเชื่อมต่อ HTTP จำนวนมากผิดปกติจากต้นทาง 198.51.100.23 ไปยัง WEB-APP01.campus.local ที่พอร์ต 80 เมื่อเวลา 2026-07-15T14:05:10+07:00 — โมเดล Random Forest จำแนกเป็น DoS Hulk และ Fusion Layer ให้คะแนนรวม fused_score=0.98 ด้วยความมั่นใจสูง (confidence=0.99) ซึ่งตรงกับเทคนิค MITRE ATT&CK T1498 ในกลวิธี impact ลักษณะการโจมตีแบบ Network Denial of Service ที่ทำให้ทรัพยากรเครือข่ายของเซิร์ฟเวอร์เป้าหมายถูกใช้จนหมด",
+  "technique_id": "T1498",
+  "mitre_tactic": "impact",
+  "affected_asset": "WEB-APP01.campus.local",
+  "remediation": [
+    "บล็อกการเชื่อมต่อจากต้นทาง 198.51.100.23 ที่ไฟร์วอลล์/WAF ทันที",
+    "เปิดใช้งาน rate limiting บน WEB-APP01.campus.local สำหรับพอร์ต 80",
+    "ตรวจสอบ log การเชื่อมต่อย้อนหลัง 1 ชั่วโมงเพื่อยืนยันแหล่งที่มาของการโจมตีเพิ่มเติม"
+  ],
+  "confidence": 0.99,
+  "response_ms": 1800
+}

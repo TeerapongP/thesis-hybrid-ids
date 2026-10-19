@@ -1,0 +1,8 @@
+{
+  "category": "DDoS",
+  "recall": 0.6385473463839892,
+  "fpr": 0.10937988079917034,
+  "n_test_rows": 448146,
+  "n_attack_rows": 128014,
+  "n_benign_rows": 320132
+}

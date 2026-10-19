@@ -1,0 +1,18 @@
+{
+  "source_ip": "203.0.113.44",
+  "dst_ip": "192.168.20.15",
+  "affected_asset": "AUTH-SVR01.campus.local",
+  "dst_port": 22,
+  "timestamp": "2026-07-15T10:22:05+07:00",
+  "rf_predicted_label": "SSH-Patator",
+  "fused_score": 0.55,
+  "fused_prediction": 1,
+  "confidence": 0.55,
+  "model_used": "if_ae_fallback",
+  "rag_top_chunk": {
+    "technique_id": "T1110.001",
+    "chunk_type": "detection",
+    "tactic": "credential-access",
+    "document": "Detects repeated failed authentication attempts against the same account or service in a short time window, consistent with password guessing/brute force login attempts."
+  }
+}

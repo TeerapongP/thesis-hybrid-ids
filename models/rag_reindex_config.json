@@ -1,0 +1,47 @@
+{
+  "phase": "RAG Layer - scheduled re-fetch service (built on top of Phase 3's src/rag/rag_retrieval.py)",
+  "source_modules": ["src/ingestion/mitre_kb_extract.py", "src/rag/rag_reindex_service.py"],
+  "reindex_interval": {
+    "env_key": "RAG_REINDEX_HOURS",
+    "value": 168,
+    "unit": "hours",
+    "note": "168h = 7 days. Set 2026-07-18, replacing the previous value of 24 recorded during Phase 3 (docs/rag_chunking_plan.md/HANDOFF_RAG_PHASE3.md era). This service reads the value only to log/document it -- it does not sleep or loop itself (see invocation_mode below)."
+  },
+  "invocation_mode": {
+    "chosen": "one_shot_external_scheduler",
+    "rejected": ["long_running_loop_process", "self_registering_os_scheduler_task"],
+    "reasoning": "Matches this repo's existing pattern: every src/*.py pipeline script (eda_sanity_check.py, preprocess_pipeline.py, label_builder.py, feature_extractor.py, build_cross_dataset_eval.py, ...) is a one-shot invocation, nothing in this repo runs as a background daemon today. src/rag/rag_reindex_service.py does a single check-and-maybe-rebuild and exits; the operator registers it with Windows Task Scheduler or cron at the RAG_REINDEX_HOURS interval (exact commands printed at the end of every run and in reports/rag_reindex_log.csv's sibling report). Explicitly NOT registered as an actual scheduled task by this build -- that is a system-level change outside the repo, left for the user to do when ready.",
+    "confirmed_with_user": "2026-07-18, AskUserQuestion -- user chose 'one-shot script only' over the --loop and auto-register-Task-Scheduler alternatives that were also offered."
+  },
+  "source_of_truth": {
+    "provider": "mitre-attack/attack-stix-data GitHub repo (enterprise-attack/enterprise-attack.json), via src/ingestion/mitre_kb_extract.py",
+    "not_opencti": "Deliberately, permanently -- see CLAUDE.md's 'RAG Layer -- knowledge base source decision' (Detection Strategies/Analytics unsupported by OpenCTI's data model; Enterprise/ICS mitigation entity-merge bug). This service does not import, call, or reference anything under opencti/ -- confirmed by inspection of both src/ingestion/mitre_kb_extract.py and src/rag/rag_reindex_service.py's import lists.",
+    "phase_1_script_gap_note": "No Phase-1-extraction script existed in this repo before this service was built -- data/knowledge_base/mitre_techniques.json was checked in directly (git log shows it first appears in the initial commit, no generating script in history). src/ingestion/mitre_kb_extract.py is that extraction logic written for the first time as a reusable module, not a copy of a pre-existing script. It was verified byte-for-byte against the checked-in mitre_techniques.json before being used by the reindex service: a fresh fetch on 2026-07-18 reproduced source{} and all 11 techniques' description/detection/mitigations/tactics/platforms/sub_techniques/etc. fields exactly (kb == current_kb, Python dict equality), after fixing two ordering-only bugs found during that verification (platforms must keep raw STIX list order, not be sorted; detection text's per-analytic '[Log sources: ...]' list must be alphabetically sorted, not left in STIX relationship-encounter order) -- both fixed in src/ingestion/mitre_kb_extract.py before this config was written."
+  },
+  "detection_field_reconstruction": {
+    "why_needed": "Confirmed live on 2026-07-18: the current STIX bundle has NO flat x_mitre_detection field on attack-pattern objects any more (it is empty/absent for all 11 target techniques). Detection guidance now lives in separate x-mitre-detection-strategy (699 objects) / x-mitre-analytic (1758 objects) STIX types, linked via 'detects' relationships (strategy -> technique) and each strategy's x_mitre_analytic_refs list -- this is exactly the schema gap CLAUDE.md's OpenCTI investigation found OpenCTI has zero support for.",
+    "reconstruction": "mitre_kb_extract.reconstruct_detection_text() rebuilds the 'Behavioral Detection Strategy for X\\n- Analytic NNNN: <description> [Log sources: <sorted, deduped log source names>]' text format already present in the checked-in KB, from the strategy's name + each linked analytic's name/description/x_mitre_log_source_references. Revoked/deprecated strategies are skipped."
+  },
+  "diff_strategy": {
+    "compared_fields": ["description", "detection", "mitigations"],
+    "not_compared": ["tactics", "platforms", "sub_techniques", "deprecated", "revoked", "url", "attack_version", "name"],
+    "reasoning": "Only description/detection/mitigations text is ever embedded into a chunk (docs/rag_chunking_plan.md's 45-chunk design: 11 description + 11 detection + 23 deduplicated mitigation). A change to any other field (e.g. a technique gaining a new platform, or its tactics list being re-tagged) would not change retrieval behavior at all, so comparing it would only produce rebuild-triggering noise with no benefit -- this mirrors the project's general discipline of not doing unnecessary work.",
+    "granularity": "per technique_id, not a single whole-file hash -- src/rag_reindex_service.diff_techniques() returns exactly which technique_ids changed, logged in reports/rag_reindex_log.csv's techniques_changed column, so a future investigation can see which technique(s) drove a given rebuild without re-diffing manually.",
+    "mitre_version_changed_is_separate_from_content_changed": "source.attack_version bumping (a new MITRE ATT&CK release) does NOT by itself trigger a rebuild -- only an actual content diff on one of the 11 target techniques does. Both booleans are logged independently per run so a version bump with zero content impact on this KB's 11 techniques is visible in the log but correctly does not cost an unnecessary re-embed."
+  },
+  "backup_strategy": {
+    "location": "data/knowledge_base/history/mitre_techniques_<UTC timestamp>.json",
+    "trigger": "only written when content_changed=true and the run is not --dry-run, right before mitre_techniques.json is overwritten",
+    "reasoning": "Every real content update is individually recoverable -- the original Phase 1 artifact was never versioned anywhere else, so this is the only history that will exist once a scheduled rebuild first overwrites it."
+  },
+  "rebuild_mechanism": {
+    "reused_unchanged": "src/rag_retrieval.build_index(force=True) -- the exact Phase 3 chunking/embedding/upsert code (build_chunks, verify_chunk_counts, embed_texts, collection.upsert) is called as-is, not reimplemented. force=True is required because build_index's own default skip-if-count-matches check only looks at collection.count() == 45, which would not detect a same-count content change (e.g. an edited description with no chunk added/removed).",
+    "post_condition": "rag_retrieval.build_index already asserts collection.count() == EXPECTED_CHUNK_COUNT (45) after every build and raises if not -- this service does not duplicate that check, it relies on build_index's own guard and would surface any failure as an 'error' row in reports/rag_reindex_log.csv."
+  },
+  "logging": {
+    "file": "reports/rag_reindex_log.csv",
+    "mode": "append-only across runs (NOT overwritten each run, unlike this repo's other reports/*_report.txt convention) -- deliberate, since this log's whole purpose is a history across many scheduled runs over time, not a single latest-run snapshot",
+    "columns": ["run_timestamp_utc", "previous_attack_version", "fetched_attack_version", "mitre_version_changed", "content_changed", "techniques_changed", "index_rebuilt", "chroma_collection_count", "dry_run", "status", "error_message"],
+    "written_on_every_run": "including dry runs and error runs -- a failed fetch still produces a row with status=error and error_message set, so the log is a complete audit trail, not just a record of successful rebuilds."
+  }
+}

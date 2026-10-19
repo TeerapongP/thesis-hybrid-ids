@@ -1,0 +1,118 @@
+======================================================================
+=== dataset: cicids2017 ===
+======================================================================
+  โหลด ./data/processed\cicids2017_labeled.parquet  shape=(2520798, 83)
+======================================================================
+cicids2017: STEP 1 — join คอลัมน์ MITRE กลับเข้า train/val/test
+======================================================================
+  cicids2017/train: join label กลับเข้า split สำเร็จ 100% (1,512,478 แถว)
+  cicids2017/val: join label กลับเข้า split สำเร็จ 100% (504,160 แถว)
+  cicids2017/test: join label กลับเข้า split สำเร็จ 100% (504,160 แถว)
+======================================================================
+cicids2017: STEP 2 — network feature columns (numeric dtype, ไม่รวม identifier/label)
+======================================================================
+  network feature columns (78): ['Destination Port', 'Flow Duration', 'Total Fwd Packets', 'Total Backward Packets', 'Total Length of Fwd Packets', 'Total Length of Bwd Packets', 'Fwd Packet Length Max', 'Fwd Packet Length Min', 'Fwd Packet Length Mean', 'Fwd Packet Length Std', 'Bwd Packet Length Max', 'Bwd Packet Length Min', 'Bwd Packet Length Mean', 'Bwd Packet Length Std', 'Flow Bytes/s', 'Flow Packets/s', 'Flow IAT Mean', 'Flow IAT Std', 'Flow IAT Max', 'Flow IAT Min', 'Fwd IAT Total', 'Fwd IAT Mean', 'Fwd IAT Std', 'Fwd IAT Max', 'Fwd IAT Min', 'Bwd IAT Total', 'Bwd IAT Mean', 'Bwd IAT Std', 'Bwd IAT Max', 'Bwd IAT Min', 'Fwd PSH Flags', 'Bwd PSH Flags', 'Fwd URG Flags', 'Bwd URG Flags', 'Fwd Header Length', 'Bwd Header Length', 'Fwd Packets/s', 'Bwd Packets/s', 'Min Packet Length', 'Max Packet Length', 'Packet Length Mean', 'Packet Length Std', 'Packet Length Variance', 'FIN Flag Count', 'SYN Flag Count', 'RST Flag Count', 'PSH Flag Count', 'ACK Flag Count', 'URG Flag Count', 'CWE Flag Count', 'ECE Flag Count', 'Down/Up Ratio', 'Average Packet Size', 'Avg Fwd Segment Size', 'Avg Bwd Segment Size', 'Fwd Header Length.1', 'Fwd Avg Bytes/Bulk', 'Fwd Avg Packets/Bulk', 'Fwd Avg Bulk Rate', 'Bwd Avg Bytes/Bulk', 'Bwd Avg Packets/Bulk', 'Bwd Avg Bulk Rate', 'Subflow Fwd Packets', 'Subflow Fwd Bytes', 'Subflow Bwd Packets', 'Subflow Bwd Bytes', 'Init_Win_bytes_forward', 'Init_Win_bytes_backward', 'act_data_pkt_fwd', 'min_seg_size_forward', 'Active Mean', 'Active Std', 'Active Max', 'Active Min', 'Idle Mean', 'Idle Std', 'Idle Max', 'Idle Min']
+======================================================================
+cicids2017: STEP 3 — impute คอลัมน์ sentinel (fit median จาก train เท่านั้น)
+======================================================================
+  Init_Win_bytes_forward: median (จาก train) = 1024.0
+  Init_Win_bytes_backward: median (จาก train) = 235.0
+======================================================================
+cicids2017: STEP 4 — CTI features (fit encoding จาก train เท่านั้น)
+======================================================================
+  technique_id_encoded mapping (7 ค่า, null->0): {'T1046': 1, 'T1071.001': 2, 'T1110': 3, 'T1110.001': 4, 'T1190': 5, 'T1498': 6, 'T1499.002': 7}
+  tactic_encoded mapping (5 ค่า, null->0): {'Command and Control': 1, 'Credential Access': 2, 'Discovery': 3, 'Impact': 4, 'Initial Access': 5}
+  mapping_confidence_encoded mapping (ตายตัว): {'n/a': 0, 'low': 1, 'medium': 2, 'high': 3}
+======================================================================
+cicids2017: STEP 5 — MinMaxScaler (fit บน train เท่านั้น, เฉพาะ network features)
+======================================================================
+  fit บน train เท่านั้น: 78 คอลัมน์ (ไม่แตะ ['Init_Win_bytes_forward_missing', 'Init_Win_bytes_backward_missing', 'technique_id_encoded', 'tactic_encoded', 'mapping_confidence_encoded', 'is_known_technique'])
+  scale แล้ว: train, val, test (ใช้ scaler ตัวเดียวกันที่ fit จาก train)
+======================================================================
+cicids2017: STEP 6 — SMOTE (train เท่านั้น)
+======================================================================
+  cicids2017: SMOTE sampling_strategy ต่อ class ที่จะถูกขยาย (เพดาน = min(majority, 20x ของเดิม, 50,000)):
+    DoS GoldenEye                           6,172 ->    50,000
+    FTP-Patator                             3,559 ->    50,000
+    DoS slowloris                           3,231 ->    50,000
+    DoS Slowhttptest                        3,137 ->    50,000
+    SSH-Patator                             1,931 ->    38,620
+    Bot                                     1,169 ->    23,380
+    Web Attack - Brute Force                  882 ->    17,640
+    Web Attack - XSS                          391 ->     7,820
+    Infiltration                               22 ->       440
+    Web Attack - Sql Injection                 13 ->       260
+    Heartbleed                                  7 ->       140
+  cicids2017: SMOTE k_neighbors=5  แถวก่อน=1,512,478  แถวหลัง=1,780,264  (เพิ่มขึ้น 267,786)
+  cicids2017/val: ไม่ถูก SMOTE แตะ (504,160 แถว เท่ากับก่อน SMOTE)
+  cicids2017/test: ไม่ถูก SMOTE แตะ (504,160 แถว เท่ากับก่อน SMOTE)
+======================================================================
+cicids2017: STEP 7 — เซฟผลลัพธ์
+======================================================================
+  network features: 78
+  sentinel missing-flag features (เพิ่มจาก impute STEP 3): 2 ['Init_Win_bytes_forward_missing', 'Init_Win_bytes_backward_missing']
+  CTI features: 4 ['technique_id_encoded', 'tactic_encoded', 'mapping_confidence_encoded', 'is_known_technique']
+  รวม feature columns ทั้งหมดต่อแถว (ไม่รวม reference/label): 84
+  เซฟ cicids2017/train -> ./data/features\cicids2017_features_train.parquet  shape=(1780264, 89)
+  เซฟ cicids2017/val -> ./data/features\cicids2017_features_val.parquet  shape=(504160, 89)
+  เซฟ cicids2017/test -> ./data/features\cicids2017_features_test.parquet  shape=(504160, 89)
+======================================================================
+=== dataset: unswnb15 ===
+======================================================================
+  โหลด ./data/processed\unswnb15_labeled.parquet  shape=(306173, 82)
+======================================================================
+unswnb15: STEP 1 — join คอลัมน์ MITRE กลับเข้า train/val/test
+======================================================================
+  unswnb15/train: join label กลับเข้า split สำเร็จ 100% (183,703 แถว)
+  unswnb15/val: join label กลับเข้า split สำเร็จ 100% (61,235 แถว)
+  unswnb15/test: join label กลับเข้า split สำเร็จ 100% (61,235 แถว)
+======================================================================
+unswnb15: STEP 2 — network feature columns (numeric dtype, ไม่รวม identifier/label)
+======================================================================
+  network feature columns (76): ['Flow Duration', 'Total Fwd Packets', 'Total Backward Packets', 'Total Length of Fwd Packets', 'Total Length of Bwd Packets', 'Fwd Packet Length Max', 'Fwd Packet Length Min', 'Fwd Packet Length Mean', 'Fwd Packet Length Std', 'Bwd Packet Length Max', 'Bwd Packet Length Min', 'Bwd Packet Length Mean', 'Bwd Packet Length Std', 'Flow Bytes/s', 'Flow Packets/s', 'Flow IAT Mean', 'Flow IAT Std', 'Flow IAT Max', 'Flow IAT Min', 'Fwd IAT Total', 'Fwd IAT Mean', 'Fwd IAT Std', 'Fwd IAT Max', 'Fwd IAT Min', 'Bwd IAT Total', 'Bwd IAT Mean', 'Bwd IAT Std', 'Bwd IAT Max', 'Bwd IAT Min', 'Fwd PSH Flags', 'Bwd PSH Flags', 'Fwd URG Flags', 'Bwd URG Flags', 'Fwd Header Length', 'Bwd Header Length', 'Fwd Packets/s', 'Bwd Packets/s', 'Min Packet Length', 'Max Packet Length', 'Packet Length Mean', 'Packet Length Std', 'Packet Length Variance', 'FIN Flag Count', 'SYN Flag Count', 'RST Flag Count', 'PSH Flag Count', 'ACK Flag Count', 'URG Flag Count', 'CWE Flag Count', 'ECE Flag Count', 'Down/Up Ratio', 'Average Packet Size', 'Avg Fwd Segment Size', 'Avg Bwd Segment Size', 'Fwd Avg Bytes/Bulk', 'Fwd Avg Packets/Bulk', 'Fwd Avg Bulk Rate', 'Bwd Avg Bytes/Bulk', 'Bwd Avg Packets/Bulk', 'Bwd Avg Bulk Rate', 'Subflow Fwd Packets', 'Subflow Fwd Bytes', 'Subflow Bwd Packets', 'Subflow Bwd Bytes', 'Init_Win_bytes_forward', 'Init_Win_bytes_backward', 'act_data_pkt_fwd', 'min_seg_size_forward', 'Active Mean', 'Active Std', 'Active Max', 'Active Min', 'Idle Mean', 'Idle Std', 'Idle Max', 'Idle Min']
+======================================================================
+unswnb15: STEP 3 — impute คอลัมน์ sentinel (fit median จาก train เท่านั้น)
+======================================================================
+======================================================================
+unswnb15: STEP 4 — CTI features (fit encoding จาก train เท่านั้น)
+======================================================================
+  technique_id_encoded mapping (5 ค่า, null->0): {'T1059': 1, 'T1210': 2, 'T1498': 3, 'T1505.003': 4, 'T1595': 5}
+  tactic_encoded mapping (5 ค่า, null->0): {'Execution': 1, 'Impact': 2, 'Lateral Movement': 3, 'Persistence': 4, 'Reconnaissance': 5}
+  mapping_confidence_encoded mapping (ตายตัว): {'n/a': 0, 'low': 1, 'medium': 2, 'high': 3}
+======================================================================
+unswnb15: STEP 5 — MinMaxScaler (fit บน train เท่านั้น, เฉพาะ network features)
+======================================================================
+  fit บน train เท่านั้น: 76 คอลัมน์ (ไม่แตะ ['technique_id_encoded', 'tactic_encoded', 'mapping_confidence_encoded', 'is_known_technique'])
+  scale แล้ว: train, val, test (ใช้ scaler ตัวเดียวกันที่ fit จาก train)
+======================================================================
+unswnb15: STEP 6 — SMOTE (train เท่านั้น)
+======================================================================
+  unswnb15: SMOTE sampling_strategy ต่อ class ที่จะถูกขยาย (เพดาน = min(majority, 20x ของเดิม, 50,000)):
+    1                                      48,702 ->    50,000
+  unswnb15: SMOTE k_neighbors=5  แถวก่อน=183,703  แถวหลัง=185,001  (เพิ่มขึ้น 1,298)
+  [WARNING] unswnb15: label ต่อไปนี้ map ไปที่ reference columns มากกว่า 1 ชุดค่า -> เติม NaN ให้แถว synthetic ของ label เหล่านี้แทนการเดาค่า: [1]
+  unswnb15/val: ไม่ถูก SMOTE แตะ (61,235 แถว เท่ากับก่อน SMOTE)
+  unswnb15/test: ไม่ถูก SMOTE แตะ (61,235 แถว เท่ากับก่อน SMOTE)
+======================================================================
+unswnb15: STEP 7 — เซฟผลลัพธ์
+======================================================================
+  network features: 76
+  sentinel missing-flag features (เพิ่มจาก impute STEP 3): 0 []
+  CTI features: 4 ['technique_id_encoded', 'tactic_encoded', 'mapping_confidence_encoded', 'is_known_technique']
+  รวม feature columns ทั้งหมดต่อแถว (ไม่รวม reference/label): 80
+  เซฟ unswnb15/train -> ./data/features\unswnb15_features_train.parquet  shape=(185001, 86)
+  เซฟ unswnb15/val -> ./data/features\unswnb15_features_val.parquet  shape=(61235, 86)
+  เซฟ unswnb15/test -> ./data/features\unswnb15_features_test.parquet  shape=(61235, 86)
+======================================================================
+สรุปผลรวมทุก dataset
+======================================================================
+--- cicids2017 ---
+  feature count: network=78  sentinel_missing_flags=2  cti=4  รวม=84
+  SMOTE ถูกเรียกใช้จริงหรือไม่ (มี class ต่ำกว่าเพดาน): True
+  train rows: ก่อน SMOTE=1,512,478  หลัง SMOTE=1,780,264
+  val rows=504,160  test rows=504,160 (ไม่ถูก SMOTE แตะเลย)
+--- unswnb15 ---
+  feature count: network=76  sentinel_missing_flags=0  cti=4  รวม=80
+  SMOTE ถูกเรียกใช้จริงหรือไม่ (มี class ต่ำกว่าเพดาน): True
+  train rows: ก่อน SMOTE=183,703  หลัง SMOTE=185,001
+  val rows=61,235  test rows=61,235 (ไม่ถูก SMOTE แตะเลย)

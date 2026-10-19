@@ -1,0 +1,19 @@
+{
+  "category": "DoS Hulk",
+  "n_test_rows": 492978,
+  "n_attack_rows": 172846,
+  "n_benign_rows": 320132,
+  "rf_recall": 0.012959513092579521,
+  "rf_fpr": 0.0010183299389002036,
+  "if_recall": 0.9778994017796189,
+  "if_fpr": 0.14992877937850638,
+  "ae_recall": 0.9589403283848049,
+  "ae_fpr": 0.009514825134631965,
+  "fused_recall": 0.9881165893338579,
+  "fused_fpr": 0.0023833918508615196,
+  "fusion_strategy": "confidence_weighted",
+  "confidence_threshold": 0.95,
+  "fused_decision_threshold": 0.05,
+  "ae_fold_threshold": 0.0014622261514887214,
+  "fused_recall_val_tuned_threshold": 0.9881165893338579
+}

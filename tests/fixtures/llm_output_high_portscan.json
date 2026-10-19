@@ -1,0 +1,14 @@
+{
+  "priority": "HIGH",
+  "explanation_th": "ตรวจพบพฤติกรรมการสแกนพอร์ต (Network Service Discovery) จากต้นทาง 10.20.14.87 ไปยัง FS-PRINT02.campus.local ที่พอร์ต 445 เมื่อเวลา 2026-07-14T09:12:33+07:00 โมเดล Random Forest จำแนกเป็น PortScan และ Fusion Layer ให้คะแนนรวม fused_score=0.91 ซึ่งตรงกับเทคนิค MITRE ATT&CK T1046 ในกลวิธี discovery — ลักษณะการเชื่อมต่อจำนวนมากไปยังปลายทางเดียวกันในช่วงเวลาสั้น ๆ สอดคล้องกับการสแกนบริการเครือข่ายเพื่อหาช่องโหว่",
+  "technique_id": "T1046",
+  "mitre_tactic": "discovery",
+  "affected_asset": "FS-PRINT02.campus.local",
+  "remediation": [
+    "บล็อกการเชื่อมต่อจากต้นทาง 10.20.14.87 ที่ไฟร์วอลล์ทันที",
+    "ตรวจสอบ log การเชื่อมต่อขาเข้าที่พอร์ต 445 บน FS-PRINT02.campus.local ย้อนหลัง 24 ชั่วโมง",
+    "ประสานทีมเครือข่ายเพื่อตรวจสอบว่ามีการเคลื่อนไหวด้านข้าง (lateral movement) ตามมาหลังจากการสแกนนี้หรือไม่"
+  ],
+  "confidence": 0.91,
+  "response_ms": 2400
+}

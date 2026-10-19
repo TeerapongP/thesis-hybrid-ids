@@ -1,0 +1,19 @@
+{
+  "category": "DoS Slowhttptest",
+  "n_test_rows": 325360,
+  "n_attack_rows": 5228,
+  "n_benign_rows": 320132,
+  "rf_recall": 0.2115531752104055,
+  "rf_fpr": 0.0012588557220146689,
+  "if_recall": 0.8374139250191278,
+  "if_fpr": 0.09755975660040234,
+  "ae_recall": 0.31197398622800304,
+  "ae_fpr": 0.009780340609498582,
+  "fused_recall": 0.8435348125478195,
+  "fused_fpr": 0.0024708557719940526,
+  "fusion_strategy": "confidence_weighted",
+  "confidence_threshold": 0.95,
+  "fused_decision_threshold": 0.05,
+  "ae_fold_threshold": 0.001264458172954619,
+  "fused_recall_val_tuned_threshold": 0.8435348125478195
+}

@@ -1,0 +1,51 @@
+Ensemble test evaluation
+Run ID: 20261019T163551126613Z_c3f2409e369e44ada7fd81d65d536d56
+Run started at UTC: 2026-10-19T16:35:51.126613+00:00
+Dataset and split: CICIDS-2017 test split
+Fusion strategy: rf_ae_or
+Confidence threshold: 0.1
+Fused decision threshold: 0.05
+Autoencoder solo threshold: 0.0021476084366440773
+Fusion config SHA-256: e5a66c7c49119acdda8c612e4cc7e86f1460772afab0894ca7f812b59b67afc1
+Evaluation source SHA-256: 6b9183ca573e064432a0f60a6cd2dae015dc5aafffe517ae8b4469a1af5fa5a9
+Fusion source SHA-256: 8f401920d06b08e20b30502d9a0d45844a3135e564ebad4545fc79eb53922139
+Git HEAD revision: f9e6b147a3ee7eaf06205853dd39b8be05a09f5b
+Run-relevant working tree changes present: True
+RF test data SHA-256: 76cdf0917a16f42abb3820c9f82f19d95dbd34b8897f9d2f9be6e20a1a1bf876
+Behavioral test data SHA-256: d451d6ac985859e59ec27b5fe03a051a18b1feca2c66920de93621e5833aca7f
+Random Forest model SHA-256: c2ae8ecf8b0083cd2d7b78e336df1d4da4180ca7a1781fc6b706114c2ffe8a65
+Isolation Forest model SHA-256: 514ba3f4735494520185a01d6e9eb5477de1be130d31d0b0c36dee93a9f1b40b
+Autoencoder weights SHA-256: 84f678d3df7f51f3402fc491894c9ace24b8f21f3753f31568dbe3825e6fbf5d
+RF full test rows: 504160
+Fused joined test rows: 405142
+RF feature count: 80
+Behavioral feature count: 92
+
+Aggregate model metrics
+                         model  precision   recall       f1  auc_roc
+Ensemble (confidence_weighted)   0.973417 0.999871 0.986467 0.999737
+ RF solo (argmax, multi-class)   0.995784 0.995725 0.995754 0.999735
+     AE-v2 solo (99th pct thr)   0.955213 0.831846 0.889271 0.979723
+IF-v2 solo (contamination=0.2)   0.588347 0.553460 0.570370 0.838083
+
+Per-category recall on fused test population
+                                n  ensemble_recall  rf_recall
+Label                                                        
+Bot                           390         0.997436   0.882051
+DDoS                        25603         1.000000   0.999648
+DoS GoldenEye                2057         1.000000   0.998542
+DoS Hulk                    34569         0.999798   0.996934
+DoS Slowhttptest             1046         1.000000   0.996176
+DoS slowloris                1077         0.999071   0.996286
+FTP-Patator                  1186         1.000000   1.000000
+Heartbleed                      2         1.000000   0.500000
+Infiltration                    7         1.000000   1.000000
+PortScan                    18139         0.999890   0.989911
+SSH-Patator                   644         1.000000   0.995342
+Web Attack - Brute Force      294         1.000000   0.989796
+Web Attack - Sql Injection      4         1.000000   0.750000
+Web Attack - XSS              130         1.000000   0.992308
+
+Ensemble false-positive rate on test BENIGN: 0.007266 (n=319994)
+RF false-positive rate on test BENIGN: 0.001122
+RF full-population rows: 504160

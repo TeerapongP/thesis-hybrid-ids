@@ -1,0 +1,53 @@
+======================================================================
+PHASE 1: โหลดไฟล์ split เดิม + behavioral labeled
+======================================================================
+behavioral_labeled shape = (2520961, 102)
+cicids2017_train.parquet shape = (1512478, 79)
+cicids2017_val.parquet shape = (504160, 79)
+cicids2017_test.parquet shape = (504160, 79)
+
+join key: 79 คอลัมน์ (คาดว่า 79)
+======================================================================
+PHASE 2 (train): diagnostic outer join -- ตรวจก่อน join จริงเสมอ
+======================================================================
+  total=1,512,478  matched=1,216,171  unmatched=296,307 (19.59%)
+  BENIGN: total=1,257,033  unmatched=296,307 (23.57%)  |  non-BENIGN unmatched=0
+  drift check: total_unmatched 19.59% (baseline 19.59%, drift 0.00pp)  |  benign_unmatched 23.57% (baseline 23.57%, drift 0.00pp)
+======================================================================
+PHASE 3 (train): join จริง (validate='1:1') + drop แถว BENIGN ที่ไม่ match
+======================================================================
+  train: join แล้ว drop แถว BENIGN ที่ไม่ match 296,307 แถว (1,512,478 -> 1,216,171 แถว)
+  เซฟไว้ที่ ./data/processed/behavioral\cicids2017_behavioral_train.parquet (1,216,171 แถว, 92 คอลัมน์)
+======================================================================
+PHASE 2 (val): diagnostic outer join -- ตรวจก่อน join จริงเสมอ
+======================================================================
+  total=504,160  matched=405,085  unmatched=99,075 (19.65%)
+  BENIGN: total=419,012  unmatched=99,075 (23.64%)  |  non-BENIGN unmatched=0
+  drift check: total_unmatched 19.65% (baseline 19.65%, drift 0.00pp)  |  benign_unmatched 23.64% (baseline 23.64%, drift 0.00pp)
+======================================================================
+PHASE 3 (val): join จริง (validate='1:1') + drop แถว BENIGN ที่ไม่ match
+======================================================================
+  val: join แล้ว drop แถว BENIGN ที่ไม่ match 99,075 แถว (504,160 -> 405,085 แถว)
+  เซฟไว้ที่ ./data/processed/behavioral\cicids2017_behavioral_val.parquet (405,085 แถว, 92 คอลัมน์)
+======================================================================
+PHASE 2 (test): diagnostic outer join -- ตรวจก่อน join จริงเสมอ
+======================================================================
+  total=504,160  matched=405,142  unmatched=99,018 (19.64%)
+  BENIGN: total=419,012  unmatched=99,018 (23.63%)  |  non-BENIGN unmatched=0
+  drift check: total_unmatched 19.64% (baseline 19.64%, drift 0.00pp)  |  benign_unmatched 23.63% (baseline 23.63%, drift 0.00pp)
+======================================================================
+PHASE 3 (test): join จริง (validate='1:1') + drop แถว BENIGN ที่ไม่ match
+======================================================================
+  test: join แล้ว drop แถว BENIGN ที่ไม่ match 99,018 แถว (504,160 -> 405,142 แถว)
+  เซฟไว้ที่ ./data/processed/behavioral\cicids2017_behavioral_test.parquet (405,142 แถว, 92 คอลัมน์)
+======================================================================
+สรุปผลลัพธ์
+======================================================================
+Phase 1 ของ Option A (row-hash join validation) เสร็จสมบูรณ์:
+  - ทุก attack category match 100% ระหว่างสอง distribution (ไม่มีแถว attack ถูก drop เลย)
+  - แถว BENIGN ที่ไม่ match (~23.6%) ถูก drop ออกตามนโยบายที่ตกลงไว้ ดูตัวเลขจริงต่อ split ด้านบน
+  - ผลลัพธ์: data/processed/behavioral/cicids2017_behavioral_{train,val,test}.parquet
+  - ยังไม่ scale/SMOTE/impute -- นั่นคือ Phase 2 (แผนแยกต่างหาก ยังไม่เริ่ม)
+  - ข้อจำกัดที่ต้อง carry ไป Phase 2: Autoencoder BENIGN training population ลดลง ~23.6%;
+    04_fusion_layer.ipynb row_index positional-alignment assumption ต้อง re-derive สำหรับ
+    การเทียบ fusion ในอนาคตกับ Random Forest (ซึ่งยังใช้ population เดิมไม่ลด)

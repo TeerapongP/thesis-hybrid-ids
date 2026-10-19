@@ -1,0 +1,10 @@
+{
+  "category": "FTP-Patator",
+  "recall": 0.0005058168942842691,
+  "fpr": 0.009964639586170705,
+  "n_test_rows": 326063,
+  "n_attack_rows": 5931,
+  "n_benign_rows": 320132,
+  "threshold": 0.0025059685576707125,
+  "epochs_run": 30
+}

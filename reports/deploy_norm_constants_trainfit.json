@@ -1,0 +1,8 @@
+{
+  "if_min": 0.3288020239277581,
+  "if_max": 0.6969734130072542,
+  "ae_min": 1.7595783674551058e-06,
+  "ae_max": 0.1224876269698143,
+  "fit_population": "data/features/behavioral/cicids2017_behavioral_features_train.parquet",
+  "fit_rows": 1483957
+}

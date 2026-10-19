@@ -1,0 +1,36 @@
+RF inference: 6.3s for 504,160 rows -> 12.49 us/flow
+IF-v2 inference: 2.2s -> 5.34 us/flow
+AE-v2 inference (cuda): 0.2s -> 0.58 us/flow
+
+Fused test population: 405,142 / RF full 504,160 = 80.36%
+
+=== TEST SET (CICIDS-2017), binary attack-vs-BENIGN, fused population n=405,142 ===
+                         model  precision  recall     f1  auc_roc
+Ensemble (confidence_weighted)     0.9928  0.9889 0.9908   0.9997
+ RF solo (argmax, multi-class)     0.9958  0.9957 0.9958   0.9997
+     AE-v2 solo (99th pct thr)     0.9552  0.8318 0.8893   0.9797
+IF-v2 solo (contamination=0.2)     0.5883  0.5535 0.5704   0.8381
+
+RF solo on FULL test population (n=504,160): P=0.9957 R=0.9957 F1=0.9957 AUC=0.9998
+RF multi-class macro F1 (full test): 0.8361 | weighted F1: 0.9982
+
+=== per-category recall on TEST (ensemble vs RF solo) ===
+                                n  ensemble_recall  rf_recall
+Label                                                        
+DoS Hulk                    34569           0.9951     0.9969
+DDoS                        25603           0.9993     0.9996
+PortScan                    18139           0.9770     0.9899
+DoS GoldenEye                2057           0.9903     0.9985
+FTP-Patator                  1186           0.9975     1.0000
+DoS slowloris                1077           0.9916     0.9963
+DoS Slowhttptest             1046           0.9943     0.9962
+SSH-Patator                   644           0.9317     0.9953
+Bot                           390           0.5949     0.8821
+Web Attack - Brute Force      294           0.7449     0.9898
+Web Attack - XSS              130           0.8231     0.9923
+Infiltration                    7           1.0000     1.0000
+Web Attack - Sql Injection      4           0.0000     0.7500
+Heartbleed                      2           1.0000     0.5000
+
+Ensemble FPR on test BENIGN: 0.001913  (n=319,994)
+RF solo   FPR on test BENIGN: 0.001122

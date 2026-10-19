@@ -1,0 +1,47 @@
+======================================================================
+STEP 1: ตรวจสอบ mitre_mapping.csv
+======================================================================
+  โหลด ./config/mitre_mapping.csv shape=(24, 6)
+  dataset ที่มีในตาราง: ['cicids2017', 'unswnb15']
+======================================================================
+STEP 2: โหลด cicids2017_clean.parquet
+======================================================================
+  shape=(2520798, 79)
+======================================================================
+STEP 3: apply_mitre_mapping (CICIDS-2017, label_col='Label')
+======================================================================
+======================================================================
+apply_mitre_mapping: dataset='cicids2017'  label_col='Label'
+======================================================================
+  แถวทั้งหมด: 2520798
+  แถวที่ไม่มี label ให้ map (เช่น normal traffic ที่ไม่มี attack_cat): 0
+  แถวที่มี label และ match กับ mitre_mapping.csv สำเร็จ (mapped): 2520798
+  แถวที่มี label แต่หา match ใน mitre_mapping.csv ไม่เจอ (unmapped): 0
+  ยืนยัน: ไม่มี label ไหนหลุด mapping (unmapped=0) — mitre_mapping.csv ครอบคลุมครบ
+  --- breakdown mapping_confidence (รวมแถวไม่มี label เป็น NaN) ---
+    n/a                                 n=  2095057
+    high                                n=   423105
+    medium                              n=     1984
+    low                                 n=      652
+เซฟ ./data/processed\cicids2017_labeled.parquet
+======================================================================
+STEP 4: โหลด unswnb15_clean.parquet
+======================================================================
+  shape=(306173, 78)
+======================================================================
+STEP 5: apply_mitre_mapping (UNSW-NB15, label_col='attack_cat')
+======================================================================
+======================================================================
+apply_mitre_mapping: dataset='unswnb15'  label_col='attack_cat'
+======================================================================
+  แถวทั้งหมด: 306173
+  แถวที่ไม่มี label ให้ map (เช่น normal traffic ที่ไม่มี attack_cat): 225003
+  แถวที่มี label และ match กับ mitre_mapping.csv สำเร็จ (mapped): 81170
+  แถวที่มี label แต่หา match ใน mitre_mapping.csv ไม่เจอ (unmapped): 0
+  ยืนยัน: ไม่มี label ไหนหลุด mapping (unmapped=0) — mitre_mapping.csv ครอบคลุมครบ
+  --- breakdown mapping_confidence (รวมแถวไม่มี label เป็น NaN) ---
+    NaN (ไม่มี label ให้ map)           n=   225003
+    medium                              n=    59846
+    high                                n=    16443
+    low                                 n=     4881
+เซฟ ./data/processed\unswnb15_labeled.parquet

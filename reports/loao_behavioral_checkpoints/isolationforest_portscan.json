@@ -1,0 +1,8 @@
+{
+  "category": "PortScan",
+  "recall": 0.46272079740666416,
+  "fpr": 0.09502104790905012,
+  "n_test_rows": 509738,
+  "n_attack_rows": 90694,
+  "n_benign_rows": 419044
+}

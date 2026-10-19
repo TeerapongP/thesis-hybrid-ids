@@ -1,0 +1,12 @@
+{
+  "backend": "ollama",
+  "model": "typhoon2.1-12b-instruct",
+  "orchestration": "LangChain ChatOllama; ChatOpenAI for the llama.cpp OpenAI-compatible endpoint",
+  "json_enforcement": "LangChain structured output with a Pydantic schema, followed by deterministic fact overrides",
+  "confidence_formula": "rf_confidence = abs(rf_attack_probability - 0.5) * 2; emitted with model_used by fusion_layer.fuse_with_metadata",
+  "technique_precedence": "Use RAG top-3 consensus; abstain with null technique_id/tactic when fewer than two hits agree",
+  "per_alert_fields": ["priority", "explanation_th", "technique_id", "mitre_tactic", "affected_asset", "remediation", "confidence", "response_ms"],
+  "excluded_live_fields": ["faithfulness_score", "hallucination_rate"],
+  "runtime_verified": false,
+  "runtime_verification_note": "Ollama is not installed on this machine; module and offline contract tests are verified, live throughput/GPU offload remain pending."
+}

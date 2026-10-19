@@ -1,0 +1,8 @@
+{
+  "category": "DoS slowloris",
+  "recall": 0.6051996285979573,
+  "fpr": 0.10881912161968671,
+  "n_test_rows": 424429,
+  "n_attack_rows": 5385,
+  "n_benign_rows": 419044
+}

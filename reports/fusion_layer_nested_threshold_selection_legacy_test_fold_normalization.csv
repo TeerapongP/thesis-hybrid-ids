@@ -1,0 +1,80 @@
+# Nested threshold selection (SS11): outer loop holds out one LOAO category at a time;
+# (confidence_threshold, decision_threshold) selected on the other 9 only, then applied
+# to the held-out category. 'tuned-on-all' rows reproduce SS7.2's own procedure for
+# comparison. Source: reports/fusion_layer_loao_checkpoints/*_scores.parquet, no retraining.
+# confidence_threshold grid: [np.float64(0.1), np.float64(0.3), np.float64(0.5), np.float64(0.7), np.float64(0.9), np.float64(0.95), np.float64(0.97), np.float64(0.99), np.float64(1.0)]
+# decision_threshold grid: 28 values, 0.005 to 0.950
+# NOTE: if_norm/ae_norm remain normalized on each fold's own zero-day test scores (SS7.1);
+#       nesting addresses threshold-selection optimism only.
+#
+# --- pooled: tuned-on-all vs nested, per candidate ---
+candidate,selection,precision,recall,f1
+fusion,tuned-on-all,0.9421630329231039,0.7829918992238031,0.8552345169472578
+fusion,nested,0.9118242249715379,0.7368012404092974,0.8150222522968014
+rf_solo,tuned-on-all,0.9248291571753986,0.7641975337689196,0.8368750652198279
+rf_solo,nested,0.9232173920827353,0.7279828526119886,0.814058056045948
+ae_solo,tuned-on-all,0.9616083329897899,0.8232204996929563,0.8870494222159122
+ae_solo,nested,0.9608530690353196,0.8175031351392049,0.8834005184120168
+#
+# --- per report category: selected thresholds and held-out recall ---
+candidate,selection,report_category,selected_confidence_threshold,selected_decision_threshold,recall
+fusion,tuned-on-all,Bot,0.99,0.05,0.018993839835728953
+fusion,tuned-on-all,DDoS,0.99,0.05,0.974573093567891
+fusion,tuned-on-all,DoS GoldenEye,0.99,0.05,0.9771534124052109
+fusion,tuned-on-all,DoS Hulk,0.99,0.05,0.9919176608078868
+fusion,tuned-on-all,DoS Slowhttptest,0.99,0.05,0.9196633511859219
+fusion,tuned-on-all,DoS slowloris,0.99,0.05,0.9654596100278552
+fusion,tuned-on-all,FTP-Patator,0.99,0.05,0.9726858877086495
+fusion,tuned-on-all,PortScan,0.99,0.05,0.07372042251968157
+fusion,tuned-on-all,SSH-Patator,0.99,0.05,0.9245107176141659
+fusion,tuned-on-all,Web Attack - Brute Force,0.99,0.05,0.7170068027210884
+fusion,nested,Bot,1.0,0.05,0.021560574948665298
+fusion,nested,DDoS,0.95,0.05,0.9045885606261815
+fusion,nested,DoS GoldenEye,1.0,0.1,0.8006027610344157
+fusion,nested,DoS Hulk,1.0,0.05,0.9930169052219895
+fusion,nested,DoS Slowhttptest,1.0,0.05,0.9479724560061209
+fusion,nested,DoS slowloris,1.0,0.05,0.9654596100278552
+fusion,nested,FTP-Patator,1.0,0.1,0.0010116337885685382
+fusion,nested,PortScan,0.97,0.05,0.03710278518975897
+fusion,nested,SSH-Patator,1.0,0.05,0.9245107176141659
+fusion,nested,Web Attack - Brute Force,1.0,0.05,0.638095238095238
+rf_solo,tuned-on-all,Bot,,0.025,0.008213552361396304
+rf_solo,tuned-on-all,DDoS,,0.025,0.9348352523942693
+rf_solo,tuned-on-all,DoS GoldenEye,,0.025,0.9743340462764923
+rf_solo,tuned-on-all,DoS Hulk,,0.025,0.99151846152066
+rf_solo,tuned-on-all,DoS Slowhttptest,,0.025,0.8659143075745983
+rf_solo,tuned-on-all,DoS slowloris,,0.025,0.9994428969359331
+rf_solo,tuned-on-all,FTP-Patator,,0.025,1.0
+rf_solo,tuned-on-all,PortScan,,0.025,0.03526142853992546
+rf_solo,tuned-on-all,SSH-Patator,,0.025,0.9947188567878223
+rf_solo,tuned-on-all,Web Attack - Brute Force,,0.025,1.0
+rf_solo,nested,Bot,,0.025,0.008213552361396304
+rf_solo,nested,DDoS,,0.05,0.8135125845610637
+rf_solo,nested,DoS GoldenEye,,0.025,0.9743340462764923
+rf_solo,nested,DoS Hulk,,0.02,0.9923226455920299
+rf_solo,nested,DoS Slowhttptest,,0.025,0.8659143075745983
+rf_solo,nested,DoS slowloris,,0.025,0.9994428969359331
+rf_solo,nested,FTP-Patator,,0.025,1.0
+rf_solo,nested,PortScan,,0.025,0.03526142853992546
+rf_solo,nested,SSH-Patator,,0.025,0.9947188567878223
+rf_solo,nested,Web Attack - Brute Force,,0.025,1.0
+ae_solo,tuned-on-all,Bot,,0.04,0.01591375770020534
+ae_solo,tuned-on-all,DDoS,,0.04,0.9583326823628666
+ae_solo,tuned-on-all,DoS GoldenEye,,0.04,0.2585067081469959
+ae_solo,tuned-on-all,DoS Hulk,,0.04,0.9044640894206404
+ae_solo,tuned-on-all,DoS Slowhttptest,,0.04,0.1928079571537873
+ae_solo,tuned-on-all,DoS slowloris,,0.04,0.5753017641597029
+ae_solo,tuned-on-all,FTP-Patator,,0.04,0.0005058168942842691
+ae_solo,tuned-on-all,PortScan,,0.04,0.7064634926235474
+ae_solo,tuned-on-all,SSH-Patator,,0.04,0.0006213109661385523
+ae_solo,tuned-on-all,Web Attack - Brute Force,,0.04,0.0
+ae_solo,nested,Bot,,0.04,0.01591375770020534
+ae_solo,nested,DDoS,,0.045,0.9506303998000218
+ae_solo,nested,DoS GoldenEye,,0.04,0.2585067081469959
+ae_solo,nested,DoS Hulk,,0.04,0.9044640894206404
+ae_solo,nested,DoS Slowhttptest,,0.04,0.1928079571537873
+ae_solo,nested,DoS slowloris,,0.04,0.5753017641597029
+ae_solo,nested,FTP-Patator,,0.04,0.0005058168942842691
+ae_solo,nested,PortScan,,0.05,0.6905418219507354
+ae_solo,nested,SSH-Patator,,0.034999999999999996,0.0006213109661385523
+ae_solo,nested,Web Attack - Brute Force,,0.04,0.0

@@ -1,0 +1,4 @@
+[mcp_servers.rea]
+command = "cmd.exe"
+args = ["/d", "/c", "npx", "-y", "rea-agents@6.5.0", "mcp"]
+startup_timeout_sec = 30

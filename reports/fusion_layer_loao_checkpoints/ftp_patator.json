@@ -1,0 +1,19 @@
+{
+  "category": "FTP-Patator",
+  "n_test_rows": 326063,
+  "n_attack_rows": 5931,
+  "n_benign_rows": 320132,
+  "rf_recall": 0.3127634462991064,
+  "rf_fpr": 0.0012463608761385928,
+  "if_recall": 0.0005058168942842691,
+  "if_fpr": 0.09553246785700899,
+  "ae_recall": 0.0005058168942842691,
+  "ae_fpr": 0.009517948846100983,
+  "fused_recall": 0.9726858877086495,
+  "fused_fpr": 0.0026707733060112706,
+  "fusion_strategy": "confidence_weighted",
+  "confidence_threshold": 0.95,
+  "fused_decision_threshold": 0.05,
+  "ae_fold_threshold": 0.0017030264716595411,
+  "fused_recall_val_tuned_threshold": 0.9726858877086495
+}

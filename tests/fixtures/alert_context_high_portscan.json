@@ -1,0 +1,18 @@
+{
+  "source_ip": "10.20.14.87",
+  "dst_ip": "192.168.40.12",
+  "affected_asset": "FS-PRINT02.campus.local",
+  "dst_port": 445,
+  "timestamp": "2026-07-14T09:12:33+07:00",
+  "rf_predicted_label": "PortScan",
+  "fused_score": 0.91,
+  "fused_prediction": 1,
+  "confidence": 0.91,
+  "model_used": "if_ae_fallback",
+  "rag_top_chunk": {
+    "technique_id": "T1046",
+    "chunk_type": "detection",
+    "tactic": "discovery",
+    "document": "Behavioral Detection Strategy for Network Service Discovery Across Platforms - Analytic 1057: Detects processes performing network enumeration (e.g., port scans, service probing) by correlating process creation, socket connections, and sequential destination IP probing within a time window."
+  }
+}

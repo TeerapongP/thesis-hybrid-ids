@@ -1,0 +1,10 @@
+{
+  "category": "Web Attack - Brute Force",
+  "recall": 0.0,
+  "fpr": 0.009629060432794647,
+  "n_test_rows": 420514,
+  "n_attack_rows": 1470,
+  "n_benign_rows": 419044,
+  "threshold": 0.0016431037802249193,
+  "epochs_run": 30
+}

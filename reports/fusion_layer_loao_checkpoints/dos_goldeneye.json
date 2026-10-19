@@ -1,0 +1,19 @@
+{
+  "category": "DoS GoldenEye",
+  "n_test_rows": 330418,
+  "n_attack_rows": 10286,
+  "n_benign_rows": 320132,
+  "rf_recall": 0.16887030915807894,
+  "rf_fpr": 0.0012463608761385928,
+  "if_recall": 0.4205716507874781,
+  "if_fpr": 0.09313345744880237,
+  "ae_recall": 0.2926307602566595,
+  "ae_fpr": 0.009967763297639723,
+  "fused_recall": 0.9599455570678592,
+  "fused_fpr": 0.002411505254082691,
+  "fusion_strategy": "confidence_weighted",
+  "confidence_threshold": 0.95,
+  "fused_decision_threshold": 0.05,
+  "ae_fold_threshold": 0.0022989024873822927,
+  "fused_recall_val_tuned_threshold": 0.9599455570678592
+}

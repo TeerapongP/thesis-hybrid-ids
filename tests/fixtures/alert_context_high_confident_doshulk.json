@@ -1,0 +1,18 @@
+{
+  "source_ip": "198.51.100.23",
+  "dst_ip": "192.168.10.5",
+  "affected_asset": "WEB-APP01.campus.local",
+  "dst_port": 80,
+  "timestamp": "2026-07-15T14:05:10+07:00",
+  "rf_predicted_label": "DoS Hulk",
+  "fused_score": 0.98,
+  "fused_prediction": 1,
+  "confidence": 0.99,
+  "model_used": "random_forest",
+  "rag_top_chunk": {
+    "technique_id": "T1498",
+    "chunk_type": "description",
+    "tactic": "impact",
+    "document": "Network Denial of Service techniques degrade or block the availability of targeted resources to legitimate users by exhausting network bandwidth or connection resources with a high volume of traffic."
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "category": "DDoS",
+  "n_test_rows": 448146,
+  "n_attack_rows": 128014,
+  "n_benign_rows": 320132,
+  "rf_recall": 0.6155732966706766,
+  "rf_fpr": 0.0012432371646695739,
+  "if_recall": 0.6385473463839892,
+  "if_fpr": 0.10937988079917034,
+  "ae_recall": 0.9746512100239036,
+  "ae_fpr": 0.009608536478702535,
+  "fused_recall": 0.9045885606261815,
+  "fused_fpr": 0.002427123811427786,
+  "fusion_strategy": "confidence_weighted",
+  "confidence_threshold": 0.95,
+  "fused_decision_threshold": 0.05,
+  "ae_fold_threshold": 0.0015742653049528599,
+  "fused_recall_val_tuned_threshold": 0.9045885606261815
+}

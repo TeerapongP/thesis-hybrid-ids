@@ -1,0 +1,8 @@
+case_id,passed,detail
+TC-ENT-01,true,technical entities preserved in prompt
+TC-ENT-02,true,technical entities preserved in prompt
+TC-FAITH-01,true,malformed output rejected
+TC-FAITH-02,true,malformed output rejected
+TC-ADV-01,true,disputed RAG hits cause abstention
+TC-ADV-02,true,disputed RAG hits cause abstention
+aggregate,true,6/6 passed

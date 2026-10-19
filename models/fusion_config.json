@@ -1,0 +1,65 @@
+{
+  "chosen_strategy": "rf_ae_or",
+  "strategy_formula": "fused_score = max(rf_attack_probability, ae_norm); attack = fused_score > fused_decision_threshold",
+  "fused_decision_threshold": 0.05,
+  "confidence_threshold": 0.1,
+  "confidence_threshold_note": "SUPERSEDED. Belongs to the retired `confidence_weighted` cascade and is NOT used by `rf_ae_or`. Kept only so that strategy stays reproducible and so src/evaluation/eval_test_set_ensemble.py's config/module consistency assertions still have a key to compare.",
+  "tuning_objective": "Nested LOAO (zero-day) F1 on train-fold-normalized scores -- thresholds selected on the other nine categories and applied to the held-out one. NOT validation-selected.",
+  "isolation_forest_role": "Excluded from the deployed OR. IF-v2's LOAO false-positive rate is ~0.095, roughly 10x RF's and AE-v2's, so ORing it in raises system FPR for little recall. Still scored and normalized at inference for metadata/explanation use only.",
+  "normalization": {
+    "if_min": 0.3288020239277581,
+    "if_max": 0.6969734130072542,
+    "ae_min": 1.7595783674551058e-06,
+    "ae_max": 0.1224876269698143,
+    "fit_population": "data/features/behavioral/cicids2017_behavioral_features_train.parquet",
+    "fit_rows": 1483957,
+    "fit_artifact": "reports/deploy_norm_constants_trainfit.json",
+    "note": "TRAIN-fitted with the deployed models, matching what each LOAO fold does with its own train fold, so the LOAO-selected decision threshold transfers. Fit once, reused as-is at inference -- never refit per request. Superseded val-fit constants had ae_max=0.8110765814781189, 6.6x the true train-fit value, which would have shrunk every deployed ae_norm by that factor and made the LOAO-tuned threshold unreachable, silently silencing the detector."
+  },
+  "loao_evaluation": {
+    "status": "complete",
+    "normalization_scope": "train_fold_fitted",
+    "source_checkpoint_signature": "68d8a1c08c18dd189faf73e487481845cb6f5b1d9930d70b9149c15c439af562",
+    "pooled_rows": 3626341,
+    "pooled_attack_rows": 425021,
+    "n_categories": 10,
+    "reports": [
+      "reports/fusion_layer_loao_trainnorm_results_68d8a1c08c18_843be29a.csv",
+      "reports/fusion_layer_loao_trainnorm_or_comparison.csv",
+      "reports/fusion_layer_loao_trainnorm_nested_selection.csv",
+      "reports/fusion_layer_loao_trainnorm_swept_baseline.csv"
+    ],
+    "nested_pooled_f1": {
+      "rf_ae_or_deployed": 0.9253,
+      "or_two_thresholds": 0.9126,
+      "ae_v2_solo": 0.8896,
+      "rf_solo": 0.8327,
+      "confidence_weighted_superseded": 0.8324,
+      "weighted_average": 0.7457,
+      "max_score_three_way": 0.5662,
+      "if_v2_solo": 0.4410
+    },
+    "deployed_nested_recall": 0.9122,
+    "deployed_nested_fpr": 0.0079,
+    "threshold_stability": "Nested selection chose 0.05 in every one of the 10 held-out folds, and tuned-on-all selection chose 0.05 as well -- the operating point is fold-stable, not fitted to one category."
+  },
+  "row_alignment": {
+    "join_key": "orig_row_index (IF-v2/AE-v2) <-> row_index (RF)",
+    "val_fused_population_rows": 405085,
+    "val_rf_full_population_rows": 504160,
+    "val_pct_of_rf_population": 80.34850047603935
+  },
+  "known_limitations": [
+    "Bot: nested LOAO recall 0.028. Every member is near-zero here (RF 0.014, IF-v2 0.023, AE-v2 0.021), so no combination rule recovers it. Unchanged across every evaluation in this thesis.",
+    "FTP-Patator: RF solo reaches 1.000 nested recall at its own swept threshold while both unsupervised members sit at 0.001. The OR keeps RF's contribution, but this category depends entirely on RF -- there is no redundancy if RF degrades.",
+    "PortScan: depends entirely on AE-v2 (0.731 nested) -- RF solo is 0.035. Same single-member-dependency caveat as FTP-Patator, mirrored.",
+    "Isolation Forest contributes nothing to the deployed decision. The 'three-model ensemble' framing in the architecture diagrams no longer matches what actually decides an alert; the deployed detector is RF + AE-v2.",
+    "No SHAP-based explainability. The architecture description's 0-100 risk score with SHAP attribution remains unbuilt; alert_dispatcher derives its 0-100 display score by clamping and scaling fused_score, which is not an attribution method.",
+    "Normalized scores are intentionally unclipped, so fused_score can exceed 1.0 for rows more anomalous than anything in the training population. Consumers that need a bounded score must clamp at the presentation boundary."
+  ],
+  "superseded_history": {
+    "confidence_weighted": "Retired. RF-primary cascade with an IF-v2/AE-v2 mean fallback. Nested LOAO F1 0.8324, statistically indistinguishable from RF alone (0.8327) -- the cascade added complexity without adding detection. Its own tuner selected confidence_threshold=1.00 in 9/10 nested folds, i.e. it switched the RF-primary design off and fell back to the unsupervised mean almost always.",
+    "test_fold_normalization_bug": "All LOAO reports produced before this evaluation normalized each fold's zero-day test scores with that same test fold's own min/max, making them invalid held-out estimates. They are preserved under *_legacy_test_fold_normalization.csv names. Correcting the bug improved every candidate by roughly 1-4pp but did not change their ranking.",
+    "val_selected_thresholds": "confidence_threshold=0.10 / fused_decision_threshold=0.30 were validation-selected placeholders used while the corrected LOAO run was pending. Both are superseded."
+  }
+}

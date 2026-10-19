@@ -1,0 +1,19 @@
+{
+  "hidden_dims": [
+    64,
+    32
+  ],
+  "bottleneck_dim": 16,
+  "activation": "relu",
+  "learning_rate": 0.001,
+  "epochs": 30,
+  "batch_size": 2048,
+  "weight_decay": 0.0,
+  "early_stopping_patience": 5,
+  "input_dim": 80,
+  "chosen_threshold": 0.0004051264841109514,
+  "chosen_percentile": 99,
+  "random_state": 42,
+  "benign_internal_val_frac": 0.1,
+  "epochs_run": 30
+}

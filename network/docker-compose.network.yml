@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+
+  app:
+    image: nginx:latest
+    container_name: app
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    networks:
+      - targets_zone
+      - soc_shared
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+networks:
+  targets_zone:
+    name: targets_zone
+    driver: bridge
+  soc_shared:
+    name: soc_shared
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.10.0/24
+  soc_mgmt:
+    name: soc_mgmt
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.20.0/24
+volumes:
+  mongo_data:

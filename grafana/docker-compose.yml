@@ -1,0 +1,105 @@
+
+services:
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    restart: unless-stopped
+    networks:
+      - soc_shared
+    ports:
+      - "127.0.0.1:3000:3000"
+    entrypoint: ["/bin/sh", "-eu", "-c"]
+    command:
+      - if [ "$$GF_SECURITY_ADMIN_PASSWORD" = "admin" ]; then echo "Grafana refuses the vendor-default admin password" >&2; exit 1; fi; exec /run.sh
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER:?Set GF_SECURITY_ADMIN_USER in notification/.env}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:?Set a non-default GF_SECURITY_ADMIN_PASSWORD in notification/.env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      INFLUX_URL: http://influxdb:8086
+      ELASTIC_URL: ${ELASTIC_DOCKER_URL:-http://host.docker.internal:9200}
+      INFLUX_ORG: ${INFLUX_ORG:?Set INFLUX_ORG in notification/.env}
+      INFLUX_BUCKET: ${INFLUX_BUCKET:?Set INFLUX_BUCKET in notification/.env}
+      INFLUX_TOKEN: ${INFLUX_TOKEN:?Set INFLUX_TOKEN in notification/.env}
+      ELASTIC_ALERT_INDEX: ${ELASTIC_ALERT_INDEX:?Set ELASTIC_ALERT_INDEX in notification/.env}
+      ELASTIC_READER_API_KEY: ${ELASTIC_READER_API_KEY:?Set ELASTIC_READER_API_KEY in notification/.env}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./dashboards:/var/lib/grafana/dashboards:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 6
+      start_period: 45s
+
+  kafka-broker:
+    image: confluentinc/cp-kafka:latest
+    restart: unless-stopped
+    networks:
+      - soc_shared
+    ports:
+      - "127.0.0.1:9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-broker:29093
+
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker:29092,PLAINTEXT_HOST://127.0.0.1:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      CLUSTER_ID: n-WdP94tQ_-AzzP5F1N8_g
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_BYTES: 10737418240
+      KAFKA_MESSAGE_MAX_BYTES: 10485760
+      KAFKA_REPLICA_FETCH_MAX_BYTES: 10485760
+
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+        reservations:
+          memory: 1g
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    restart: unless-stopped
+    depends_on:
+      kafka-broker:
+        condition: service_healthy
+    networks:
+      - soc_shared
+    ports:
+      - "127.0.0.1:8083:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: soc-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-broker:29092
+
+volumes:
+  grafana-data:
+    driver: local
+  kafka-data:
+    driver: local
+
+networks:
+  soc_shared:
+    external: true
