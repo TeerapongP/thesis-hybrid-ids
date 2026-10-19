@@ -1,0 +1,29 @@
+{
+  "source_signature": "68d8a1c08c18dd189faf73e487481845cb6f5b1d9930d70b9149c15c439af562",
+  "normalization": "train_fold_fitted",
+  "pooled_rows": 3626341,
+  "nested_pooled_f1": {
+    "OR: max(RF, AE)": 0.9252855801277041,
+    "OR: RF or AE (2 thresholds)": 0.9125591184546346,
+    "AE-v2 solo": 0.889611376961998,
+    "AND: RF and AE": 0.8554647787908957,
+    "RF solo": 0.832728322273604,
+    "fusion: confidence_weighted": 0.8324194980319837
+  },
+  "nested_pooled_recall": {
+    "OR: max(RF, AE)": 0.9122113966133438,
+    "OR: RF or AE (2 thresholds)": 0.887532616035443,
+    "AE-v2 solo": 0.8465887567908409,
+    "AND: RF and AE": 0.7642163563682736,
+    "RF solo": 0.7704678121786923,
+    "fusion: confidence_weighted": 0.7710183732097944
+  },
+  "nested_pooled_fpr": {
+    "OR: max(RF, AE)": 0.007903302387765047,
+    "OR: RF or AE (2 thresholds)": 0.007649657016480702,
+    "AE-v2 solo": 0.00752627041345445,
+    "AND: RF and AE": 0.00298095785488486,
+    "RF solo": 0.010620931365811603,
+    "fusion: confidence_weighted": 0.010814601476890782
+  }
+}
