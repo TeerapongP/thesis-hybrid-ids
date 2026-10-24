@@ -1,42 +1,3 @@
-"""
-alert_dispatcher.py
-====================
-Dashboard & Notification Layer -- the consumer of the LLM explanation layer's
-frozen JSON output schema (HANDOFF_LLM_LAYER.md Sec."Output schema reconciliation"), combined
-with the alert context / fused score that produced it (that JSON alone is not enough -- it has
-no `source_ip`/`dst_port`/`risk_score`, see HANDOFF_OUTPUT_LAYER.md Required Reading #2).
-
-`dispatch_alert(alert_context, fused_score, llm_output)` is the entry point:
-  1. Assembles one alert record (adds `alert_id`, `risk_score` (0-100), `model_used` -- none of
-     which exist on the raw LLM-layer JSON).
-  2. Publishes it to the `soc.alerts` durable topic exchange on the `soc` RabbitMQ vhost with
-     routing key `alert.<PRIORITY>` (topic routing, per the diagram -- HIGH/MEDIUM/LOW-specific
-     consumers can bind to only what they need; this module doesn't declare consumer queues
-     itself, only the exchange, per HANDOFF_OUTPUT_LAYER.md's Conventions).
-  3. Writes the `soc_alert` InfluxDB point in the exact schema `grafana/dashboards/soc-overview.json`
-     already queries.
-  4. Writes the same assembled record directly to Elasticsearch at `soc-alerts-YYYY.MM.dd`
-     (date taken from the alert's own timestamp, matching Logstash's other 4 indices' rollover
-     convention -- see notification/.env's ELASTIC_ALERT_INDEX comment).
-  5. Routes to a notification channel by `priority`: HIGH -> LINE immediately, MEDIUM -> Gmail
-     immediately, LOW -> accumulated into a local SQLite digest store (flushed once/day by
-     `flush_low_priority_digest`, see models/output_layer_config.json for why SQLite was chosen
-     over a file or a dedicated RabbitMQ queue).
-
-Failure isolation (required by HANDOFF_OUTPUT_LAYER.md): steps 2-4 (the event bus + dashboard
-writes) are each independently try/except-wrapped so a partial infra outage never crashes the
-whole call and never blocks the other writes; step 5 (notification) is wrapped the same way and
-is guaranteed to run only after steps 2-4 have already been attempted -- a LINE/Gmail failure
-can never roll back or block an already-successful RabbitMQ publish / InfluxDB write /
-Elasticsearch write. The returned receipt dict reports the real status of every step, including
-failures -- nothing is silently swallowed.
-
-`model_used` is copied from the actual branch emitted by the Fusion Layer. The dispatcher never
-reconstructs that branch from the separate, generic `confidence` field.
-
-Config-driven, fail-fast on missing keys -- same pattern as src/rag/rag_retrieval.py's
-`load_env_config`. Never prints/logs a raw secret value.
-"""
 
 from __future__ import annotations
 
@@ -73,9 +34,6 @@ _log_level = (dotenv_values(ROOT_ENV_PATH).get("LOG_LEVEL") or "INFO").upper()
 logger.setLevel(getattr(logging, _log_level, logging.INFO))
 
 
-# ----------------------------------------------------------------------------
-# Config (notification/.env) -- never hardcode these, never print/log raw values
-# ----------------------------------------------------------------------------
 REQUIRED_ENV_KEYS = (
     "RABBITMQ_URL",
     "RABBITMQ_VHOST",
@@ -99,13 +57,6 @@ REQUIRED_ENV_KEYS = (
 
 
 def load_env_config(env_path: Path = NOTIFICATION_ENV_PATH) -> dict[str, Any]:
-    """Read dispatcher-relevant config from notification/.env. Fail-fast if any required key
-    is entirely ABSENT from the file (mirrors src/rag/rag_retrieval.py's load_env_config). Note:
-    GMAIL_* and LOW_DIGEST_SCHEDULE are allowed to hold an EMPTY string (they are legitimately
-    blank stub/mock placeholders per HANDOFF_OUTPUT_LAYER.md's resolved open question #2) --
-    "missing" here means the key line doesn't exist in the file at all, not that its value is
-    blank. Real-vs-dry-run gating on emptiness happens inside notify_line.py/notify_gmail.py,
-    not here."""
     raw = dotenv_values(env_path)
     missing = [k for k in REQUIRED_ENV_KEYS if k not in raw or raw[k] is None]
     if missing:
@@ -133,13 +84,9 @@ def load_env_config(env_path: Path = NOTIFICATION_ENV_PATH) -> dict[str, Any]:
     }
 
 
-# ----------------------------------------------------------------------------
-# model_used derivation -- see module docstring
-# ----------------------------------------------------------------------------
 def derive_model_used(alert_context: dict[str, Any], llm_output: dict[str, Any]) -> str:
-    """Return the actual branch emitted upstream; never infer it from generic confidence."""
     model_used = alert_context.get("model_used")
-    if model_used not in ("random_forest", "if_ae_fallback"):
+    if model_used not in ("random_forest", "autoencoder_v2"):
         logger.warning("[alert_dispatcher] no valid pipeline model_used -- model_used='unknown'")
         return "unknown"
     return model_used
@@ -151,9 +98,6 @@ def _elapsed_ms(start_iso: str | None, end_iso: str | None) -> float | None:
     return max(0.0, (datetime.fromisoformat(end_iso) - datetime.fromisoformat(start_iso)).total_seconds() * 1000)
 
 
-# ----------------------------------------------------------------------------
-# Record assembly
-# ----------------------------------------------------------------------------
 def assemble_alert_record(
     alert_context: dict[str, Any],
     fused_score: float,
@@ -161,10 +105,8 @@ def assemble_alert_record(
     model_used: str,
     alert_id: str,
 ) -> dict[str, Any]:
-    """Build the one dict written to RabbitMQ/InfluxDB/Elasticsearch/notifications -- adds
-    fields (alert_id, risk_score 0-100, model_used) that don't exist on the raw LLM-layer JSON,
-    per HANDOFF_OUTPUT_LAYER.md Required Reading #2/#6."""
-    risk_score = round(float(fused_score) * 100)
+    display_score = min(max(float(fused_score), 0.0), 1.0)
+    risk_score = round(display_score * 100)
     ingested_at = alert_context.get("ingested_at")
     detected_at = alert_context.get("detected_at")
     return {
@@ -192,17 +134,7 @@ def assemble_alert_record(
     }
 
 
-# ----------------------------------------------------------------------------
-# RabbitMQ publish helper
-# ----------------------------------------------------------------------------
 def publish_to_rabbitmq(record: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
-    """Publish `record` to the `soc.alerts` durable topic exchange on the `soc` vhost with
-    routing key `alert.<PRIORITY>`. Declares the exchange (idempotent, durable=True) -- per
-    HANDOFF_OUTPUT_LAYER.md's Conventions, only the vhost/permissions were provisioned ahead of
-    time via rabbitmqctl, exchange declaration is this module's job. Opens/closes a fresh
-    connection per call (small, inspectable, no pooled-connection lifecycle to manage) --
-    matches this repo's preference for small hand-written modules over heavier abstractions
-    (see src/rag/rag_retrieval.py's own docstring reasoning)."""
     routing_key = f"alert.{record['priority']}"
     params = pika.URLParameters(config["rabbitmq_url"])
     connection = pika.BlockingConnection(params)
@@ -221,13 +153,7 @@ def publish_to_rabbitmq(record: dict[str, Any], config: dict[str, Any]) -> dict[
     return {"status": "ok", "exchange": config["rabbitmq_exchange"], "vhost": config["rabbitmq_vhost"], "routing_key": routing_key}
 
 
-# ----------------------------------------------------------------------------
-# InfluxDB write helper -- schema per grafana/dashboards/soc-overview.json, not negotiable
-# ----------------------------------------------------------------------------
 def write_influx_point(record: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
-    """Writes exactly the soc_alert measurement grafana/dashboards/soc-overview.json's 5 panels
-    query: tags = alert_id/source_ip/dst_port/priority/anomaly_type/mitre_tactic, fields =
-    risk_score/response_ms, timestamp = the alert's own timestamp (not "now")."""
     ts = record.get("timestamp")
     point_time = datetime.fromisoformat(ts) if ts else datetime.now(timezone.utc)
 
@@ -251,13 +177,7 @@ def write_influx_point(record: dict[str, Any], config: dict[str, Any]) -> dict[s
     return {"status": "ok", "measurement": "soc_alert", "bucket": config["influx_bucket"], "time": point_time.isoformat()}
 
 
-# ----------------------------------------------------------------------------
-# Elasticsearch write helper -- soc-alerts-YYYY.MM.dd, direct write (not via Logstash)
-# ----------------------------------------------------------------------------
 def _es_index_name(timestamp_iso: str | None) -> str:
-    """soc-alerts-YYYY.MM.dd, date taken from the ALERT's own timestamp (not "today"), matching
-    Logstash's rollover convention for its other 4 pa5220.* indices for operational/ILM
-    consistency (see notification/.env's ELASTIC_ALERT_INDEX comment)."""
     dt = datetime.fromisoformat(timestamp_iso) if timestamp_iso else datetime.now(timezone.utc)
     return f"soc-alerts-{dt.strftime('%Y.%m.%d')}"
 
@@ -269,11 +189,6 @@ def write_elasticsearch_doc(record: dict[str, Any], config: dict[str, Any]) -> d
     return {"status": "ok", "index": index_name, "result": resp.get("result")}
 
 
-# ----------------------------------------------------------------------------
-# LOW-priority digest -- SQLite accumulator + once-daily flush
-# (mechanism decision: SQLite file, per HANDOFF_OUTPUT_LAYER.md's resolved Open Question #1 --
-#  see models/output_layer_config.json for the schema/location writeup)
-# ----------------------------------------------------------------------------
 def _get_digest_conn() -> sqlite3.Connection:
     DIGEST_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DIGEST_DB_PATH)
@@ -307,8 +222,6 @@ def _get_digest_conn() -> sqlite3.Connection:
 
 
 def accumulate_low_priority_digest(record: dict[str, Any]) -> dict[str, Any]:
-    """Insert one LOW-priority alert into the local SQLite digest store. Does NOT send
-    anything -- LOW alerts are batched, never sent one-by-one (per the diagram's spec)."""
     conn = _get_digest_conn()
     try:
         conn.execute(
@@ -343,12 +256,6 @@ def accumulate_low_priority_digest(record: dict[str, Any]) -> dict[str, Any]:
 
 
 def flush_low_priority_digest(config: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Query all un-flushed LOW-priority rows, build one HTML digest (alert count, top attack
-    types, average MTTD when timestamps are available, sample remediation steps), send it via notify_gmail.send_digest_email,
-    then mark only the emailed rows flushed after a confirmed send. Errors and dry runs
-    leave the batch pending for retry. Meant to be invoked once/day by an external OS scheduler
-    (Windows Task Scheduler / cron) per LOW_DIGEST_SCHEDULE -- see models/output_layer_config.json.
-    Safe to call with zero pending rows (returns status="no_alerts", sends nothing)."""
     config = config or load_env_config()
     conn = _get_digest_conn()
     try:
@@ -386,8 +293,6 @@ def flush_low_priority_digest(config: dict[str, Any] | None = None) -> dict[str,
 
         batch_id = str(uuid.uuid4())
         now_iso = datetime.now(timezone.utc).isoformat()
-        # New alerts may be inserted while Gmail is sending. Acknowledge only the
-        # selected primary keys, using executemany to avoid SQLite's parameter limit.
         conn.executemany(
             "UPDATE low_priority_alerts SET flushed_at = ?, digest_batch_id = ? "
             "WHERE id = ? AND flushed_at IS NULL",
@@ -400,13 +305,7 @@ def flush_low_priority_digest(config: dict[str, Any] | None = None) -> dict[str,
         conn.close()
 
 
-# ----------------------------------------------------------------------------
-# Entry point
-# ----------------------------------------------------------------------------
 def dispatch_alert(alert_context: dict[str, Any], fused_score: float, llm_output: dict[str, Any]) -> dict[str, Any]:
-    """The core entry point. See module docstring for the full step-by-step behavior and the
-    failure-isolation guarantee (a notification failure never blocks/undoes the event-bus or
-    dashboard writes, which are attempted first)."""
     priority = llm_output.get("priority")
     if priority not in VALID_PRIORITIES:
         raise ValueError(f"llm_output['priority'] must be one of {VALID_PRIORITIES}, got {priority!r}")
@@ -425,19 +324,19 @@ def dispatch_alert(alert_context: dict[str, Any], fused_score: float, llm_output
 
     try:
         receipt["rabbitmq"] = publish_to_rabbitmq(record, config)
-    except Exception as exc:  # noqa: BLE001 -- must never crash the dispatcher
+    except Exception as exc:
         logger.exception("[alert_dispatcher] RabbitMQ publish failed")
         receipt["rabbitmq"] = {"status": "error", "error": f"{type(exc).__name__}: {exc}"}
 
     try:
         receipt["influxdb"] = write_influx_point(record, config)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.exception("[alert_dispatcher] InfluxDB write failed")
         receipt["influxdb"] = {"status": "error", "error": f"{type(exc).__name__}: {exc}"}
 
     try:
         receipt["elasticsearch"] = write_elasticsearch_doc(record, config)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.exception("[alert_dispatcher] Elasticsearch write failed")
         receipt["elasticsearch"] = {"status": "error", "error": f"{type(exc).__name__}: {exc}"}
 
@@ -446,9 +345,9 @@ def dispatch_alert(alert_context: dict[str, Any], fused_score: float, llm_output
             receipt["notification"] = notify_line.send_line_alert(record, config)
         elif priority == "MEDIUM":
             receipt["notification"] = notify_gmail.send_immediate_email(record, config)
-        else:  # LOW
+        else:
             receipt["notification"] = accumulate_low_priority_digest(record)
-    except Exception as exc:  # noqa: BLE001 -- notification channel outage must never crash the dispatcher
+    except Exception as exc:
         logger.exception("[alert_dispatcher] notification step failed")
         receipt["notification"] = {"status": "error", "error": f"{type(exc).__name__}: {exc}"}
 
@@ -460,9 +359,6 @@ def dispatch_alert(alert_context: dict[str, Any], fused_score: float, llm_output
     return receipt
 
 
-# ----------------------------------------------------------------------------
-# CLI -- smoke test / digest flush entry points
-# ----------------------------------------------------------------------------
 if __name__ == "__main__":
     import argparse
 
