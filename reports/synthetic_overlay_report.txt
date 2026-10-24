@@ -1,0 +1,90 @@
+======================================================================
+SYNTHETIC ATTACK OVERLAY (inject timestamps for MTTD, metric M1b)
+======================================================================
+Seed: 42   Generator: src/ingestion/synthetic_overlay.py   Output: data/synthetic/cicids2017_overlay.parquet
+
+======================================================================
+1. INJECTION RATIO (MEASURED)
+======================================================================
+Benign baseline: BENIGN rows of data/features/behavioral/cicids2017_behavioral_features_test.parquet = 319,994
+Synthetic flows injected                              = 9,895
+Achieved ratio = 9,895 / (319,994 + 9,895) = 0.029995 (2.999%)
+Ceiling 5%: HELD; generate_overlay raises ValueError above the ceiling, so a violating file cannot be written.
+
+======================================================================
+2. PER-CLASS COUNTS
+======================================================================
+brute_force          flows= 2,474  campaigns=  7  MITRE=T1110.001
+                     pattern: one source, one SSH target, steady jittered stream of completed handshakes
+port_scan            flows= 1,979  campaigns=  3  MITRE=T1046
+                     pattern: single-source burst of SYN probes across many distinct ports; closed ports answer RST
+data_exfil           flows=   989  campaigns=132  MITRE=none in config/mitre_mapping.csv
+                     pattern: few long, upload-heavy flows from an internal host to one external endpoint, minutes apart
+c2_beacon            flows= 1,979  campaigns= 24  MITRE=T1071.001
+                     pattern: fixed-period check-ins with roughly 15% gaussian jitter to one external C2 host
+credential_stuffing  flows= 2,474  campaigns=  5  MITRE=T1110
+                     pattern: bursts of short failed-login HTTP requests spread over a small proxy pool, then pauses
+
+======================================================================
+3. TEMPORAL SPAN
+======================================================================
+Stream window: 2026-01-01T00:00:00+00:00 for 24 h (fixed anchor, not wall clock, for reproducibility).
+First inject: 2026-01-01T00:02:59.550282+00:00   Last inject: 2026-01-01T23:59:25.265363+00:00   Span: 0 days 23:56:25.715081
+The real parquet files carry no timestamps (stripped for privacy), so the benign baseline has no
+clock. Whoever merges the overlay into a replay assigns benign timestamps; the overlay's own
+inject_timestamp values are authoritative and must not be recomputed.
+
+======================================================================
+4. SCHEMA AND FIDELITY
+======================================================================
+Rows are in the scaled 92-feature space of cicids2017_behavioral_features_*.parquet. Raw values
+are drawn first, then scaled with the real train-split min/max (the pipeline's MinMaxScaler,
+reconstructed from data/processed/behavioral). Verification on 2,000 real test rows: max abs
+difference between this scaling and the pipeline's scaled values = 2.22e-16.
+Real columns also exceed [0,1] slightly because test rows fall outside the train range; no clipping.
+
+Tier A, MODELLED per attack class (drawn from the profile's distributions):
+  Destination Port, Flow Duration, Total Fwd/Backward Packets, Fwd/Bwd Packet Length Mean/Std,
+  PSH/SYN/FIN/RST/ACK counts (from handshake outcome), Init_Win_bytes_forward/backward,
+  Init_Win_*_missing flags (backward missing when the target never replies, as in real data).
+Tier B, DERIVED deterministically from tier A (exact given the primitives):
+  Total Length Fwd/Bwd, Subflow*, Flow Bytes/s, Flow Packets/s, Fwd/Bwd Packets/s, Down/Up Ratio,
+  Average Packet Size, Avg Fwd/Bwd Segment Size, Packet Length Mean/Std/Variance.
+Tier C, HEURISTIC approximations (plausible, not drawn from real attack captures):
+  Fwd/Bwd Packet Length Max/Min (mean +/- 2 std, capped at 1460), all IAT Mean/Std/Max/Min and
+  Fwd/Bwd IAT Total (mean = duration / gaps, std = cv * mean with cv drawn per profile),
+  Fwd/Bwd Header Length and Fwd Header Length.1 (20 bytes per packet), act_data_pkt_fwd (n_fwd - 2),
+  Fwd PSH Flags (1 when any PSH), min_seg_size_forward (20).
+Tier D, PLACEHOLDER defaults, not modelled:
+  Active Mean/Max/Min = flow duration, Active Std = 0, all Idle* = 0 (each flow is one active period),
+  Bwd PSH Flags, Fwd/Bwd URG Flags, URG/CWE/ECE Flag Count = 0,
+  all six Fwd/Bwd Avg Bytes/Packets/Bulk and Bulk Rate columns = 0.
+Tier E, WINDOWED behavioral columns (12): computed, not drawn, with the real extractor's own
+  _sliding_window_features and compute_failed_flag. Caveat: windows see only overlay flows from the
+  same synthetic source IP, never the benign background. Synthetic sources use TEST-NET-3
+  (203.0.113.0/24) or 10.20.0.0/16, so they do not collide with real CICIDS-2017 hosts.
+Metadata, not model input: inject_id, inject_timestamp, synthetic, attack_class, campaign_id,
+  src_ip, dst_ip, technique_id/name, tactic, Label ('SYNTHETIC'). The four CTI-encoded columns are
+  omitted: they are not detection-model input (CLAUDE.md) and encodings were fit on real labels.
+MITRE notes: data_exfil has no matching row in config/mitre_mapping.csv, so technique is empty.
+  credential_stuffing uses T1110 (parent); T1110.004 is not in the mapping file.
+Fidelity limit: the five profiles are hand-set distributions informed by attack mechanics, not fitted
+  to real captures. Treat detector recall on this overlay as a measure of timing and plumbing, not
+  as evidence of real-world detection performance.
+
+======================================================================
+5. COMPUTING MTTD FROM inject_timestamp
+======================================================================
+inject_timestamp is set once at generation (flow start time, UTC, tz-aware) and never recomputed.
+Per flow:      MTTD_flow = detected_at(inject_id) - inject_timestamp, where detected_at is the time
+               the pipeline first raised an alert for that flow. Join alerts to the overlay on inject_id.
+Per campaign:  MTTD_campaign = min(detected_at over the campaign's flows) - min(inject_timestamp over
+               the campaign). This is the analyst-relevant figure: how long the attack ran unseen.
+Report the mean (and median) across detected campaigns per attack_class. Campaigns with no alert are
+misses: count them separately; do not drop them silently or assign them an MTTD.
+Code: mttd_seconds(overlay, detections, per='flow'|'campaign'), detections = [inject_id, detected_at].
+Worked example (HYPOTHETICAL detection time, to show the arithmetic):
+  inject_id inj-c2_beacon-000514 has inject_timestamp 2026-01-01T00:02:59.550282+00:00.
+  Suppose the first alert for it is at 2026-01-01T00:03:07.050282+00:00.
+  MTTD_flow = 2026-01-01T00:03:07.050282+00:00 - 2026-01-01T00:02:59.550282+00:00 = 7.5 s.
+
