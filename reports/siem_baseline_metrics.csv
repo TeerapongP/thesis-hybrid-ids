@@ -1,0 +1,45 @@
+# overall binary metrics: any implementable rule fires = alert (test split, thresholds from train BENIGN only)
+precision,recall,f1,fpr,tp,fp,fn,tn
+0.8624337428374453,0.8961925118616997,0.8789891089622126,0.03803821321649781,76309,12172,8839,307822
+
+# per-rule binary metrics; target_recall = recall over the categories the rule is meant to catch
+rule_id,name,technique_id,precision,recall,f1,fpr,target_recall,tp,fp
+R1,Port scan,T1046,0.0,0.0,0.0,0.009578304593211122,0.0,0,3065
+R2,Brute force (repeated same-port logins),T1110.001,0.943243050351497,0.6208601493869498,0.7488278538748105,0.009940811390213567,0.0,52865,3181
+R3,Connection flood,T1498,0.958162801273306,0.8908253863860572,0.9232679293052243,0.01035019406613874,0.9477735460958717,75852,3312
+R4,Slow-rate DoS,T1499.002,0.02070913084405397,0.0007751209658477004,0.0014943114280862625,0.009753307874522648,0.009420631182289214,66,3121
+R5,Repeated-target beaconing,T1071.001,0.0,0.0,0.0,0.0,0.0,0,0
+
+# per-category recall of the combined SIEM (all 14 attack categories)
+category,n_rows,recall
+Bot,390,0.0
+FTP-Patator,1186,0.0
+Heartbleed,2,0.0
+SSH-Patator,644,0.0
+Web Attack - Brute Force,294,0.0
+Web Attack - Sql Injection,4,0.0
+Web Attack - XSS,130,0.0
+DoS Slowhttptest,1046,0.006692160611854685
+DoS slowloris,1077,0.012070566388115135
+DoS GoldenEye,2057,0.08945065629557608
+Infiltration,7,0.14285714285714285
+PortScan,18139,0.9301505044379513
+DoS Hulk,34569,0.9826723364864474
+DDoS,25603,0.9866812482912158
+
+# per-category recall by individual rule
+category,R1,R2,R3,R4,R5
+Bot,0.0,0.0,0.0,0.0,0.0
+FTP-Patator,0.0,0.0,0.0,0.0,0.0
+Heartbleed,0.0,0.0,0.0,0.0,0.0
+SSH-Patator,0.0,0.0,0.0,0.0,0.0
+Web Attack - Brute Force,0.0,0.0,0.0,0.0,0.0
+Web Attack - Sql Injection,0.0,0.0,0.0,0.0,0.0
+Web Attack - XSS,0.0,0.0,0.0,0.0,0.0
+DoS Slowhttptest,0.0,0.0,0.0,0.006692160611854685,0.0
+DoS slowloris,0.0,0.0,0.0,0.012070566388115135,0.0
+DoS GoldenEye,0.0,0.036460865337870685,0.052989790957705396,0.0019445794846864365,0.0
+Infiltration,0.0,0.0,0.14285714285714285,0.0,0.0
+PortScan,0.0,0.0,0.9301505044379513,0.0,0.0
+DoS Hulk,0.0,0.796320402672915,0.9826723364864474,0.0012149613815846567,0.0
+DDoS,0.0,0.9866812482912158,0.9725422802015389,0.0,0.0

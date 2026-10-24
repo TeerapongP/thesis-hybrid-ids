@@ -1,0 +1,90 @@
+======================================================================
+RULE-BASED SIEM BASELINE (CICIDS-2017, behavioral test split)
+======================================================================
+Command: python -m src.evaluation.siem_baseline
+
+======================================================================
+1. SCOPE
+======================================================================
+Test rows: 405,142 (85,148 attack, 319,994 BENIGN).
+Each rule is one row of RULES in src/evaluation/siem_baseline.py. The SIEM alerts when any
+implementable rule fires. Rules and percentiles were fixed before any test number was seen
+and were not tuned afterwards.
+
+======================================================================
+2. THRESHOLD DERIVATION
+======================================================================
+Features in the parquet are MinMax-scaled to the train split, so raw packet-count thresholds are
+meaningless. Every threshold is a percentile of that column over BENIGN rows of
+cicids2017_behavioral_features_train.parquet, computed by derive_thresholds(train). Nothing is
+read from the test split except to score it. Percentiles are a-priori analyst choices (p99 for
+abnormally high, p25 for abnormally low rate), not searched.
+
+R1 Port scan [T1046 Network Service Discovery]
+    uniq_dport_count_1m >= 0.629986 (train-BENIGN p99) AND conn_count_1m >= 0.020059 (train-BENIGN p95)
+R2 Brute force (repeated same-port logins) [T1110.001 Brute Force: Password Guessing]
+    repeat_ratio_5m >= 0.009153 (train-BENIGN p99) AND conn_count_5m >= 0.011885 (train-BENIGN p90)
+R3 Connection flood [T1498 Network Denial of Service]
+    conn_count_1m >= 0.043372 (train-BENIGN p99)
+R4 Slow-rate DoS [T1499.002 Endpoint DoS: Service Exhaustion Flood]
+    Flow Duration >= 0.984526 (train-BENIGN p99) AND Flow Packets/s <= 0.333334 (train-BENIGN p25)
+R5 Repeated-target beaconing [T1071.001 Application Layer Protocol: Web Protocols]
+    repeat_ratio_5m >= 0.009153 (train-BENIGN p99) AND conn_count_5m <= 0.003083 (train-BENIGN p50)
+
+======================================================================
+3. OVERALL (combined SIEM)
+======================================================================
+precision 0.8624  recall 0.8962  F1 0.8790  FPR 0.0380
+TP 76,309  FP 12,172  FN 8,839  TN 307,822
+Reference: the ML ensemble reaches F1 0.9865 on this same test split.
+
+======================================================================
+4. PER RULE
+======================================================================
+rule_id                                    name technique_id  precision  recall     f1    fpr  target_recall    tp   fp
+     R1                               Port scan        T1046     0.0000  0.0000 0.0000 0.0096         0.0000     0 3065
+     R2 Brute force (repeated same-port logins)    T1110.001     0.9432  0.6209 0.7488 0.0099         0.0000 52865 3181
+     R3                        Connection flood        T1498     0.9582  0.8908 0.9233 0.0104         0.9478 75852 3312
+     R4                           Slow-rate DoS    T1499.002     0.0207  0.0008 0.0015 0.0098         0.0094    66 3121
+     R5               Repeated-target beaconing    T1071.001     0.0000  0.0000 0.0000 0.0000         0.0000     0    0
+
+======================================================================
+5. PER-CATEGORY RECALL (combined SIEM, all 14 attack categories)
+======================================================================
+                  category  n_rows  recall
+                       Bot     390  0.0000
+               FTP-Patator    1186  0.0000
+                Heartbleed       2  0.0000
+               SSH-Patator     644  0.0000
+  Web Attack - Brute Force     294  0.0000
+Web Attack - Sql Injection       4  0.0000
+          Web Attack - XSS     130  0.0000
+          DoS Slowhttptest    1046  0.0067
+             DoS slowloris    1077  0.0121
+             DoS GoldenEye    2057  0.0895
+              Infiltration       7  0.1429
+                  PortScan   18139  0.9302
+                  DoS Hulk   34569  0.9827
+                      DDoS   25603  0.9867
+
+======================================================================
+6. NOT IMPLEMENTABLE FROM AVAILABLE COLUMNS
+======================================================================
+R6 Distributed credential stuffing [T1110]: needs per-destination aggregation across many source IPs; every behavioral column is per source IP. Targets: Web Attack - Brute Force. Recorded, not faked.
+R7 Web exploit signature (XSS, SQLi, Heartbleed) [T1190]: needs payload or URL inspection; CICFlowMeter flow statistics carry no payload content. Targets: Web Attack - XSS, Web Attack - Sql Injection, Heartbleed. Recorded, not faked.
+
+======================================================================
+7. WHAT EACH RULE ACTUALLY CATCHES VS ITS INTENT (categories with rule recall >= 0.5)
+======================================================================
+R1 intended: PortScan | actually catches: nothing
+R2 intended: FTP-Patator, SSH-Patator, Web Attack - Brute Force | actually catches: DoS Hulk, DDoS
+R3 intended: DDoS, DoS Hulk, DoS GoldenEye | actually catches: PortScan, DoS Hulk, DDoS
+R4 intended: DoS slowloris, DoS Slowhttptest | actually catches: nothing
+R5 intended: Bot | actually catches: nothing
+
+======================================================================
+8. CAVEATS
+======================================================================
+Window features are computed per source IP over the whole capture, so BENIGN heavy talkers
+(servers, scanners-by-design) trip volume rules; this is the realistic cost of static rules.
+The test set carries natural class prevalence, so precision depends on it; recall and FPR do not.
