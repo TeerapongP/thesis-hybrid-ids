@@ -1,0 +1,117 @@
+======================================================================
+ENRICH SERVICE (src/services/enrich.py) -- OpenCTI enrichment, pa5220.raw -> pa5220.enriched
+======================================================================
+Scope: the one unbuilt service-layer box in the architecture diagrams. Consumes Kafka
+pa5220.raw, enriches each event against OpenCTI (IoC match + graph walk), publishes to
+pa5220.enriched, which observability/logstash/pipeline/soc.conf already indexes.
+
+======================================================================
+1. ENTRY POINTS
+======================================================================
+  python -m src.services.enrich --help
+  python -m src.services.enrich --dry-run [--input events.jsonl] [--stub-fail]
+  python -m src.services.enrich                 (live; config from repo-root .env)
+
+Pure functions (no broker, no network): extract_observables, pattern_matches_observable,
+match_indicators, build_enrichment, enrich_event, process_record.
+Stateful: CachedLookup (LRU + TTL cache, circuit breaker). Clients: HttpOpenCTIClient (live),
+StubOpenCTIClient (dry-run and tests). Loop: run(records, producer, commit, lookup, topic).
+
+======================================================================
+2. DATA SHAPE
+======================================================================
+Enriched event = raw event + one additive `enrichment` object: matched, observables_checked,
+indicators [{id,name,confidence,valid_until}], related [{id,type,name,relationship}],
+enriched_at, source ("opencti" or "cache"), and `error` only on an OpenCTI failure.
+Unmatched events carry matched=false. No raw key is changed or removed. If the raw event has
+no `timestamp`, an ISO8601 one is added (Logstash dates on it). If it has a non-ISO8601
+`timestamp` it is left untouched and `enrichment.timestamp_warning` is set.
+
+Decisions worth knowing:
+  - Observables are IPs from IP_FIELDS (src_ip, dst_ip and PA-style spellings). Only globally
+    routable addresses are queried; private, loopback and reserved ones are skipped because CTI
+    indicators do not describe them. They are not listed in observables_checked.
+  - Search hits are re-verified against the STIX pattern (exact IP or containing CIDR), since
+    OpenCTI full-text search is fuzzy.
+  - A partial failure (one of two IPs errors) keeps the matches found and adds `error`.
+  - `source` is "opencti" unless every looked-up observable came from cache. An event with no
+    queryable observable reports "opencti" (the contract allows only two values).
+  - `error` text carries only the exception class name, never URLs or tokens.
+
+======================================================================
+3. OPERATIONAL PROPERTIES
+======================================================================
+Idempotent: enriched_at = Kafka message timestamp, else the event's own timestamp, else wall
+clock (the last only happens for dry-run input with neither). Offsets are committed only after
+the publish future resolves (enable_auto_commit=False). A publish failure raises and leaves
+the offset uncommitted. The message key is preserved, or a sha1 of the payload if absent.
+Caveat: a redelivery served from a warm cache reports source "cache" where the first
+delivery said "opencti". Everything else is byte-identical. Compare with `source` excluded.
+Degrade: OpenCTIError per observable gives matched=false plus error. Three consecutive
+failures open a 30 s circuit breaker so a dead OpenCTI costs no timeout per event. Failures
+are not cached.
+Cache: LRU bounded by OPENCTI_CACHE_SIZE, keyed by observable, 300 s TTL (negative answers
+included, expiring so a new indicator is eventually seen). TTL, breaker threshold and cooldown
+are constructor arguments, not env keys, because the task fixed the key set.
+Malformed (non-JSON or non-object) messages are logged, counted, committed and skipped; they
+are not published (nothing to enrich). This is a dead-letter gap, not a stall.
+
+======================================================================
+4. DEPENDENCIES (Anaconda Python 3.13.9)
+======================================================================
+  importable: python-dotenv, requests (unused here), pytest
+  MISSING:    kafka-python (kafka), confluent-kafka, pycti
+Nothing was added to pyproject.toml. The module imports without any of them: kafka-python is
+imported lazily in _live_records() (live mode exits with code 3 and a clear message if absent),
+and OpenCTI is reached with stdlib urllib GraphQL, so pycti is not required at all. To run
+live, kafka-python must be installed and declared by someone with pyproject authority.
+
+======================================================================
+5. VERIFIED OFFLINE
+======================================================================
+tests/test_enrich_service.py, 27 tests, no broker, no OpenCTI, no network. They pass under
+both unittest (the CI runner) and pytest. Covered behavior:
+  - enrichment is additive; input not mutated; no raw field dropped
+  - unmatched and no-observable events still carry enrichment with matched=false
+  - OpenCTI failure still publishes, with an error string; the batch continues
+  - redelivery: identical bytes with a cold cache; identical except `source` with a warm one
+  - cache: repeat IP not re-queried (positive and negative), LRU bound, TTL expiry, failures
+    not cached, breaker opens and recloses
+  - commit happens strictly after send; a send failure leaves the offset uncommitted
+  - malformed messages skipped and committed; timestamp added or warned
+  - boundary parsing of OpenCTI payloads; CIDR and fuzzy-hit rejection in pattern matching
+  - config fail-fast names missing keys and never echoes a value; token hidden from repr
+  - --dry-run end to end through the real run() loop with the stub client
+A bug the tests caught: RFC 5737 documentation addresses are not "global", so the first
+fixtures were silently skipped. Fixtures now use genuinely public addresses.
+Full-suite note: `unittest discover -s tests` on Anaconda shows 2 failures (test_llm_layer
+import error, test_fixed_contracts fusion branch). Both reproduce identically with my files
+stashed, so they are pre-existing and unrelated (CI uses the uv environment, not Anaconda).
+
+======================================================================
+6. NOT VERIFIED (no live infrastructure reachable)
+======================================================================
+  - Any real Kafka broker: consumer-group behavior, rebalancing, KafkaProducer acks, and the
+    kafka-python API calls in _live_records() (never executed; the library is not installed).
+  - Any real OpenCTI: the GraphQL query shapes in HttpOpenCTIClient (indicators(search:),
+    stixCoreRelationships(fromId:), the inline-fragment field names) are written for
+    OpenCTI 5.12.x from knowledge and were never run. The first live run may need query
+    adjustment. Search-then-verify limits the damage to "no match", not wrong matches.
+  - Real-latency behavior of the 5 s timeout and the circuit breaker.
+  - End-to-end Logstash to Elasticsearch indexing of enriched events.
+  - Throughput. Not measured.
+The OpenCTI knowledge-base defects in CLAUDE.md (x_mitre_detection, cross-domain CoA merge)
+are not touched: this service reads indicators and relationships only.
+
+======================================================================
+7. COMMANDS RUN
+======================================================================
+  PY=C:\Users\devMrX\anaconda3\python.exe   (from the worktree root)
+  $PY -m src.services.enrich --help
+  $PY -m src.services.enrich --dry-run
+  $PY -m src.services.enrich --dry-run --stub-fail
+  $PY -m src.services.enrich                          -> exit 2, names missing keys (no .env here)
+  $PY -m unittest tests.test_enrich_service           -> OK
+  $PY -m pytest -q tests/test_enrich_service.py       -> 27 passed
+  $PY -m unittest discover -s tests -p "test_*.py"    -> 2 pre-existing failures, see section 5
+  $PY -m compileall -q src/services tests/test_enrich_service.py
