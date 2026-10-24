@@ -1,26 +1,32 @@
-# Credentials -- never commit (covers .env, notification/.env, observability/.env, opencti/.env)
 .env
 **/.env
 
-# Datasets -- large (8.7GB as of 2026-07-06), kept local only
 data/
 
-# Python virtual environment
 .venv/
 __pycache__/
 *.py[cod]
 
-# IDE
 .idea/
 
-# OS cruft
 .DS_Store
 Thumbs.db
 
-# Claude Code local/session state (not shared project config)
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 
-# Local agent-skill installs (managed outside the thesis source tree)
 .agents/
 skills-lock.json
+!.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/reverse-engineer-anything/
+!.agents/skills/reverse-engineer-anything/**
+
+# Trained model artifacts above GitHub's 100 MB blob limit. models/random_forest.pkl is
+# 483 MB and was removed from history on 2026-10-24 so this branch could be pushed at all.
+# Regenerate it by running notebooks/02_random_forest.ipynb; models/fusion_config.json and
+# reports/random_forest_*.csv carry the hyperparameters and the metrics it must reproduce.
+# Every other models/* artifact is small and stays tracked.
+models/random_forest.pkl
