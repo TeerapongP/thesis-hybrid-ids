@@ -1,0 +1,77 @@
+SHAP EXPLAINABILITY REPORT
+==========================
+
+1. ATTRIBUTION CONTRACT
+-----------------------
+Deployed rule: fused = max(rf_attack_probability, ae_norm), threshold 0.05.
+The members use different feature spaces (RF 80, AE-v2 92) and are joined on
+orig_row_index <-> row_index. max() has no single input space, so no blended
+attribution is produced. Each alert is explained by the member that supplied the max
+(fusion_layer.fuse_with_metadata -> model_used), in that member's own features, using
+TreeExplainer (RF, target 1 - P(BENIGN)) or KernelExplainer (AE-v2, target ae_norm).
+The non-deciding member is not attributed. Full argument in the module docstring.
+
+2. FAITHFULNESS CHECKS (base + sum(shap) vs member score, max abs gap over 20 rows)
+----------------------------------------------------------------------
+random_forest: 1.090e-12
+autoencoder_v2: 1.788e-07
+
+3. AE-v2 BACKGROUND SAMPLE
+--------------------------
+100 BENIGN rows, random_state=42, from the behavioral TRAIN split.
+The AE is trained on BENIGN only, so attributions read as 'what makes this flow
+reconstruct worse than a typical benign flow'. KernelExplainer nsamples=500.
+
+4. WALL-CLOCK PER EXPLANATION (measured, end to end, single-row calls, CPU)
+------------------------------------------------------------------------
+100 test rows, half attack / half BENIGN. Includes RF predict_proba, AE scoring, fusion, SHAP.
+random_forest: n=52 mean=1.032s median=1.014s p95=1.182s max=1.385s
+autoencoder_v2: n=48 mean=0.055s median=0.059s p95=0.061s max=0.062s
+RF is slow because the forest is 200 trees of depth ~66 over 15 classes; TreeExplainer
+computes all classes though only BENIGN is used. Batching does not help (measured ~1.0s/row
+at batch 1, 10 and 50). Fine for per-alert use, impractical for bulk scoring of flow streams.
+
+5. WHICH MEMBER DECIDED (latency sample)
+----------------------------------------
+attack  random_forest     50
+benign  autoencoder_v2    48
+        random_forest      2
+
+6. GLOBAL TOP FEATURES, random_forest (mean |SHAP| over 300 balanced attack/benign test rows)
+----------------------------------------------------------------------
+ 1. Destination Port: 0.05040
+ 2. Bwd Packet Length Min: 0.03064
+ 3. Init_Win_bytes_forward: 0.02898
+ 4. Packet Length Variance: 0.02221
+ 5. Init_Win_bytes_backward: 0.02149
+ 6. Bwd Packet Length Std: 0.02077
+ 7. min_seg_size_forward: 0.01975
+ 8. Max Packet Length: 0.01842
+ 9. Bwd Packet Length Mean: 0.01692
+10. Bwd Packets/s: 0.01652
+
+7. GLOBAL TOP FEATURES, autoencoder_v2 (mean |SHAP| over 200 balanced attack/benign test rows)
+----------------------------------------------------------------------
+ 1. Init_Win_bytes_forward_missing: 0.02529
+ 2. PSH Flag Count: 0.01436
+ 3. FIN Flag Count: 0.01416
+ 4. Init_Win_bytes_backward_missing: 0.01131
+ 5. repeat_ratio_5m: 0.01113
+ 6. repeat_ratio_3m: 0.01091
+ 7. repeat_ratio_1m: 0.00748
+ 8. ACK Flag Count: 0.00604
+ 9. conn_count_5m: 0.00538
+10. Fwd PSH Flags: 0.00441
+
+Units: RF shap is in attack-probability units, AE shap in ae_norm units. Importances
+are not comparable across members. Feature values are scaled model inputs.
+
+8. FINDINGS
+-----------
+- The dispatcher's risk_score (round(fused*100)) is unclamped and can exceed 100 when
+  ae_norm > 1; this module clamps. Not changed in the dispatcher.
+- Rows where both members score near 0 are explained by RF (tie goes to RF); those
+  attributions describe a benign-looking row and are low-magnitude. In the latency sample 48 of 50
+  BENIGN rows were decided by AE-v2 (its tiny reconstruction error edged RF's ~0 probability).
+- RF's top global feature is Destination Port, a dataset-specific cue that may not transfer;
+  worth knowing when an analyst reads an RF explanation.
