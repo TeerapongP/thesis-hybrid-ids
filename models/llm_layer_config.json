@@ -1,12 +1,115 @@
 {
   "backend": "ollama",
-  "model": "typhoon2.1-12b-instruct",
+  "model": "scb10x/llama3.1-typhoon2-8b-instruct",
   "orchestration": "LangChain ChatOllama; ChatOpenAI for the llama.cpp OpenAI-compatible endpoint",
   "json_enforcement": "LangChain structured output with a Pydantic schema, followed by deterministic fact overrides",
   "confidence_formula": "rf_confidence = abs(rf_attack_probability - 0.5) * 2; emitted with model_used by fusion_layer.fuse_with_metadata",
   "technique_precedence": "Use RAG top-3 consensus; abstain with null technique_id/tactic when fewer than two hits agree",
-  "per_alert_fields": ["priority", "explanation_th", "technique_id", "mitre_tactic", "affected_asset", "remediation", "confidence", "response_ms"],
-  "excluded_live_fields": ["faithfulness_score", "hallucination_rate"],
-  "runtime_verified": false,
-  "runtime_verification_note": "Ollama is not installed on this machine; module and offline contract tests are verified, live throughput/GPU offload remain pending."
+  "per_alert_fields": [
+    "priority",
+    "explanation_th",
+    "technique_id",
+    "mitre_tactic",
+    "affected_asset",
+    "remediation",
+    "confidence",
+    "response_ms"
+  ],
+  "excluded_live_fields": [
+    "faithfulness_score",
+    "hallucination_rate"
+  ],
+  "runtime_verified": true,
+  "runtime_verification": {
+    "date": "2026-10-25",
+    "hardware": "RTX 3070 8GB, Ollama 0.34.4",
+    "model_size_gb": 4.9,
+    "gpu_offload": "100% (ollama ps size_vram == size, 5.81GB at context 8192)",
+    "peak_vram_mb": 7250,
+    "idle_vram_baseline_mb": 1416,
+    "generation_tokens_per_s": [
+      67.8,
+      66.1
+    ],
+    "prompt_tokens": [
+      1482,
+      1813
+    ],
+    "response_ms": [
+      18868,
+      3711
+    ],
+    "cold_load_s": 40.0,
+    "prompt_eval_speed": "not recorded: the measuring call reused the cached prompt, so its prompt_eval figure is inflated",
+    "evidence": "reports/llm_layer_live_typhoon2_8b.json",
+    "rerun_after_quality_fixes": {
+      "generation_tokens_per_s": [
+        61.2,
+        60.9
+      ],
+      "prompt_tokens": [
+        1852,
+        2183
+      ],
+      "response_ms": [
+        6025,
+        6050
+      ],
+      "peak_vram_mb": 7637,
+      "evidence": "reports/llm_layer_live_typhoon2_8b_v2.json"
+    },
+    "rerun_after_priority_rule": {
+      "generation_tokens_per_s": [
+        67.1,
+        67.8
+      ],
+      "prompt_tokens": [
+        1884,
+        2216
+      ],
+      "response_ms": [
+        5777,
+        5225
+      ],
+      "peak_vram_mb": 7170,
+      "evidence": "reports/llm_layer_live_typhoon2_8b_v3.json"
+    }
+  },
+  "quality_verified": false,
+  "quality_issues": [
+    "PortScan remediation still suggests blocking at a WAF for SMB traffic, wording borrowed from the web-attack few-shot.",
+    "The SSH-Patator explanation does not state that the RAG evidence was insufficient, although the prompt asks it to.",
+    "Only two live alerts have been checked; quality has not been measured on a larger set or reviewed by analysts."
+  ],
+  "remediation_limit": "1-5 unique items: JSON schema maxItems plus a dedupe-and-truncate validator on LlmDraft",
+  "repeat_penalty": 1.15,
+  "few_shot_policy": "Few-shot entities must not match tests/fixtures; enforced by tests/test_llm_layer.py",
+  "quality_issues_fixed": [
+    "Few-shot copying: explanations now describe the real alert entities instead of reproducing the examples.",
+    "Remediation loop: both alerts returned 3 distinct items, and response time fell from 18.9s to about 6s.",
+    "Abstention: with technique_id null, the SSH-Patator explanation no longer names a technique.",
+    "Priority: now derived by rule; SSH-Patator at fused_score 0.55 is MEDIUM as the fixture expects.",
+    "In the priority-rule rerun, remediation no longer named EternalBlue and the SSH alert no longer suggested a WAF."
+  ],
+  "per_alert_fields_source": {
+    "llm": [
+      "explanation_th",
+      "remediation"
+    ],
+    "deterministic": [
+      "priority",
+      "technique_id",
+      "mitre_tactic",
+      "affected_asset",
+      "confidence",
+      "response_ms"
+    ]
+  },
+  "priority_rule": {
+    "function": "src/llm/llm_explain.py derive_priority",
+    "rule": "fused_prediction != 1 -> LOW; fused_score >= 0.80 -> HIGH; otherwise MEDIUM",
+    "high_min_fused_score": 0.8,
+    "inputs": "fused_score and fused_prediction only; rf confidence is not used because it measures RF certainty in either direction, not attack risk",
+    "status": "provisional: chosen to match the five tests/fixtures expectations, not tuned on data or validated with analysts"
+  }
 }

@@ -1,0 +1,54 @@
+{
+ "high_portscan": {
+  "output": {
+   "priority": "HIGH",
+   "explanation_th": "เครื่อง 10.20.14.87 ส่งคำขอไปยังบริการ SMB บน FS-PRINT02.campus.local ที่พอร์ต 445 โมเดลทำนายว่าเป็นการสำรวจพอร์ต (PortScan) และมีความมั่นใจสูง (0.91)",
+   "technique_id": "T1046",
+   "mitre_tactic": "discovery",
+   "affected_asset": "FS-PRINT02.campus.local",
+   "remediation": [
+    "ตรวจสอบ log ของเซิร์ฟเวอร์ FS-PRINT02 ในช่วงเวลาที่เกิดเหตุ",
+    "ปิดกั้น 10.20.14.87 ชั่วคราวที่ WAF",
+    "ติดตั้งแพตช์ล่าสุดบน FS-PRINT02 เพื่อป้องกันการโจมตีแบบ EternalBlue"
+   ],
+   "confidence": 0.91,
+   "response_ms": 6025
+  },
+  "error": null,
+  "metrics": {
+   "prompt_tokens": 1852,
+   "gen_tokens": 196,
+   "prompt_tok_s": 73858.4,
+   "gen_tok_s": 61.2,
+   "peak_vram_mb": 7637,
+   "total_vram_mb": 8192,
+   "peak_gpu_util": 100
+  }
+ },
+ "medium_sshpatator": {
+  "output": {
+   "priority": "HIGH",
+   "explanation_th": "พบการพยายามเข้าถึง SSH ของ AUTH-SVR01.campus.local จาก 203.0.113.44 ที่พอร์ต 22 โมเดลคาดการณ์ว่าเป็นการโจมตีแบบ SSH-Patator ด้วยความมั่นใจ 0.55",
+   "technique_id": null,
+   "mitre_tactic": null,
+   "affected_asset": "AUTH-SVR01.campus.local",
+   "remediation": [
+    "ตรวจสอบการเข้าถึง SSH ของ AUTH-SVR01.campus.local เพื่อให้แน่ใจว่ามีการควบคุมการเข้าถึงที่เหมาะสม",
+    "ใช้ WAF หรือไฟร์วอลล์เพื่อจำกัดการเข้าถึงจาก 203.0.113.44",
+    "ตรวจสอบและติดตั้งแพตช์สำหรับ SSH บน AUTH-SVR01.campus.local"
+   ],
+   "confidence": 0.55,
+   "response_ms": 6050
+  },
+  "error": null,
+  "metrics": {
+   "prompt_tokens": 2183,
+   "gen_tokens": 180,
+   "prompt_tok_s": 78238.1,
+   "gen_tok_s": 60.9,
+   "peak_vram_mb": 7259,
+   "total_vram_mb": 8192,
+   "peak_gpu_util": 100
+  }
+ }
+}

@@ -1,0 +1,54 @@
+{
+ "high_portscan": {
+  "output": {
+   "priority": "HIGH",
+   "explanation_th": "เครื่อง 10.20.14.87 ส่งคำขอไปยังบริการ SMB บนพอร์ต 445 ของ FS-PRINT02.campus.local โมเดลคาดการณ์ว่าเป็นการสำรวจเครือข่าย (PortScan) ด้วยความมั่นใจสูง (0.91)",
+   "technique_id": "T1046",
+   "mitre_tactic": "discovery",
+   "affected_asset": "FS-PRINT02.campus.local",
+   "remediation": [
+    "ตรวจสอบ log ของเซิร์ฟเวอร์ FS-PRINT02 ในช่วงเวลาที่เกิดเหตุ",
+    "ปิดกั้น 10.20.14.87 ชั่วคราวที่ WAF",
+    "ปรับปรุงการควบคุมการเข้าถึงเครือข่ายเพื่อป้องกันไม่ให้เครื่องอื่นส่งคำขอไปยังพอร์ต SMB"
+   ],
+   "confidence": 0.91,
+   "response_ms": 5777
+  },
+  "error": null,
+  "metrics": {
+   "prompt_tokens": 1884,
+   "gen_tokens": 147,
+   "prompt_tok_s": 51231.8,
+   "gen_tok_s": 67.1,
+   "peak_vram_mb": 7170,
+   "total_vram_mb": 8192,
+   "peak_gpu_util": 100
+  }
+ },
+ "medium_sshpatator": {
+  "output": {
+   "priority": "MEDIUM",
+   "explanation_th": "พบการเข้าถึงเครื่อง AUTH-SVR01.campus.local จาก IP 203.0.113.44 ที่พอร์ต SSH (22) โดยมีความมั่นใจ 0.55 และความสำคัญระดับ MEDIUM",
+   "technique_id": null,
+   "mitre_tactic": null,
+   "affected_asset": "AUTH-SVR01.campus.local",
+   "remediation": [
+    "ตรวจสอบ log ของเซิร์ฟเวอร์ในช่วงเวลาที่เกิดเหตุ",
+    "จำกัดการเข้าถึง SSH ให้กับ IP ที่ได้รับอนุญาตเท่านั้น",
+    "ติดตั้งแพตช์ล่าสุดและอัปเดตระบบเพื่อป้องกันการโจมตี"
+   ],
+   "confidence": 0.55,
+   "response_ms": 5225
+  },
+  "error": null,
+  "metrics": {
+   "prompt_tokens": 2216,
+   "gen_tokens": 174,
+   "prompt_tok_s": 65776.2,
+   "gen_tok_s": 67.8,
+   "peak_vram_mb": 7025,
+   "total_vram_mb": 8192,
+   "peak_gpu_util": 100
+  }
+ }
+}

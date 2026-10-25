@@ -1,26 +1,34 @@
-"""LangChain model factory and structured invocation for the SOC explainer."""
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any
 
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+MAX_REMEDIATION = 5
+# Typhoon2 8B looped one remediation line ~25 times at temperature 0.1 without this.
+REPEAT_PENALTY = 1.15
 
 
 class LlmDraft(BaseModel):
-    """Only fields the model is allowed to generate."""
 
     model_config = ConfigDict(extra="forbid")
 
-    priority: Literal["HIGH", "MEDIUM", "LOW"]
     explanation_th: str
-    remediation: list[str]
+    remediation: list[str] = Field(min_length=1, max_length=MAX_REMEDIATION)
+
+    @field_validator("remediation", mode="before")
+    @classmethod
+    def _dedupe_and_cap(cls, value: Any) -> Any:
+        if not isinstance(value, list):
+            return value
+        unique = list(dict.fromkeys(item.strip() if isinstance(item, str) else item for item in value))
+        return unique[:MAX_REMEDIATION]
 
 
 def build_chat_model(config: dict[str, Any]) -> ChatOllama | ChatOpenAI:
-    """Build a LangChain chat model without making a network request."""
     common = {
         "model": config["model"],
         "temperature": config["temperature"],
@@ -30,6 +38,7 @@ def build_chat_model(config: dict[str, Any]) -> ChatOllama | ChatOpenAI:
             **common,
             base_url=config["base_url"],
             num_predict=config["max_tokens"],
+            repeat_penalty=REPEAT_PENALTY,
             client_kwargs={"timeout": config["timeout_s"]},
         )
     if config["backend"] == "llamacpp":
@@ -48,7 +57,6 @@ def invoke_structured(
     config: dict[str, Any],
     model: ChatOllama | ChatOpenAI | Any | None = None,
 ) -> dict[str, Any]:
-    """Invoke the configured backend and return a validated model draft."""
     chat_model = model or build_chat_model(config)
     method = "json_schema" if config["backend"] == "ollama" else "json_mode"
     structured_model = chat_model.with_structured_output(LlmDraft, method=method)

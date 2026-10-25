@@ -2,4 +2,4 @@ LLM Layer Offline Contract Evaluation
 =====================================
 Result: 6/6 passed
 Scope: prompt/entity preservation, JSON validation, and adversarial RAG abstention.
-Live Typhoon quality/latency is pending because no Ollama runtime is installed.
+Live Typhoon runtime and quality results are recorded in models/llm_layer_config.json.

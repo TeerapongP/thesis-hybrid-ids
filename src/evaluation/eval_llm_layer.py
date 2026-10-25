@@ -1,4 +1,3 @@
-"""Offline contract checks for the LLM layer; live model quality needs a configured backend."""
 
 from __future__ import annotations
 
@@ -29,8 +28,8 @@ def run_cases() -> list[dict[str, str]]:
         rows.append({"case_id": case_id, "passed": str(passed).lower(), "detail": "technical entities preserved in prompt"})
 
     invalid_payloads = (
-        ("TC-FAITH-01", {"priority": "URGENT", "explanation_th": "x", "remediation": []}),
-        ("TC-FAITH-02", {"priority": "HIGH", "explanation_th": "x", "remediation": "not-a-list"}),
+        ("TC-FAITH-01", {"explanation_th": None, "remediation": ["x"]}),
+        ("TC-FAITH-02", {"explanation_th": "x", "remediation": "not-a-list"}),
     )
     for case_id, payload in invalid_payloads:
         try:
@@ -63,7 +62,7 @@ def main() -> int:
         "=====================================\n"
         f"Result: {aggregate['detail']}\n"
         "Scope: prompt/entity preservation, JSON validation, and adversarial RAG abstention.\n"
-        "Live Typhoon quality/latency is pending because no Ollama runtime is installed.\n",
+        "Live Typhoon runtime and quality results are recorded in models/llm_layer_config.json.\n",
         encoding="utf-8",
     )
     return 0 if aggregate["passed"] == "true" else 1

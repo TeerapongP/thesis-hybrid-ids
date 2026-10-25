@@ -1,0 +1,8 @@
+run_timestamp_utc,previous_attack_version,fetched_attack_version,mitre_version_changed,content_changed,techniques_changed,index_rebuilt,chroma_collection_count,dry_run,status,error_message
+2026-07-18T14:30:38.304468+00:00,19.1,19.1,False,False,,False,45,True,ok,
+2026-07-18T14:41:41.516068+00:00,19.1,19.1,False,False,,False,45,True,ok,
+2026-07-18T14:42:08.956840+00:00,19.1,19.1,False,False,,False,45,False,ok,
+2026-07-18T14:50:06.324305+00:00,19.1,19.1,False,False,,False,45,True,ok,
+2026-07-18T14:51:13.918146+00:00,19.1,19.1,False,False,,False,45,False,ok,
+2026-10-25T09:23:09.851415+00:00,,20.0,False,True,"T1046,T1059,T1071.001,T1110,T1110.001,T1190,T1210,T1498,T1499.002,T1505.003,T1595",,,False,error,No module named 'sentence_transformers'
+2026-10-25T09:23:56.503744+00:00,,20.0,False,True,"T1046,T1059,T1071.001,T1110,T1110.001,T1190,T1210,T1498,T1499.002,T1505.003,T1595",True,45,False,ok,
