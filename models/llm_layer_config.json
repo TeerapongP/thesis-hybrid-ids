@@ -77,15 +77,17 @@
   },
   "quality_verified": false,
   "quality_issues": [
-    "PortScan remediation still suggests blocking at a WAF for SMB traffic, wording borrowed from the web-attack few-shot.",
-    "The SSH-Patator explanation does not state that the RAG evidence was insufficient, although the prompt asks it to.",
-    "Only two live alerts have been checked; quality has not been measured on a larger set or reviewed by analysts."
+    "Entity omission, not fabrication, is the dominant failure: strict entity preservation is 28/100 because the model leaves out a required IP or port, while 68/100 outputs are free of any foreign or altered entity. Roughly 72 of the 100 strict failures are omissions.",
+    "Few-shot entity copying occurred in 30/100 alerts (172.16.33.9, LMS-WEB03, DNS-INT02, 100.64.7.18); one alert was a near-verbatim copy of example 1. A two-layer control was added afterwards, see `few_shot_leak_control`. The re-measurement is not complete, so treat 30/100 as the last measured value, not the current one.",
+    "PortScan remediation suggests a WAF block in 5/7 PortScan alerts. The earlier claim that this happens 'for SMB traffic' is NOT supported: none of the 7 PortScan alerts had dst_port 139 or 445. WAF advice on a non-web port with a non-web label occurs in 8/100.",
+    "SSH-Patator explanations never state that the RAG evidence was insufficient: 0/7, although all 7 abstained so the prompt did require it. Across all 47 abstaining alerts it is stated in only 11.",
+    "The model names a technique id in its prose that was never retrieved in 7/100 alerts. The 53/53 `technique_in_hits` rate is true by construction (the draft schema has no technique field) and is a regression guard, not a measurement of the model.",
+    "87 of 399 claims are Thai prose or generic advice with no checkable entity and remain undecidable mechanically. Whether they are true needs human raters."
   ],
   "remediation_limit": "1-5 unique items: JSON schema maxItems plus a dedupe-and-truncate validator on LlmDraft",
   "repeat_penalty": 1.15,
   "few_shot_policy": "Few-shot entities must not match tests/fixtures; enforced by tests/test_llm_layer.py",
   "quality_issues_fixed": [
-    "Few-shot copying: explanations now describe the real alert entities instead of reproducing the examples.",
     "Remediation loop: both alerts returned 3 distinct items, and response time fell from 18.9s to about 6s.",
     "Abstention: with technique_id null, the SSH-Patator explanation no longer names a technique.",
     "Priority: now derived by rule; SSH-Patator at fused_score 0.55 is MEDIUM as the fixture expects.",
@@ -111,5 +113,49 @@
     "high_min_fused_score": 0.8,
     "inputs": "fused_score and fused_prediction only; rf confidence is not used because it measures RF certainty in either direction, not attack risk",
     "status": "provisional: chosen to match the five tests/fixtures expectations, not tuned on data or validated with analysts"
+  },
+  "m2_measurement": {
+    "status": "measured once on 100 alerts; re-measurement after the few-shot fix is in flight",
+    "script": "src/evaluation/eval_llm_faithfulness.py",
+    "evidence": "reports/llm_faithfulness_raw.jsonl (one line per alert; every rate below is recomputable from it by hand)",
+    "pre_fix_reports": [
+      "reports/llm_faithfulness_raw.before_fewshot_fix.jsonl",
+      "reports/llm_faithfulness_metrics.before_fewshot_fix.csv",
+      "reports/llm_faithfulness_report.before_fewshot_fix.txt"
+    ],
+    "sample": "100 alerts, seed 42, stratified over 14 CICIDS-2017 attack categories (capped at 7 each so DoS Hulk and DDoS cannot dominate) plus 10 BENIGN. Per-category rates rest on 2-7 alerts and are descriptive only, not natural-traffic rates.",
+    "pipeline": "real deployed path per alert: RF + IF-v2 + AE-v2 scores, then fuse_with_metadata, then RagRetriever.retrieve(top_k=3) queried with the RF predicted label, then the LLM. The true label is never shown to the model.",
+    "rates_before_fewshot_fix": {
+      "entity_preservation_strict": "28/100",
+      "entity_corruption_free": "68/100",
+      "few_shot_entity_leak": "30/100",
+      "prose_technique_hallucination": "7/100",
+      "abstention": "47/100",
+      "claims_total": 399,
+      "claims_supported": 174,
+      "claims_undecidable": 87,
+      "claims_unsupported": 108,
+      "claims_contradicted": 30,
+      "hallucination_rate_lower_bound": "138/399 = 0.346",
+      "hallucination_rate_among_decidable": "138/312 = 0.442",
+      "alerts_with_at_least_one_bad_claim": "55/100",
+      "llm_call_success": "100/100"
+    },
+    "throughput": "61.4 tok/s pooled (median 60.4, range 52.0-70.8); 6.04 s mean wall time per alert; 2,192 token mean prompt; about 606 s for the run",
+    "not_measured": [
+      "Whether the 87 undecidable claims are true. Needs human raters.",
+      "Whether 'supported' claims are true as whole sentences. Only their entities and terms are grounded.",
+      "Semantic errors with no lexical trigger; remediation quality or safety.",
+      "Hostname preservation on real data: CICIDS-2017 has no hostnames, so affected_asset falls back to dst_ip and the hostname check is unit-tested only.",
+      "Run-to-run variance (one draw per alert), human-vs-rule agreement, live PA-5220 alerts."
+    ],
+    "no_llm_judge": "No LLM was used to grade another LLM's output. Every rate above is either an exact string check or an explicitly-labelled lexical approximation.",
+    "thesis_criteria": "Both H2 criteria fail by a wide margin: hallucination 0.346 against a <=0.10 target, strict entity preservation 0.28 against a 1.00 target. This is not a tuning gap."
+  },
+  "few_shot_leak_control": {
+    "problem": "The prompt had instructed the model not to copy from EXAMPLES since before the measurement, and it copied anyway in 30/100 alerts. An instruction that has already failed is not a control.",
+    "layer_1": "FEW_SHOTS now carry placeholders ({{SRC_IP}}, {{ASSET}}, {{DST_PORT}}, {{TECHNIQUE_ID}}, ...) instead of realistic values. Two earlier attempts only swapped one realistic set for another, so there was still something plausible to copy.",
+    "layer_2": "llm_explain._assert_no_foreign_entities rejects any output containing an IPv4, hostname-shaped token, or Txxxx id that is absent from FACTS. One corrective retry, then ValueError. It fails loudly on purpose: an explanation naming the wrong host sends an analyst to the wrong machine, which is worse than no explanation.",
+    "detection_is_shape_based": "find_foreign_entities matches token shape, not a blocklist of the current example values, so the check keeps working when the examples change."
   }
 }

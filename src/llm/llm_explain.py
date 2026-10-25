@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from collections import Counter
 from pathlib import Path
@@ -24,47 +25,105 @@ OUTPUT_FIELDS = (
 # Provisional, not tuned on data. fused_score already folds RF and AE into one risk measure under
 # rf_ae_or; rf confidence is not used because it is RF certainty in either direction.
 PRIORITY_HIGH_MIN_SCORE = 0.80
-# Entities here must never match tests/fixtures: the model copied the examples verbatim when they did.
+# The examples carry PLACEHOLDERS, never realistic values. Two earlier attempts kept the
+# entities realistic (just changed which ones) and the model still copied them verbatim into
+# real alerts: measured at 30/100 in reports/llm_faithfulness_raw.jsonl. A placeholder has
+# nothing plausible to copy, and _assert_no_foreign_entities below rejects it if one escapes.
 FEW_SHOTS = [
     {
         "input": {
-            "source_ip": "172.16.33.9", "dst_ip": "10.50.2.20", "dst_port": 8443,
-            "affected_asset": "LMS-WEB03.campus.local", "rf_predicted_label": "Web Attack",
-            "confidence": 0.88, "technique_id": "T1190", "mitre_tactic": "initial-access",
-            "priority": "HIGH",
+            "source_ip": "{{SRC_IP}}", "dst_ip": "{{DST_IP}}", "dst_port": "{{DST_PORT}}",
+            "affected_asset": "{{ASSET}}", "rf_predicted_label": "{{LABEL}}",
+            "confidence": "{{CONFIDENCE}}", "technique_id": "{{TECHNIQUE_ID}}",
+            "mitre_tactic": "{{TACTIC}}", "priority": "HIGH",
         },
         "output": {
             "explanation_th": (
-                "เครื่อง 172.16.33.9 ส่งคำขอผิดรูปแบบจำนวนมากไปยังบริการเว็บของ LMS-WEB03.campus.local "
-                "ที่พอร์ต 8443 ลักษณะตรงกับการโจมตีช่องโหว่แอปพลิเคชันที่เปิดสู่ภายนอก (T1190) "
-                "โมเดลมีความมั่นใจ 0.88"
+                "เครื่อง {{SRC_IP}} ส่งคำขอผิดรูปแบบจำนวนมากไปยังบริการของ {{ASSET}} "
+                "ที่พอร์ต {{DST_PORT}} ลักษณะตรงกับเทคนิค {{TECHNIQUE_ID}} "
+                "โมเดลมีความมั่นใจ {{CONFIDENCE}}"
             ),
             "remediation": [
-                "ตรวจสอบ log ของเว็บเซิร์ฟเวอร์ LMS-WEB03 ในช่วงเวลาที่เกิดเหตุ",
-                "ปิดกั้น 172.16.33.9 ชั่วคราวที่ WAF",
-                "ตรวจสอบและติดตั้งแพตช์ของแอปพลิเคชันบนพอร์ต 8443",
+                "ตรวจสอบ log ของ {{ASSET}} ในช่วงเวลาที่เกิดเหตุ",
+                "ปิดกั้น {{SRC_IP}} ชั่วคราวที่อุปกรณ์ควบคุมการเข้าถึงที่เหมาะกับพอร์ต {{DST_PORT}}",
+                "ตรวจสอบและติดตั้งแพตช์ของบริการบนพอร์ต {{DST_PORT}}",
             ],
         },
     },
     {
         "input": {
-            "source_ip": "100.64.7.18", "dst_ip": "10.50.8.4", "dst_port": 53,
-            "affected_asset": "DNS-INT02.campus.local", "rf_predicted_label": "BENIGN",
-            "confidence": 0.41, "technique_id": None, "mitre_tactic": None,
+            "source_ip": "{{SRC_IP}}", "dst_ip": "{{DST_IP}}", "dst_port": "{{DST_PORT}}",
+            "affected_asset": "{{ASSET}}", "rf_predicted_label": "BENIGN",
+            "confidence": "{{CONFIDENCE}}", "technique_id": None, "mitre_tactic": None,
             "priority": "LOW",
         },
         "output": {
             "explanation_th": (
-                "พบปริมาณคำขอ DNS จาก 100.64.7.18 ไปยัง DNS-INT02.campus.local สูงกว่าปกติ "
-                "แต่หลักฐานจาก RAG ไม่สอดคล้องกันพอที่จะระบุเทคนิค MITRE ได้ และความมั่นใจต่ำ (0.41)"
+                "พบปริมาณการเชื่อมต่อจาก {{SRC_IP}} ไปยัง {{ASSET}} ที่พอร์ต {{DST_PORT}} สูงกว่าปกติ "
+                "แต่หลักฐานจาก RAG ไม่สอดคล้องกันพอที่จะระบุเทคนิค MITRE ได้ "
+                "และความมั่นใจต่ำ ({{CONFIDENCE}})"
             ),
             "remediation": [
-                "เฝ้าดูพฤติกรรมของ 100.64.7.18 ต่อในรอบถัดไป",
-                "เทียบปริมาณคำขอกับค่าปกติของ DNS-INT02",
+                "เฝ้าดูพฤติกรรมของ {{SRC_IP}} ต่อในรอบถัดไป",
+                "เทียบปริมาณการเชื่อมต่อของ {{ASSET}} กับค่าปกติ",
             ],
         },
     },
 ]
+
+# Anything the model emits that looks like one of these but is absent from FACTS is a leak.
+_IPV4_RE = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b")
+_TECHNIQUE_RE = re.compile(r"\bT\d{4}(?:\.\d{3})?\b")
+_HOSTNAME_RE = re.compile(r"\b[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+){1,}\b")
+
+
+def _facts_entity_pool(facts: dict[str, Any]) -> set[str]:
+    """Every string a faithful output is allowed to contain an entity from."""
+    pool: set[str] = set()
+
+    def walk(value: Any) -> None:
+        if isinstance(value, dict):
+            for item in value.values():
+                walk(item)
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                walk(item)
+        elif value is not None:
+            pool.add(str(value))
+
+    walk(facts)
+    return pool
+
+
+def find_foreign_entities(text: str, facts: dict[str, Any]) -> list[str]:
+    """Entity-shaped tokens in `text` that appear nowhere in `facts`.
+
+    Shape-based rather than a blocklist of the current example values, so the check keeps
+    working when the examples change. Thai prose contains no ASCII hostnames or dotted
+    quads, so this does not fire on ordinary wording.
+    """
+    pool = _facts_entity_pool(facts)
+    joined = " ".join(pool)
+    foreign: list[str] = []
+    for pattern in (_IPV4_RE, _TECHNIQUE_RE, _HOSTNAME_RE):
+        for token in pattern.findall(text):
+            if token in pool or token in joined:
+                continue
+            if token not in foreign:
+                foreign.append(token)
+    return foreign
+
+
+def _assert_no_foreign_entities(parsed: dict[str, Any], facts: dict[str, Any]) -> None:
+    """Raise rather than return an explanation naming a host the alert never mentioned.
+
+    Failing loudly is the point. A silently wrong hostname sends an analyst to the wrong
+    machine, which is worse than no explanation at all.
+    """
+    text = " ".join([parsed["explanation_th"], *parsed["remediation"]])
+    foreign = find_foreign_entities(text, facts)
+    if foreign:
+        raise ValueError(f"LLM output names entities absent from FACTS: {foreign}")
 
 
 def load_env_config(env_path: Path = ENV_PATH) -> dict[str, Any]:
@@ -127,7 +186,8 @@ def build_prompt(
         "mitre_tactic, priority หรือ confidence และต้องคัดลอกค่าจาก FACTS ตรงตัว "
         "ความรุนแรงของคำอธิบายและ remediation ต้องสอดคล้องกับ priority ใน FACTS หาก technique_id เป็น null "
         "ให้คง null อธิบายว่าหลักฐาน RAG ไม่พอ และห้ามเอ่ยถึงรหัสเทคนิคใดๆ ในคำอธิบาย "
-        "EXAMPLES เป็นเพียงตัวอย่างรูปแบบ ห้ามคัดลอกค่าหรือข้อความจาก EXAMPLES "
+        "EXAMPLES ใช้ค่าตัวยึดในรูปแบบ {{...}} เท่านั้น ห้ามคัดลอกค่าใดจาก EXAMPLES "
+        "และห้ามเขียนตัวยึด {{...}} ลงในคำตอบ ให้แทนด้วยค่าจริงจาก FACTS เสมอ "
         f"remediation ต้องเป็นรายการข้อความภาษาไทย 1-{MAX_REMEDIATION} ข้อ ไม่ซ้ำกัน\n"
         f"SCHEMA={json.dumps(OUTPUT_FIELDS, ensure_ascii=False)}\n"
         f"EXAMPLES={json.dumps(FEW_SHOTS, ensure_ascii=False)}\n"
@@ -162,8 +222,24 @@ def explain_alert(
 ) -> dict[str, Any]:
     technique_id, tactic = _technique_context(rag_hits)
     prompt = build_prompt(alert_context, rag_hits, fused_score, fused_prediction, confidence)
+    guard_facts = {
+        "alert_context": alert_context,
+        "technique_id": technique_id,
+        "mitre_tactic": tactic,
+        "rag_hits": rag_hits,
+    }
     started = time.perf_counter()
     parsed = parse_llm_response(call_llm(prompt, config))
+    try:
+        _assert_no_foreign_entities(parsed, guard_facts)
+    except ValueError:
+        # One corrective retry. The instruction alone was measured at 30% leakage, so a
+        # single retry is a cheap second chance, not the control; the re-check below is.
+        retry_prompt = prompt + (
+            "\nคำตอบก่อนหน้ามีค่าที่ไม่ได้อยู่ใน FACTS ให้เขียนใหม่โดยใช้เฉพาะค่าจาก FACTS"
+        )
+        parsed = parse_llm_response(call_llm(retry_prompt, config))
+        _assert_no_foreign_entities(parsed, guard_facts)
     response_ms = round((time.perf_counter() - started) * 1000)
     result = {
         "priority": derive_priority(fused_score, fused_prediction),

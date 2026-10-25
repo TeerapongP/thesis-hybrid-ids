@@ -1,60 +1,14 @@
-"""
-validate_behavioral_join.py
-============================
-สคริปต์แยกต่างหาก (ไม่แก้ preprocess_pipeline.py / label_builder.py / feature_extractor.py /
-behavioral_feature_extractor.py และไม่แตะ output เดิมของทุกไฟล์เลย) สำหรับ validate การ join
-คอลัมน์ behavioral (จาก cicids2017_behavioral_labeled.parquet, สร้างจาก GeneratedLabelledFlows/
-TrafficLabelling distribution) กลับเข้าไปใน cicids2017_{train,val,test}.parquet เดิม (สร้างจาก
-MachineLearningCSV distribution) — นี่คือ Phase 1 ของ Option A เท่านั้น (การ join + validate)
-ไม่รวม Phase 2 (ย้าย impute/CTI-encode/scale/SMOTE logic ของ feature_extractor.py มาใช้กับข้อมูล
-ที่ join แล้ว หรือ retrain IF/AE) — Phase 2 เป็นแผนแยกต่างหากที่ต้องขออนุมัติเพิ่ม
-
-ทำไมต้อง validate ก่อน join จริง: ทั้งสอง distribution เป็น CICFlowMeter export คนละรอบกันของ
-capture เดียวกัน ไม่มี shared key column ใดๆ เลย (MachineLearningCSV ไม่มี Source IP/Timestamp,
-ถูกตัดออกเพื่อความเป็นส่วนตัว) จึงต้อง join ด้วย row-hash บน 79 คอลัมน์ร่วม (78 raw CICFlowMeter
-features + Label) เหมือนที่ feature_extractor.py ทำกับ join ของตัวเอง (คอลัมน์ MITRE กลับเข้า
-split) แต่ต่างกันตรงที่ feature_extractor.py join ข้อมูลจาก "รอบ process เดียวกัน" (labeled_df
-สร้างจาก clean_df ตัวเดียวกับ split_df) รับประกัน 100% match อยู่แล้วโดยไม่ต้องคิดอะไรเพิ่ม
-แต่ที่นี่ทั้งสอง distribution ผลิตแยกกันอิสระ (คนละไฟล์ CSV ต้นทาง) การ match จึงไม่รับประกัน —
-recon ก่อนหน้านี้เจอ "~163-row duplicate-count discrepancy" ระหว่างสอง distribution ซึ่งตอนแรก
-ดูเหมือนเป็นแค่ edge case เล็กๆ
-
-สิ่งที่ script นี้ยืนยัน (จาก diagnostic ที่รันไว้แล้วนอก script นี้ ก่อนเขียนโค้ดนี้):
-  1) hash key 79 คอลัมน์ (list(cicids2017_clean-derived split.columns)) unique ในตัวเองทั้งสองฝั่ง
-     (ไม่มี hash ซ้ำเลยแม้แต่ตัวเดียว ทั้งฝั่ง split และฝั่ง behavioral) -> validate="1:1" ใช้ได้จริง
-     ไม่ใช่แค่ assumption
-  2) hash ตรงๆ โดยไม่ normalize dtype ก่อน จะได้ 0% match (ไม่ใช่ ~163 แถวต่าง แต่พังทั้งหมด) เพราะ
-     51/79 คอลัมน์มี dtype ไม่ตรงกัน (int64 ใน cicids2017_clean.parquet vs float64 ใน
-     cicids2017_behavioral_labeled.parquet) เป็น artifact จากการที่แต่ละ script ผลิตไฟล์แยกกัน
-     ไม่ใช่ข้อมูลต่างกันจริง -> ต้อง cast เป็น float64 เหมือนกันทั้งสองฝั่งก่อน hash เสมอ
-  3) หลัง normalize dtype แล้ว: ทุกแถวที่เป็น attack (ไม่ใช่ BENIGN) match 100% ทั้ง 425,741 แถว
-     ทุก 14 category — ส่วนต่างทั้งหมดกระจุกอยู่ที่ BENIGN เท่านั้น (~23.6% ของ BENIGN แต่ละฝั่ง
-     ไม่ match กัน ปัดเศษหักลบกันเหลือ ~163 ตามที่ recon เจอ แต่ตัวเลขจริงที่ไม่ match กันใหญ่กว่านั้น
-     มาก ไม่ใช่ edge case เล็กๆ)
-  4) กระจายสม่ำเสมอทั้ง train/val/test (~23.6% ของ BENIGN ทุก split ใกล้เคียงกัน) ไม่กระจุกที่ split ใด
-  5) นโยบายที่ตัดสินใจร่วมกับผู้ใช้: DROP แถว BENIGN ที่ไม่ match ออกจาก behavioral-augmented split
-     แล้วบันทึกจำนวน/สัดส่วนไว้เป็น known limitation อย่างชัดเจน (ไม่ investigate root cause เพิ่ม)
-
-Output:
-  - data/processed/behavioral/cicids2017_behavioral_{train,val,test}.parquet (join แล้ว, ยังไม่ scale/
-    SMOTE — ตำแหน่งเดียวกับ preprocess_pipeline.py's cicids2017_{train,val,test}.parquet, ก่อนขั้น
-    impute/CTI-encode/scale/SMOTE ของ feature_extractor.py ซึ่งเป็น Phase 2 แยกต่างหาก)
-  - reports/behavioral_join_validation_report.txt
-
-รันจาก repo root เสมอ: `python -m src.features.validate_behavioral_join`
-"""
 
 import os
 import sys
 import numpy as np
 import pandas as pd
 
+from src.features import behavioral_feature_extractor
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-# ----------------------------------------------------------------------------
-# CONFIG
-# ----------------------------------------------------------------------------
 PROCESSED_DATA_DIR = "./data/processed"
 BEHAVIORAL_DATA_DIR = "./data/processed/behavioral"
 SPLIT_NAMES = ["train", "val", "test"]
@@ -64,25 +18,23 @@ BEHAVIORAL_LABELED_PATH = os.path.join(BEHAVIORAL_DATA_DIR, "cicids2017_behavior
 OUTPUT_PATHS = {s: os.path.join(BEHAVIORAL_DATA_DIR, f"cicids2017_behavioral_{s}.parquet") for s in SPLIT_NAMES}
 REPORT_PATH = "./reports/behavioral_join_validation_report.txt"
 
-# คอลัมน์ behavioral 12 ตัวที่จะพกไปกับ output ด้วย (นอกเหนือจาก 79 key columns เดิม) — ไม่รวม
-# technique_id/technique_name/tactic/mapping_confidence (มาจาก label_builder.py join แยกต่างหาก
-# อยู่แล้วใน feature_extractor.py เดิม การพกมาด้วยที่นี่จะซ้ำซ้อน/เสี่ยงชนคอลัมน์) และไม่รวม
-# Flow ID/Source IP/Destination IP/Timestamp/day_group (ไม่ใช่ส่วนหนึ่งของ schema pipeline หลัก)
-BEHAVIORAL_FEATURE_COLS = [
-    f"{metric}_{w}m"
-    for w in (1, 3, 5)
-    for metric in ("conn_count", "uniq_dport_count", "fail_ratio", "repeat_ratio")
+BEHAVIORAL_CONTEXT_COLS = [
+    "Source IP",
+    "Timestamp",
+    "Destination Port",
+    "Protocol",
+    "RST Flag Count",
+    "SYN Flag Count",
+    "ACK Flag Count",
+    "Total Length of Fwd Packets",
+    "Total Length of Bwd Packets",
+    "day_group",
 ]
 
-# baseline ที่ review แล้วจาก diagnostic ที่รันไว้ก่อนเขียน script นี้ (ดู docstring ข้อ 3-4) —
-# ใช้เทียบ drift หากรันใหม่ในอนาคต (เช่น หลัง raw data หรือ upstream script เปลี่ยน)
 BASELINE_TOTAL_UNMATCHED_PCT = {"train": 19.59, "val": 19.65, "test": 19.64}
 BASELINE_BENIGN_UNMATCHED_PCT = {"train": 23.57, "val": 23.64, "test": 23.63}
-DRIFT_TOLERANCE_PP = 2.0  # percentage points
+DRIFT_TOLERANCE_PP = 2.0
 
-# ----------------------------------------------------------------------------
-# ตัวช่วยเก็บ output (รูปแบบเดียวกับ script อื่นในโปรเจกต์)
-# ----------------------------------------------------------------------------
 _REPORT_LINES = []
 
 
@@ -106,9 +58,6 @@ def safe_read_parquet(path):
     return pd.read_parquet(path)
 
 
-# ----------------------------------------------------------------------------
-# STEP 1: hash key -- normalize dtype ก่อน hash เสมอ (ดูเหตุผลใน docstring ข้อ 2)
-# ----------------------------------------------------------------------------
 def normalize_key_dtypes(df, key_cols, label_col="Label"):
     df = df[key_cols].copy()
     numeric_cols = [c for c in key_cols if c != label_col]
@@ -132,9 +81,6 @@ def assert_hash_unique(hash_series, side_name, split_name):
         )
 
 
-# ----------------------------------------------------------------------------
-# STEP 2: diagnostic outer join ก่อน join จริงเสมอ (per split) -- ดูสัดส่วน unmatched + label breakdown
-# ----------------------------------------------------------------------------
 def diagnostic_outer_join(split_df, behavioral_df, key_cols, split_name):
     left_k = normalize_key_dtypes(split_df, key_cols)
     right_k = normalize_key_dtypes(behavioral_df, key_cols)
@@ -204,28 +150,25 @@ def check_drift(diag, split_name):
         )
 
 
-# ----------------------------------------------------------------------------
-# STEP 3: join จริง (validate='1:1') -- ใช้ left join แล้ว drop แถว unmatched (BENIGN) แบบ explicit
-# ----------------------------------------------------------------------------
 def apply_join(split_df, behavioral_df, key_cols, split_name):
     left_k = normalize_key_dtypes(split_df, key_cols)
     right_k = normalize_key_dtypes(behavioral_df, key_cols)
-
     left = split_df.copy()
     left["_h"] = compute_row_hash(left_k, key_cols)
-    # ตำแหน่งเดิมใน cicids2017_{split}.parquet ก่อน drop -- คือ space เดียวกับที่ row_index ของ
-    # cicids2017_features_{split}.parquet (ฝั่ง Random Forest เดิม) ใช้อยู่ (feature_extractor.py
-    # ไม่ drop/reorder แถวเลย) เก็บไว้เป็น orig_row_index เพื่อให้ Fusion Layer ในอนาคต join คะแนน
-    # IF/AE (behavioral, ประชากรลดแล้ว) กับคะแนน RF (ประชากรเต็ม) ด้วย key นี้แทนการสมมติว่า
-    # row_index ตรงกันทางตำแหน่ง (position) เฉยๆ ซึ่งจะพังทันทีเพราะแถวถูก drop ไปแล้ว
     left["orig_row_index"] = np.arange(len(left))
-
-    right = behavioral_df[key_cols + BEHAVIORAL_FEATURE_COLS].copy()
+    left["_split_row_order"] = np.arange(len(left))
+    # 8 of BEHAVIORAL_CONTEXT_COLS are also join keys, so pulling them from the right
+    # makes pandas suffix both sides _x/_y and add_behavioral_features then cannot find
+    # e.g. "RST Flag Count". They are join keys, so the left copy is identical by
+    # construction: take only the columns the split genuinely lacks.
+    added_context_cols = [c for c in BEHAVIORAL_CONTEXT_COLS if c not in key_cols]
+    right_context = behavioral_df[added_context_cols].copy()
+    right = behavioral_df[key_cols].copy()
     right["_h"] = compute_row_hash(right_k, key_cols)
-    right = right[["_h"] + BEHAVIORAL_FEATURE_COLS]
-
+    right = pd.concat([right["_h"], right_context], axis=1)
+    assert_hash_unique(left["_h"], "split", split_name)
+    assert_hash_unique(right["_h"], "behavioral", split_name)
     merged = left.merge(right, how="left", on="_h", validate="1:1", indicator=True)
-
     unmatched_mask = merged["_merge"] != "both"
     n_unmatched = int(unmatched_mask.sum())
     n_nonbenign_unmatched = int((unmatched_mask & (merged["Label"] != "BENIGN")).sum())
@@ -235,19 +178,23 @@ def apply_join(split_df, behavioral_df, key_cols, split_name):
             f"-> หยุดก่อน drop เพราะขัดกับนโยบายที่ตกลงไว้ (drop เฉพาะ BENIGN unmatched เท่านั้น)"
         )
 
-    n_before = len(merged)
-    merged = merged.loc[~unmatched_mask].drop(columns=["_h", "_merge"]).reset_index(drop=True)
-    n_after = len(merged)
+    matched = merged.loc[~unmatched_mask].drop(columns=["_h", "_merge"]).copy()
+    n_after = len(matched)
+    day_frames = []
+    for _, day_df in matched.groupby("day_group", sort=False):
+        ordered_day = day_df.sort_values(["Source IP", "Timestamp"], kind="stable").reset_index(drop=True)
+        day_frames.append(behavioral_feature_extractor.add_behavioral_features(ordered_day))
+    if day_frames:
+        matched = pd.concat(day_frames, ignore_index=True)
+        matched = matched.sort_values("_split_row_order", kind="stable").reset_index(drop=True)
+    matched = matched.drop(columns=["_split_row_order", *added_context_cols])
     log(
         f"  {split_name}: join แล้ว drop แถว BENIGN ที่ไม่ match {n_unmatched:,} แถว "
-        f"({n_before:,} -> {n_after:,} แถว)"
+        f"({len(split_df):,} -> {n_after:,} แถว), rolling windows rebuilt within this split"
     )
-    return merged, n_unmatched
+    return matched, n_unmatched
 
 
-# ----------------------------------------------------------------------------
-# MAIN
-# ----------------------------------------------------------------------------
 def main():
     section("PHASE 1: โหลดไฟล์ split เดิม + behavioral labeled")
     behavioral_df = safe_read_parquet(BEHAVIORAL_LABELED_PATH)
@@ -263,8 +210,8 @@ def main():
     assert len(key_cols) == 79, f"คาดว่า key columns 79 คอลัมน์ แต่ได้ {len(key_cols)}"
     missing_in_behavioral = [c for c in key_cols if c not in behavioral_df.columns]
     assert not missing_in_behavioral, f"behavioral_labeled ขาดคอลัมน์ key: {missing_in_behavioral}"
-    missing_behavioral_feats = [c for c in BEHAVIORAL_FEATURE_COLS if c not in behavioral_df.columns]
-    assert not missing_behavioral_feats, f"behavioral_labeled ขาดคอลัมน์ behavioral feature: {missing_behavioral_feats}"
+    missing_behavioral_context = [c for c in BEHAVIORAL_CONTEXT_COLS if c not in behavioral_df.columns]
+    assert not missing_behavioral_context, f"behavioral_labeled ขาดคอลัมน์สำหรับคำนวณ split-aware features: {missing_behavioral_context}"
 
     os.makedirs(BEHAVIORAL_DATA_DIR, exist_ok=True)
 
@@ -289,6 +236,7 @@ def main():
     log("Phase 1 ของ Option A (row-hash join validation) เสร็จสมบูรณ์:")
     log("  - ทุก attack category match 100% ระหว่างสอง distribution (ไม่มีแถว attack ถูก drop เลย)")
     log("  - แถว BENIGN ที่ไม่ match (~23.6%) ถูก drop ออกตามนโยบายที่ตกลงไว้ ดูตัวเลขจริงต่อ split ด้านบน")
+    log("  - rolling behavioral features คำนวณใหม่ภายในแต่ละ split เพื่อไม่ใช้ event จาก split อื่น")
     log("  - ผลลัพธ์: data/processed/behavioral/cicids2017_behavioral_{train,val,test}.parquet")
     log("  - ยังไม่ scale/SMOTE/impute -- นั่นคือ Phase 2 (แผนแยกต่างหาก ยังไม่เริ่ม)")
     log("  - ข้อจำกัดที่ต้อง carry ไป Phase 2: Autoencoder BENIGN training population ลดลง ~23.6%;")
