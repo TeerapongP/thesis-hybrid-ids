@@ -1,0 +1,138 @@
+======================================================================
+CALIBRATED FUSION vs DEPLOYED RULE -- LOAO ZERO-DAY
+======================================================================
+Script: src/evaluation/fusion_loao_calibrated.py   Run signature: 3bb5d7d29b2b1ea8
+Question: does mapping each member's score to P(attack | score) with isotonic regression,
+then combining by probability algebra, beat the deployed max(rf_attack_probability, ae_norm)
+on held-out attack categories? In-dataset cannot decide this (RF saturates at F1 0.9965).
+
+======================================================================
+1. FIT / CALIBRATION SPLIT
+======================================================================
+Each fold's TRAIN side (all BENIGN except the 20% zero-day BENIGN slice, plus every attack
+category except the held-out one) is split 75/25 stratified by Label (random_state=42).
+Fit set: RF (80 features, capped SMOTE), IF-v2 and AE-v2 (92 features, BENIGN-only for AE) are
+trained here, with scalers/imputation/AE min-max fit here too.
+Calibration set: scored by the trained members, used ONLY to fit the two isotonic maps
+(RF attack probability -> P(attack); AE-v2 raw reconstruction error -> P(attack)).
+25% keeps the rarest training classes represented in both halves under stratification while
+leaving 75% for fitting; it is a judgment call, not tuned.
+
+category                         fit       cal   cal atk      test  test atk
+DoS Hulk                   1,150,065   383,355    63,224   492,978   172,846
+PortScan                   1,211,679   403,893    83,762   410,826    90,694
+DDoS                       1,183,689   394,563    74,432   448,146   128,014
+DoS GoldenEye              1,271,985   423,995   103,864   330,418    10,286
+FTP-Patator                1,275,251   425,084   104,953   326,063     5,931
+SSH-Patator                1,277,285   425,762   105,631   323,351     3,219
+DoS slowloris              1,275,660   425,221   105,089   325,517     5,385
+DoS Slowhttptest           1,275,778   425,260   105,128   325,360     5,228
+Bot                        1,278,238   426,080   105,948   322,080     1,948
+Web Attack - Brute Force   1,278,597   426,199   106,068   321,602     1,470
+
+Zero-day test BENIGN slice is identical across folds (fixed seed), so pooled rows repeat it 10 times;
+pooled FPR is therefore the per-fold BENIGN FPR, and pooled precision is not a deployment precision.
+
+======================================================================
+2. LEAKAGE ARGUMENT
+======================================================================
+The held-out category is removed before the fit/calibration split, so neither the models nor the
+isotonic maps ever see one example of it. The maps are fit on calibration rows only: the function
+that fits them receives the calibration slice and nothing else, and tests/test_fusion_loao_calibrated.py
+asserts that changing every zero-day test row leaves the fitted maps bit-identical. Fitting a map on
+the test fold would let it learn exactly where that category's scores sit, which is the thing a
+zero-day fold measures. The cost is real: the map is calibrated to the other nine attack mixes and
+may be wrong for the held-out one. Sections 5 and 6 report how wrong rather than engineering around it.
+A second, smaller shift is also left in: calibration-set attack prevalence differs from the test fold's,
+and no prior correction was applied.
+
+======================================================================
+3. POOLED RESULTS (all 10 folds concatenated)
+======================================================================
+oracle = one threshold swept on the pooled zero-day scores (optimistic, picks the best cutoff using test labels).
+nested = per-category threshold chosen on the other nine categories, applied to the held-out one (honest).
+Each candidate is evaluated at its own swept threshold, never at another candidate's.
+
+candidate                      thr(oracle)       P       R      F1     FPR    nested P       R      F1     FPR
+deployed max(rf, ae_norm)           0.0394  0.9065  0.8856  0.8959  0.0121      0.9070  0.8656  0.8858  0.0118
+calibrated max(p_rf, p_ae)          0.5687  0.8544  0.8747  0.8645  0.0198      0.8558  0.8172  0.8361  0.0183
+calibrated noisy-OR                 0.5707  0.8555  0.8793  0.8672  0.0197      0.8528  0.8167  0.8344  0.0187
+calibrated mean                     0.3978  0.9347  0.8169  0.8719  0.0076      0.8701  0.8194  0.8440  0.0162
+p_rf alone                          0.0030  0.9211  0.7893  0.8501  0.0090      0.9055  0.7753  0.8354  0.0107
+p_ae alone                          0.5687  0.8594  0.8468  0.8531  0.0184      0.8573  0.7677  0.8100  0.0170
+
+Deployed rule at its shipped fixed threshold 0.05: P 0.9252 R 0.8655 F1 0.8943 FPR 0.0093 (tp=367,838 of 425,021 attacks, fp=29,736 of 3,201,320 benign).
+Caveat: ae_norm here is normalized on the 75% fit set and the RF saw 75% of train, so this is a
+re-trained baseline, not the earlier run's numbers. The earlier nested F1 for OR: max(RF, AE) was 0.9253.
+
+Headline: best calibrated combiner by nested F1 is calibrated mean (nested F1 0.8440 vs deployed 0.8858, delta -0.0418; oracle-F1 delta -0.0241). On this run calibrated fusion LOST TO the deployed rule on pooled zero-day.
+
+======================================================================
+4. PER-CATEGORY RECALL (nested thresholds) AND FPR
+======================================================================
+category                     n_atk  deployed R     FPR  noisy-OR R     FPR    p_rf R    p_ae R   oracle-F1 dep / nOR
+DoS Hulk                   172,846      0.9971  0.0149      0.9658  0.0171    0.9864    0.9503   0.9900 / 0.9750
+PortScan                    90,694      0.5147  0.0092      0.5667  0.0051    0.0621    0.6561   0.8272 / 0.8486
+DDoS                       128,014      0.9490  0.0088      0.8429  0.0041    0.9709    0.7065   0.9790 / 0.9674
+DoS GoldenEye               10,286      0.9491  0.0126      0.7267  0.0244    0.9613    0.4112   0.8246 / 0.6313
+FTP-Patator                  5,931      1.0000  0.0130      0.3202  0.0306    1.0000    0.0007   0.8088 / 0.2742
+SSH-Patator                  3,219      0.3156  0.0110      0.0320  0.0197    0.6095    0.0009   0.3853 / 0.0652
+DoS slowloris                5,385      0.9994  0.0135      0.9681  0.0274    0.9994    0.5989   0.9297 / 0.8768
+DoS Slowhttptest             5,228      0.7316  0.0111      0.9237  0.0178    0.8416    0.8739   0.6704 / 0.6830
+Bot                          1,948      0.0149  0.0108      0.0236  0.0165    0.0421    0.0236   0.0967 / 0.0421
+Web Attack - Brute Force     1,470      0.9728  0.0131      0.8884  0.0244    0.9864    0.0007   0.8313 / 0.7099
+
+Noisy-OR beats deployed on nested per-category F1 in 3/10 categories.
+Per-category F1 on a single fold mixes a tiny attack count with a 20% BENIGN slice; read recall and FPR, not F1, per row.
+
+======================================================================
+5. DID CALIBRATION TRANSFER TO UNSEEN CATEGORIES? (Brier on the zero-day test fold)
+======================================================================
+Lower is better. 'raw' is the uncalibrated score read as a probability (RF attack probability;
+AE ae_norm clipped to [0,1]); 'cal' is after the isotonic map fit WITHOUT the held-out category.
+
+category                     RF raw   RF cal   AE raw   AE cal    AE gain  prevalence cal/test
+DoS Hulk                     0.2139   0.2779   0.1511   0.0212      7.12x  0.165/0.351
+PortScan                     0.2180   0.2198   0.1683   0.0597      2.82x  0.207/0.221
+DDoS                         0.1031   0.1078   0.2159   0.0260      8.30x  0.189/0.286
+DoS GoldenEye                0.0163   0.0162   0.0291   0.0308      0.95x  0.245/0.031
+FTP-Patator                  0.0125   0.0135   0.0183   0.0368      0.50x  0.247/0.018
+SSH-Patator                  0.0102   0.0106   0.0100   0.0264      0.38x  0.248/0.010
+DoS slowloris                0.0033   0.0027   0.0141   0.0241      0.59x  0.247/0.017
+DoS Slowhttptest             0.0106   0.0108   0.0152   0.0193      0.79x  0.247/0.016
+Bot                          0.0068   0.0069   0.0061   0.0255      0.24x  0.249/0.006
+Web Attack - Brute Force     0.0015   0.0016   0.0047   0.0248      0.19x  0.249/0.005
+
+Pooled: RF raw 0.0720 -> cal 0.0816; AE raw 0.0751 -> cal 0.0297.
+For contrast, Brier on the calibration set itself (in-sample for the maps, so optimistic):
+  DoS Hulk                   RF 0.0012->0.0011   AE 0.1239->0.0426
+  PortScan                   RF 0.0009->0.0009   AE 0.1324->0.0257
+  DDoS                       RF 0.0016->0.0015   AE 0.1327->0.0405
+  DoS GoldenEye              RF 0.0015->0.0014   AE 0.1857->0.0407
+  FTP-Patator                RF 0.0015->0.0015   AE 0.1758->0.0374
+  SSH-Patator                RF 0.0015->0.0014   AE 0.1807->0.0344
+  DoS slowloris              RF 0.0015->0.0015   AE 0.1687->0.0414
+  DoS Slowhttptest           RF 0.0015->0.0014   AE 0.1759->0.0371
+  Bot                        RF 0.0012->0.0011   AE 0.1790->0.0402
+  Web Attack - Brute Force   RF 0.0016->0.0015   AE 0.1823->0.0395
+
+AE Brier improved in 3/10 folds, RF Brier improved in 2/10 folds. Brier mixes calibration with discrimination and with the prevalence shift between the calibration and test folds, so an improvement here is evidence of transfer but not a clean isolation of it.
+
+======================================================================
+6. WHAT THIS RUN DOES NOT SETTLE
+======================================================================
+- One seed, one fold structure. No confidence interval; the pooled deltas are point estimates. A
+  difference of a few thousandths of F1 should not be read as a ranking.
+- The oracle columns choose a threshold with test labels and flatter every candidate; only the nested
+  columns approximate deployment, and nested thresholds themselves come from nine categories of data.
+- Calibrated thresholds are posteriors only for the calibration-set prevalence, not for production
+  traffic. A 'P(attack) > t' reading holds in a deployment only if that prevalence is reproduced or reweighted.
+- Calibration was fit without the held-out category by design. A deployed system would calibrate on all
+  known categories and still meet unseen ones, which is this setup; but it says nothing about whether a
+  larger or more diverse calibration set would transfer better.
+- Isotonic regression is piecewise constant, so calibrated scores have large ties; thresholds are
+  therefore coarse and recall can jump. Platt or a smoothed map were not tried.
+- The synthetic overlay and MTTD are not touched. Real-traffic behaviour is untested.
+- Models are re-trained on 75% of each fold's train, so the deployed-rule baseline here is not
+  numerically the earlier run's; it is the fair same-data comparison, not a replacement for it.
+- Nothing here changes the shipped fusion rule or models/fusion_config.json.

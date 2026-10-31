@@ -1,0 +1,240 @@
+======================================================================
+LLM LAYER -- M2 FAITHFULNESS / HALLUCINATION MEASUREMENT
+======================================================================
+Model: scb10x/llama3.1-typhoon2-8b-instruct via Ollama, deployed path src/llm/llm_explain.explain_alert.
+Module: src/evaluation/eval_llm_faithfulness.py. Evidence: reports/llm_faithfulness_raw.jsonl.
+
+======================================================================
+1. SAMPLE
+======================================================================
+Alerts sampled: 100; LLM calls that returned a valid explanation: 100; failed: 0.
+Source: data/features/behavioral/cicids2017_behavioral_features_test.parquet (405,142 rows), seed 42.
+Stratification: up to 7 random alerts per attack category (all rows if fewer exist: Infiltration 7, Sql Injection 4, Heartbleed 2), plus 10 random BENIGN rows. Counts per true category:
+  BENIGN                       sampled= 10 ok= 10
+  Bot                          sampled=  7 ok=  7
+  DDoS                         sampled=  7 ok=  7
+  DoS GoldenEye                sampled=  7 ok=  7
+  DoS Hulk                     sampled=  7 ok=  7
+  DoS Slowhttptest             sampled=  7 ok=  7
+  DoS slowloris                sampled=  7 ok=  7
+  FTP-Patator                  sampled=  7 ok=  7
+  Heartbleed                   sampled=  2 ok=  2
+  Infiltration                 sampled=  7 ok=  7
+  PortScan                     sampled=  7 ok=  7
+  SSH-Patator                  sampled=  7 ok=  7
+  Web Attack - Brute Force     sampled=  7 ok=  7
+  Web Attack - Sql Injection   sampled=  4 ok=  4
+  Web Attack - XSS             sampled=  7 ok=  7
+Why about 100: the budget is 10-20 minutes of generation at about 65 tok/s, and a flat 100 with a cap of 7 per
+category keeps DoS Hulk and DDoS (60% of the test attacks) at 7% each. The cost is that per-category rates rest on 2-7
+alerts and are descriptive only. Only aggregate rates carry usable confidence intervals, and even those treat alerts as
+independent draws from a category-balanced mix, not from the natural traffic mix. Rates are therefore NOT the rates a
+campus SOC would see; they describe model behavior across attack types.
+Priority mix of the explained alerts: {'LOW': 10, 'HIGH': 80, 'MEDIUM': 10}.
+Alert context is real: RF/AE/IF scores from the deployed models, fusion_layer.fuse_with_metadata for fused_score and
+model_used, IPs/ports/timestamps recovered for each sampled row by row-hash join to the raw behavioral file,
+RagRetriever.retrieve (top_k=3) for the hits. Limits of that context: CICIDS-2017 has no hostnames, so affected_asset
+falls back to dst_ip and the hostname check never fires on real data (it is unit-tested only). The RAG query is the RF
+predicted label (the same query the RAG precision evaluation uses); no production query builder exists in the repo.
+For rows RF predicts BENIGN the query is a generic anomaly sentence. The true label is never shown to the LLM.
+
+======================================================================
+2. ENTITY PRESERVATION (measured, exact)
+======================================================================
+Required entities: source IP, destination IP, destination port, hostname (none in this data), and the RAG-consensus
+technique_id when one exists. 'Pass' needs every required entity verbatim in explanation_th + remediation AND no
+foreign or altered IP, port ('พอร์ต N'/'port N'/'ip:N'), technique id or hostname, AND no Thai-numeral digits.
+Strict pass:            0/100 = 0.0% (95% Wilson CI 0.0-3.7%)
+Complete (no omission): 0/100 = 0.0% (95% Wilson CI 0.0-3.7%)
+Corruption-free (no foreign/altered entity, no Thai digits): 98/100 = 98.0% (95% Wilson CI 93.0-99.4%)
+Presence by entity type:
+  ip            0/200 = 0.0% (95% Wilson CI 0.0-1.9%)
+  port          0/100 = 0.0% (95% Wilson CI 0.0-3.7%)
+  technique_id  1/53 = 1.9% (95% Wilson CI 0.3-9.9%)
+Foreign entity mentions by type (count of mentions): {'hostname': 6, 'technique_id': 5}; alerts with Thai digits: 0.
+Violating alerts (omitted = required but absent; foreign = present but not in the alert context):
+  A000 [BENIGN] omitted=['ip:172.217.11.14', 'ip:192.168.10.19', 'port:56782'] foreign=[] thai_digits=False
+  A001 [BENIGN] omitted=['ip:192.168.10.50', 'ip:172.16.0.1', 'port:25438'] foreign=[] thai_digits=False
+  A002 [BENIGN] omitted=['ip:72.247.71.166', 'ip:192.168.10.5', 'port:56214'] foreign=[] thai_digits=False
+  A003 [BENIGN] omitted=['ip:52.207.54.198', 'ip:192.168.10.5', 'port:54944'] foreign=[] thai_digits=False
+  A004 [BENIGN] omitted=['ip:192.168.10.51', 'ip:192.168.10.3', 'port:53'] foreign=[] thai_digits=False
+  A005 [BENIGN] omitted=['ip:192.168.10.8', 'ip:199.233.57.20', 'port:80'] foreign=[] thai_digits=False
+  A006 [BENIGN] omitted=['ip:192.168.10.15', 'ip:173.241.242.143', 'port:443'] foreign=[] thai_digits=False
+  A007 [BENIGN] omitted=['ip:192.168.10.12', 'ip:192.168.10.3', 'port:53'] foreign=[] thai_digits=False
+  A008 [BENIGN] omitted=['ip:192.168.10.25', 'ip:192.168.10.3', 'port:53'] foreign=[] thai_digits=False
+  A009 [BENIGN] omitted=['ip:192.168.10.3', 'ip:192.168.10.1', 'port:53'] foreign=[] thai_digits=False
+  A010 [Bot] omitted=['ip:205.174.165.73', 'ip:192.168.10.8', 'port:3021'] foreign=[] thai_digits=False
+  A011 [Bot] omitted=['ip:192.168.10.5', 'ip:205.174.165.73', 'port:8080'] foreign=[] thai_digits=False
+  A012 [Bot] omitted=['ip:192.168.10.9', 'ip:205.174.165.73', 'port:8080'] foreign=[] thai_digits=False
+  A013 [Bot] omitted=['ip:192.168.10.5', 'ip:205.174.165.73', 'port:8080'] foreign=[] thai_digits=False
+  A014 [Bot] omitted=['ip:192.168.10.15', 'ip:205.174.165.73', 'port:8080'] foreign=[] thai_digits=False
+  A015 [Bot] omitted=['ip:192.168.10.15', 'ip:205.174.165.73', 'port:8080'] foreign=[] thai_digits=False
+  A016 [Bot] omitted=['ip:192.168.10.8', 'ip:205.174.165.73', 'port:8080'] foreign=[] thai_digits=False
+  A017 [DDoS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A018 [DDoS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A019 [DDoS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A020 [DDoS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A021 [DDoS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A022 [DDoS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A023 [DDoS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A024 [DoS GoldenEye] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A025 [DoS GoldenEye] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A026 [DoS GoldenEye] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A027 [DoS GoldenEye] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A028 [DoS GoldenEye] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A029 [DoS GoldenEye] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A030 [DoS GoldenEye] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A031 [DoS Hulk] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A032 [DoS Hulk] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A033 [DoS Hulk] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A034 [DoS Hulk] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A035 [DoS Hulk] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A036 [DoS Hulk] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A037 [DoS Hulk] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A038 [DoS Slowhttptest] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A039 [DoS Slowhttptest] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A040 [DoS Slowhttptest] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A041 [DoS Slowhttptest] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A042 [DoS Slowhttptest] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A043 [DoS Slowhttptest] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A044 [DoS Slowhttptest] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A045 [DoS slowloris] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A046 [DoS slowloris] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A047 [DoS slowloris] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A048 [DoS slowloris] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A049 [DoS slowloris] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A050 [DoS slowloris] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A051 [DoS slowloris] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
+  A052 [FTP-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:21'] foreign=[] thai_digits=False
+  A053 [FTP-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:21'] foreign=[] thai_digits=False
+  A054 [FTP-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:21'] foreign=[] thai_digits=False
+  A055 [FTP-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:21'] foreign=[] thai_digits=False
+  A056 [FTP-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:21'] foreign=[] thai_digits=False
+  A057 [FTP-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:21'] foreign=[] thai_digits=False
+  A058 [FTP-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:21'] foreign=[] thai_digits=False
+  A059 [Heartbleed] omitted=['ip:172.16.0.1', 'ip:192.168.10.51', 'port:444'] foreign=[] thai_digits=False
+  A060 [Heartbleed] omitted=['ip:172.16.0.1', 'ip:192.168.10.51', 'port:444'] foreign=[] thai_digits=False
+  A061 [Infiltration] omitted=['ip:192.168.10.8', 'ip:205.174.165.73', 'port:444'] foreign=[] thai_digits=False
+  A062 [Infiltration] omitted=['ip:192.168.10.8', 'ip:205.174.165.73', 'port:444'] foreign=[] thai_digits=False
+  A063 [Infiltration] omitted=['ip:192.168.10.8', 'ip:205.174.165.73', 'port:444'] foreign=['hostname:0.combined', 'hostname:0.document', 'hostname:0.metadata.mitigation', 'hostname:1.combined', 'hostname:1.document', 'hostname:1.metadata.mitigation'] thai_digits=False
+  A064 [Infiltration] omitted=['ip:192.168.10.8', 'ip:205.174.165.73', 'port:444'] foreign=[] thai_digits=False
+  A065 [Infiltration] omitted=['ip:192.168.10.8', 'ip:205.174.165.73', 'port:444'] foreign=[] thai_digits=False
+  A066 [Infiltration] omitted=['ip:192.168.10.8', 'ip:205.174.165.73', 'port:444'] foreign=['technique_id:T1046', 'technique_id:T1071.001', 'technique_id:T1190', 'technique_id:T1498', 'technique_id:T1499.002'] thai_digits=False
+  A067 [Infiltration] omitted=['ip:192.168.10.8', 'ip:205.174.165.73', 'port:444'] foreign=[] thai_digits=False
+  A068 [PortScan] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:427', 'technique_id:T1046'] foreign=[] thai_digits=False
+  A069 [PortScan] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:2251', 'technique_id:T1046'] foreign=[] thai_digits=False
+  A070 [PortScan] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:2144', 'technique_id:T1046'] foreign=[] thai_digits=False
+  A071 [PortScan] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:3013', 'technique_id:T1046'] foreign=[] thai_digits=False
+  A072 [PortScan] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:1501', 'technique_id:T1046'] foreign=[] thai_digits=False
+  A073 [PortScan] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:1165', 'technique_id:T1046'] foreign=[] thai_digits=False
+  A074 [PortScan] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:6510', 'technique_id:T1046'] foreign=[] thai_digits=False
+  A075 [SSH-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:22'] foreign=[] thai_digits=False
+  A076 [SSH-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:22'] foreign=[] thai_digits=False
+  A077 [SSH-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:22'] foreign=[] thai_digits=False
+  A078 [SSH-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:22'] foreign=[] thai_digits=False
+  A079 [SSH-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:22'] foreign=[] thai_digits=False
+  A080 [SSH-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:22'] foreign=[] thai_digits=False
+  A081 [SSH-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:22'] foreign=[] thai_digits=False
+  A082 [Web Attack - Brute Force] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80'] foreign=[] thai_digits=False
+  A083 [Web Attack - Brute Force] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80'] foreign=[] thai_digits=False
+  A084 [Web Attack - Brute Force] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80'] foreign=[] thai_digits=False
+  A085 [Web Attack - Brute Force] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1110'] foreign=[] thai_digits=False
+  A086 [Web Attack - Brute Force] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1110'] foreign=[] thai_digits=False
+  A087 [Web Attack - Brute Force] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80'] foreign=[] thai_digits=False
+  A088 [Web Attack - Brute Force] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1110'] foreign=[] thai_digits=False
+  A089 [Web Attack - Sql Injection] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80'] foreign=[] thai_digits=False
+  A090 [Web Attack - Sql Injection] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1110'] foreign=[] thai_digits=False
+  A091 [Web Attack - Sql Injection] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1110'] foreign=[] thai_digits=False
+  A092 [Web Attack - Sql Injection] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1110'] foreign=[] thai_digits=False
+  A093 [Web Attack - XSS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1110'] foreign=[] thai_digits=False
+  A094 [Web Attack - XSS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1110'] foreign=[] thai_digits=False
+  A095 [Web Attack - XSS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80'] foreign=[] thai_digits=False
+  A096 [Web Attack - XSS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1110'] foreign=[] thai_digits=False
+  A097 [Web Attack - XSS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1110'] foreign=[] thai_digits=False
+  A098 [Web Attack - XSS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80'] foreign=[] thai_digits=False
+  A099 [Web Attack - XSS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80'] foreign=[] thai_digits=False
+
+======================================================================
+3. TECHNIQUE GROUNDING (measured)
+======================================================================
+The Typhoon draft schema has no technique_id or tactic field. explain_alert fills both from the RAG top-3 consensus and the
+KB, so the result-level fields cannot be hallucinated by the model by construction. Those rates are reported as a
+regression guard, not a model measurement. The model-dependent question is whether its PROSE names technique ids.
+Abstained (technique_id null):                 47/100 = 47.0% (95% Wilson CI 37.5-56.7%)
+Result technique_id present in retrieved hits: 53/53 = 100.0% (95% Wilson CI 93.2-100.0%)  (guard)
+Result mitre_tactic equals KB lowercase tactic: 53/53 = 100.0% (95% Wilson CI 93.2-100.0%)  (guard)
+Alerts whose prose names any technique id:     2/100 = 2.0% (95% Wilson CI 0.6-7.0%)
+Alerts whose prose names an id NOT retrieved:   0/100 = 0.0% (95% Wilson CI 0.0-3.7%)   <- technique hallucination rate
+Informational, not hallucination: RAG consensus technique equals MITRE mapping of the true label: 39/53 = 73.6% (95% Wilson CI 60.4-83.6%)
+
+======================================================================
+4. CLAIM-LEVEL SUPPORT (approximated, partial)
+======================================================================
+Segmentation: explanation_th is split at newlines, ';', a full stop after a Latin letter/digit/')' followed by space or end,
+and whitespace between two Thai characters. Each remediation item is one claim. This is a heuristic; Thai has no sentence
+punctuation, so some claims are over- or under-split.
+Classification is rule-based on checkable atoms only. contradicted: stated port, IP, confidence number, priority level or
+attack type conflicts with the alert (explanation), or a different retrieved technique than the consensus. unsupported: names
+an IP, port, technique, hostname or Latin-script service/product term found nowhere in the alert or retrieved chunk text
+(alias and port-to-service tables in the source; 'SMB' is grounded by dst_port 445/139). supported: it has >=1 checkable
+atom and all are grounded. undecidable: no checkable atom (most Thai prose and generic advice).
+Claims total: 395; verdicts: {'unsupported': 303, 'undecidable': 5, 'supported': 87}
+Hallucination LOWER bound (unsupported+contradicted)/all claims: 303/395 = 76.7% (95% Wilson CI 72.3-80.6%)
+Among mechanically decidable claims only:                       303/390 = 77.7% (95% Wilson CI 73.3-81.5%)
+Undecidable share (not judged either way):                       5/395 = 1.3% (95% Wilson CI 0.5-2.9%)
+Alerts with at least one unsupported/contradicted claim:         100/100 = 100.0% (95% Wilson CI 96.3-100.0%)
+By source: {'explanation': {'unsupported': 103, 'undecidable': 3, 'supported': 11}, 'remediation': {'unsupported': 200, 'supported': 76, 'undecidable': 2}}
+Rules that fired (claims may fire several): {'ungrounded_term': 468, 'foreign_hostname': 6, 'technique_named_despite_abstention': 5}
+Reading: a claim marked supported means its checkable atoms are grounded, not that the sentence is true. No LLM judge was
+used. Typhoon grading Typhoon would not be independent, and no second model was available that would not need its own
+validation.
+
+======================================================================
+5. KNOWN DEFECTS FROM models/llm_layer_config.json (measured on this set)
+======================================================================
+Defect C (new, not in quality_issues): few-shot entity copying, which quality_issues_fixed says was fixed.
+  Alerts whose prose contains a few-shot entity (172.16.33.9, LMS-WEB03, DNS-INT02, 100.64.7.18, ...): 0/100 = 0.0% (95% Wilson CI 0.0-3.7%)
+Defect A: PortScan remediation suggesting a WAF block.
+  RF-predicted PortScan alerts with WAF in remediation:   0/7 = 0.0% (95% Wilson CI 0.0-35.4%)
+  Truly PortScan alerts with WAF in remediation:          0/7 = 0.0% (95% Wilson CI 0.0-35.4%)
+  ... of those with dst_port 139/445 (SMB):               0/0 = nan% (95% Wilson CI nan-nan%)
+  Any alert with WAF while dst_port is non-web and label not Web Attack: 0/100 = 0.0% (95% Wilson CI 0.0-3.7%)
+Defect B: explanation does not state the RAG evidence is insufficient (keyword regex, approximated).
+  Truly SSH-Patator alerts where technique abstained:      7/7 = 100.0% (95% Wilson CI 64.6-100.0%)
+  Truly SSH-Patator alerts stating insufficiency:          3/7 = 42.9% (95% Wilson CI 15.8-75.0%)
+  ... among SSH-Patator alerts that abstained:             3/7 = 42.9% (95% Wilson CI 15.8-75.0%)
+  All abstained alerts (any category) stating insufficiency: 22/47 = 46.8% (95% Wilson CI 33.3-60.8%)
+The prompt only asks for the insufficiency statement when technique_id is null, so the abstained denominators are the fair ones.
+
+======================================================================
+6. THROUGHPUT (measured)
+======================================================================
+Alerts with Ollama timing metadata: 100.
+Generation: 15721 tokens in 242.8s of decode = 64.8 tok/s pooled (per-alert median 68.3, min 52.1, max 72.6).
+Mean prompt tokens: 2198. Mean wall time per alert: 5.47s; first alert 8.52s (may include model load).
+Total LLM wall time: 547s. Whole run including alert build and retrieval: 549s.
+
+======================================================================
+7. WHAT IS NOT MEASURED
+======================================================================
+- Whether undecidable claims (5 of 395) are true. These are the Thai prose statements and generic remediation
+  advice with no checkable entity. Judging them needs human raters (SOC analysts) against the retrieved chunks.
+- Whether 'supported' claims are true as sentences; only their entities and terms are grounded.
+- Semantic contradictions with no lexical trigger, for example a remediation that is wrong for the attack but uses only
+  grounded words, or severity language beyond the three English priority words and three Thai severity words.
+- Remediation quality, safety and operational fit (is blocking this IP appropriate for this campus). Not mechanically decidable.
+- Hostname preservation on real data: CICIDS-2017 has no hostnames. The check exists and is unit-tested only.
+- Any live (non-CICIDS) alert. PA-5220 firewall logs were not available to this run.
+- Run-to-run variance: one sample per alert at temperature 0.1; no repeated draws.
+- Inter-rater reliability or agreement between these rules and human judgment: none, because no human labels exist.
+- Priority correctness: priority is a deterministic rule (derive_priority), not model output.
+
+======================================================================
+8. HOW TO RECHECK A NUMBER
+======================================================================
+Each line of reports/llm_faithfulness_raw.jsonl holds the alert context, the retrieved hits (id, metadata, text), the raw
+model output, and every per-alert check. Entity pass = checks.entity.pass. Claim verdicts = checks.claims[*].verdict.
+Prose grounding = checks.grounding.prose_ungrounded non-empty. Defects = checks.defects.*. The aggregate rows in
+llm_faithfulness_metrics.csv are counts over those fields. `--rescore` recomputes all checks and both reports from the raw
+outputs without calling the LLM, so scoring-rule changes never require regenerating text.
+

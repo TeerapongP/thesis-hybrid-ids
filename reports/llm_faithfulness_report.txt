@@ -7,30 +7,30 @@ Module: src/evaluation/eval_llm_faithfulness.py. Evidence: reports/llm_faithfuln
 ======================================================================
 1. SAMPLE
 ======================================================================
-Alerts sampled: 100; LLM calls that returned a valid explanation: 100; failed: 0.
+Alerts sampled: 100; LLM calls that returned a valid explanation: 79; failed: 21.
 Source: data/features/behavioral/cicids2017_behavioral_features_test.parquet (405,142 rows), seed 42.
 Stratification: up to 7 random alerts per attack category (all rows if fewer exist: Infiltration 7, Sql Injection 4, Heartbleed 2), plus 10 random BENIGN rows. Counts per true category:
-  BENIGN                       sampled= 10 ok= 10
-  Bot                          sampled=  7 ok=  7
+  BENIGN                       sampled= 10 ok=  0
+  Bot                          sampled=  7 ok=  0
   DDoS                         sampled=  7 ok=  7
   DoS GoldenEye                sampled=  7 ok=  7
   DoS Hulk                     sampled=  7 ok=  7
   DoS Slowhttptest             sampled=  7 ok=  7
   DoS slowloris                sampled=  7 ok=  7
   FTP-Patator                  sampled=  7 ok=  7
-  Heartbleed                   sampled=  2 ok=  2
-  Infiltration                 sampled=  7 ok=  7
+  Heartbleed                   sampled=  2 ok=  1
+  Infiltration                 sampled=  7 ok=  5
   PortScan                     sampled=  7 ok=  7
   SSH-Patator                  sampled=  7 ok=  7
   Web Attack - Brute Force     sampled=  7 ok=  7
-  Web Attack - Sql Injection   sampled=  4 ok=  4
+  Web Attack - Sql Injection   sampled=  4 ok=  3
   Web Attack - XSS             sampled=  7 ok=  7
 Why about 100: the budget is 10-20 minutes of generation at about 65 tok/s, and a flat 100 with a cap of 7 per
 category keeps DoS Hulk and DDoS (60% of the test attacks) at 7% each. The cost is that per-category rates rest on 2-7
 alerts and are descriptive only. Only aggregate rates carry usable confidence intervals, and even those treat alerts as
 independent draws from a category-balanced mix, not from the natural traffic mix. Rates are therefore NOT the rates a
 campus SOC would see; they describe model behavior across attack types.
-Priority mix of the explained alerts: {'LOW': 10, 'HIGH': 80, 'MEDIUM': 10}.
+Priority mix of the explained alerts: {'HIGH': 75, 'MEDIUM': 4}.
 Alert context is real: RF/AE/IF scores from the deployed models, fusion_layer.fuse_with_metadata for fused_score and
 model_used, IPs/ports/timestamps recovered for each sampled row by row-hash join to the raw behavioral file,
 RagRetriever.retrieve (top_k=3) for the hits. Limits of that context: CICIDS-2017 has no hostnames, so affected_asset
@@ -44,87 +44,22 @@ For rows RF predicts BENIGN the query is a generic anomaly sentence. The true la
 Required entities: source IP, destination IP, destination port, hostname (none in this data), and the RAG-consensus
 technique_id when one exists. 'Pass' needs every required entity verbatim in explanation_th + remediation AND no
 foreign or altered IP, port ('พอร์ต N'/'port N'/'ip:N'), technique id or hostname, AND no Thai-numeral digits.
-Strict pass:            28/100 = 28.0% (95% Wilson CI 20.1-37.5%)
-Complete (no omission): 28/100 = 28.0% (95% Wilson CI 20.1-37.5%)
-Corruption-free (no foreign/altered entity, no Thai digits): 68/100 = 68.0% (95% Wilson CI 58.3-76.3%)
+Strict pass:            72/79 = 91.1% (95% Wilson CI 82.8-95.6%)
+Complete (no omission): 74/79 = 93.7% (95% Wilson CI 86.0-97.3%)
+Corruption-free (no foreign/altered entity, no Thai digits): 77/79 = 97.5% (95% Wilson CI 91.2-99.3%)
 Presence by entity type:
-  ip            134/200 = 67.0% (95% Wilson CI 60.2-73.1%)
-  port          44/100 = 44.0% (95% Wilson CI 34.7-53.8%)
-  technique_id  14/53 = 26.4% (95% Wilson CI 16.4-39.6%)
-Foreign entity mentions by type (count of mentions): {'hostname': 58, 'ip': 25, 'port': 22, 'technique_id': 17}; alerts with Thai digits: 0.
+  ip            158/158 = 100.0% (95% Wilson CI 97.6-100.0%)
+  port          79/79 = 100.0% (95% Wilson CI 95.4-100.0%)
+  technique_id  48/53 = 90.6% (95% Wilson CI 79.7-95.9%)
+Foreign entity mentions by type (count of mentions): {'technique_id': 2}; alerts with Thai digits: 0.
 Violating alerts (omitted = required but absent; foreign = present but not in the alert context):
-  A002 [BENIGN] omitted=['port:56214'] foreign=[] thai_digits=False
-  A003 [BENIGN] omitted=['port:54944'] foreign=[] thai_digits=False
-  A004 [BENIGN] omitted=['port:53'] foreign=[] thai_digits=False
-  A006 [BENIGN] omitted=['ip:173.241.242.143'] foreign=[] thai_digits=False
-  A007 [BENIGN] omitted=['port:53'] foreign=['hostname:DNS-INT02'] thai_digits=False
-  A008 [BENIGN] omitted=['port:53'] foreign=[] thai_digits=False
-  A011 [Bot] omitted=['ip:192.168.10.5', 'ip:205.174.165.73', 'port:8080'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443', 'technique_id:T1190'] thai_digits=False
-  A012 [Bot] omitted=['ip:192.168.10.9', 'ip:205.174.165.73', 'port:8080'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443'] thai_digits=False
-  A013 [Bot] omitted=['ip:192.168.10.5', 'ip:205.174.165.73', 'port:8080'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443', 'technique_id:T1190'] thai_digits=False
-  A014 [Bot] omitted=['ip:192.168.10.15', 'ip:205.174.165.73', 'port:8080'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443'] thai_digits=False
-  A015 [Bot] omitted=['ip:192.168.10.15', 'ip:205.174.165.73', 'port:8080'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443', 'technique_id:T1190'] thai_digits=False
-  A016 [Bot] omitted=['ip:192.168.10.8', 'ip:205.174.165.73', 'port:8080'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443', 'technique_id:T1190'] thai_digits=False
-  A017 [DDoS] omitted=['ip:192.168.10.50', 'technique_id:T1499.002'] foreign=[] thai_digits=False
-  A018 [DDoS] omitted=['technique_id:T1499.002'] foreign=[] thai_digits=False
-  A019 [DDoS] omitted=['technique_id:T1499.002'] foreign=[] thai_digits=False
-  A020 [DDoS] omitted=['technique_id:T1499.002'] foreign=[] thai_digits=False
+  A017 [DDoS] omitted=['technique_id:T1499.002'] foreign=[] thai_digits=False
   A021 [DDoS] omitted=['technique_id:T1499.002'] foreign=[] thai_digits=False
-  A022 [DDoS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=['hostname:DNS-INT02', 'hostname:campus.local', 'ip:100.64.7.18'] thai_digits=False
-  A023 [DDoS] omitted=['technique_id:T1499.002'] foreign=[] thai_digits=False
-  A024 [DoS GoldenEye] omitted=['port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
-  A026 [DoS GoldenEye] omitted=['port:80', 'technique_id:T1499.002'] foreign=['hostname:DNS-INT02'] thai_digits=False
-  A027 [DoS GoldenEye] omitted=['port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
-  A028 [DoS GoldenEye] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=['hostname:DNS-INT02', 'hostname:campus.local', 'ip:100.64.7.18'] thai_digits=False
-  A029 [DoS GoldenEye] omitted=['technique_id:T1499.002'] foreign=[] thai_digits=False
-  A030 [DoS GoldenEye] omitted=['port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
-  A031 [DoS Hulk] omitted=['technique_id:T1499.002'] foreign=[] thai_digits=False
-  A032 [DoS Hulk] omitted=['port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
-  A033 [DoS Hulk] omitted=['technique_id:T1499.002'] foreign=[] thai_digits=False
-  A034 [DoS Hulk] omitted=['technique_id:T1499.002'] foreign=[] thai_digits=False
-  A035 [DoS Hulk] omitted=['port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
-  A036 [DoS Hulk] omitted=['ip:192.168.10.50'] foreign=[] thai_digits=False
-  A037 [DoS Hulk] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443', 'technique_id:T1190'] thai_digits=False
-  A039 [DoS Slowhttptest] omitted=['port:80'] foreign=[] thai_digits=False
-  A040 [DoS Slowhttptest] omitted=['ip:192.168.10.50'] foreign=[] thai_digits=False
-  A041 [DoS Slowhttptest] omitted=['ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=['hostname:DNS-INT02', 'hostname:campus.local'] thai_digits=False
-  A042 [DoS Slowhttptest] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80'] foreign=['hostname:DNS-INT02', 'hostname:campus.local'] thai_digits=False
-  A043 [DoS Slowhttptest] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1499.002'] foreign=['hostname:DNS-INT02', 'hostname:campus.local', 'ip:100.64.7.18'] thai_digits=False
-  A044 [DoS Slowhttptest] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80'] foreign=['hostname:DNS-INT02', 'hostname:campus.local', 'ip:100.64.7.18', 'port:53'] thai_digits=False
-  A045 [DoS slowloris] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443'] thai_digits=False
-  A046 [DoS slowloris] omitted=['port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
-  A047 [DoS slowloris] omitted=['port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
-  A048 [DoS slowloris] omitted=['technique_id:T1499.002'] foreign=[] thai_digits=False
-  A049 [DoS slowloris] omitted=['port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
-  A050 [DoS slowloris] omitted=['port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
-  A051 [DoS slowloris] omitted=['port:80', 'technique_id:T1499.002'] foreign=[] thai_digits=False
-  A059 [Heartbleed] omitted=['ip:172.16.0.1', 'ip:192.168.10.51', 'port:444'] foreign=['technique_id:T1110'] thai_digits=False
-  A068 [PortScan] omitted=['ip:192.168.10.50', 'port:427'] foreign=[] thai_digits=False
-  A069 [PortScan] omitted=['technique_id:T1046'] foreign=[] thai_digits=False
-  A070 [PortScan] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:2144', 'technique_id:T1046'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443', 'technique_id:T1190'] thai_digits=False
-  A071 [PortScan] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:3013', 'technique_id:T1046'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443', 'technique_id:T1190'] thai_digits=False
-  A072 [PortScan] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:1501', 'technique_id:T1046'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443', 'technique_id:T1190'] thai_digits=False
-  A073 [PortScan] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:1165', 'technique_id:T1046'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443', 'technique_id:T1190'] thai_digits=False
-  A074 [PortScan] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:6510', 'technique_id:T1046'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443', 'technique_id:T1190'] thai_digits=False
-  A075 [SSH-Patator] omitted=['port:22'] foreign=[] thai_digits=False
-  A076 [SSH-Patator] omitted=['port:22'] foreign=[] thai_digits=False
-  A077 [SSH-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:22'] foreign=[] thai_digits=False
-  A078 [SSH-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:22'] foreign=[] thai_digits=False
-  A079 [SSH-Patator] omitted=['ip:192.168.10.50', 'port:22'] foreign=[] thai_digits=False
-  A080 [SSH-Patator] omitted=['port:22'] foreign=['technique_id:T1059', 'technique_id:T1110.001'] thai_digits=False
-  A081 [SSH-Patator] omitted=['port:22'] foreign=[] thai_digits=False
-  A082 [Web Attack - Brute Force] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443'] thai_digits=False
-  A084 [Web Attack - Brute Force] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443', 'technique_id:T1190'] thai_digits=False
-  A085 [Web Attack - Brute Force] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1110'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443', 'technique_id:T1190'] thai_digits=False
-  A087 [Web Attack - Brute Force] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443'] thai_digits=False
-  A089 [Web Attack - Sql Injection] omitted=['ip:192.168.10.50'] foreign=['hostname:DNS-INT02', 'hostname:campus.local'] thai_digits=False
-  A090 [Web Attack - Sql Injection] omitted=['port:80', 'technique_id:T1110'] foreign=[] thai_digits=False
-  A091 [Web Attack - Sql Injection] omitted=['port:80', 'technique_id:T1110'] foreign=[] thai_digits=False
-  A092 [Web Attack - Sql Injection] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1110'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443', 'technique_id:T1190'] thai_digits=False
-  A096 [Web Attack - XSS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80', 'technique_id:T1110'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443'] thai_digits=False
-  A097 [Web Attack - XSS] omitted=['port:80', 'technique_id:T1110'] foreign=[] thai_digits=False
-  A098 [Web Attack - XSS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443'] thai_digits=False
-  A099 [Web Attack - XSS] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:80'] foreign=['hostname:LMS-WEB03', 'hostname:campus.local', 'ip:172.16.33.9', 'port:8443', 'technique_id:T1190'] thai_digits=False
+  A022 [DDoS] omitted=['technique_id:T1499.002'] foreign=[] thai_digits=False
+  A025 [DoS GoldenEye] omitted=['technique_id:T1499.002'] foreign=[] thai_digits=False
+  A030 [DoS GoldenEye] omitted=['technique_id:T1499.002'] foreign=[] thai_digits=False
+  A054 [FTP-Patator] omitted=[] foreign=['technique_id:T1190'] thai_digits=False
+  A058 [FTP-Patator] omitted=[] foreign=['technique_id:T1190'] thai_digits=False
 
 ======================================================================
 3. TECHNIQUE GROUNDING (measured)
@@ -132,11 +67,11 @@ Violating alerts (omitted = required but absent; foreign = present but not in th
 The Typhoon draft schema has no technique_id or tactic field. explain_alert fills both from the RAG top-3 consensus and the
 KB, so the result-level fields cannot be hallucinated by the model by construction. Those rates are reported as a
 regression guard, not a model measurement. The model-dependent question is whether its PROSE names technique ids.
-Abstained (technique_id null):                 47/100 = 47.0% (95% Wilson CI 37.5-56.7%)
+Abstained (technique_id null):                 26/79 = 32.9% (95% Wilson CI 23.6-43.9%)
 Result technique_id present in retrieved hits: 53/53 = 100.0% (95% Wilson CI 93.2-100.0%)  (guard)
 Result mitre_tactic equals KB lowercase tactic: 53/53 = 100.0% (95% Wilson CI 93.2-100.0%)  (guard)
-Alerts whose prose names any technique id:     30/100 = 30.0% (95% Wilson CI 21.9-39.6%)
-Alerts whose prose names an id NOT retrieved:   7/100 = 7.0% (95% Wilson CI 3.4-13.7%)   <- technique hallucination rate
+Alerts whose prose names any technique id:     50/79 = 63.3% (95% Wilson CI 52.3-73.1%)
+Alerts whose prose names an id NOT retrieved:   0/79 = 0.0% (95% Wilson CI 0.0-4.6%)   <- technique hallucination rate
 Informational, not hallucination: RAG consensus technique equals MITRE mapping of the true label: 39/53 = 73.6% (95% Wilson CI 60.4-83.6%)
 
 ======================================================================
@@ -150,13 +85,13 @@ attack type conflicts with the alert (explanation), or a different retrieved tec
 an IP, port, technique, hostname or Latin-script service/product term found nowhere in the alert or retrieved chunk text
 (alias and port-to-service tables in the source; 'SMB' is grounded by dst_port 445/139). supported: it has >=1 checkable
 atom and all are grounded. undecidable: no checkable atom (most Thai prose and generic advice).
-Claims total: 399; verdicts: {'supported': 174, 'undecidable': 87, 'unsupported': 108, 'contradicted': 30}
-Hallucination LOWER bound (unsupported+contradicted)/all claims: 138/399 = 34.6% (95% Wilson CI 30.1-39.4%)
-Among mechanically decidable claims only:                       138/312 = 44.2% (95% Wilson CI 38.8-49.8%)
-Undecidable share (not judged either way):                       87/399 = 21.8% (95% Wilson CI 18.0-26.1%)
-Alerts with at least one unsupported/contradicted claim:         55/100 = 55.0% (95% Wilson CI 45.2-64.4%)
-By source: {'explanation': {'supported': 68, 'undecidable': 15, 'contradicted': 30, 'unsupported': 12}, 'remediation': {'supported': 106, 'undecidable': 72, 'unsupported': 96}}
-Rules that fired (claims may fire several): {'ungrounded_term': 47, 'confidence': 26, 'foreign_hostname': 91, 'foreign_ip': 50, 'foreign_port': 41, 'technique_not_retrieved': 7, 'attack_type': 6, 'technique_named_despite_abstention': 5, 'technique_differs_from_consensus': 5}
+Claims total: 324; verdicts: {'supported': 315, 'undecidable': 7, 'unsupported': 2}
+Hallucination LOWER bound (unsupported+contradicted)/all claims: 2/324 = 0.6% (95% Wilson CI 0.2-2.2%)
+Among mechanically decidable claims only:                       2/317 = 0.6% (95% Wilson CI 0.2-2.3%)
+Undecidable share (not judged either way):                       7/324 = 2.2% (95% Wilson CI 1.1-4.4%)
+Alerts with at least one unsupported/contradicted claim:         2/79 = 2.5% (95% Wilson CI 0.7-8.8%)
+By source: {'explanation': {'supported': 79, 'undecidable': 7, 'unsupported': 2}, 'remediation': {'supported': 236}}
+Rules that fired (claims may fire several): {'technique_named_despite_abstention': 2}
 Reading: a claim marked supported means its checkable atoms are grounded, not that the sentence is true. No LLM judge was
 used. Typhoon grading Typhoon would not be independent, and no second model was available that would not need its own
 validation.
@@ -165,31 +100,31 @@ validation.
 5. KNOWN DEFECTS FROM models/llm_layer_config.json (measured on this set)
 ======================================================================
 Defect C (new, not in quality_issues): few-shot entity copying, which quality_issues_fixed says was fixed.
-  Alerts whose prose contains a few-shot entity (172.16.33.9, LMS-WEB03, DNS-INT02, 100.64.7.18, ...): 30/100 = 30.0% (95% Wilson CI 21.9-39.6%)
+  Alerts whose prose contains a few-shot entity (172.16.33.9, LMS-WEB03, DNS-INT02, 100.64.7.18, ...): 0/79 = 0.0% (95% Wilson CI 0.0-4.6%)
 Defect A: PortScan remediation suggesting a WAF block.
-  RF-predicted PortScan alerts with WAF in remediation:   5/7 = 71.4% (95% Wilson CI 35.9-91.8%)
-  Truly PortScan alerts with WAF in remediation:          5/7 = 71.4% (95% Wilson CI 35.9-91.8%)
+  RF-predicted PortScan alerts with WAF in remediation:   0/7 = 0.0% (95% Wilson CI 0.0-35.4%)
+  Truly PortScan alerts with WAF in remediation:          0/7 = 0.0% (95% Wilson CI 0.0-35.4%)
   ... of those with dst_port 139/445 (SMB):               0/0 = nan% (95% Wilson CI nan-nan%)
-  Any alert with WAF while dst_port is non-web and label not Web Attack: 8/100 = 8.0% (95% Wilson CI 4.1-15.0%)
+  Any alert with WAF while dst_port is non-web and label not Web Attack: 0/79 = 0.0% (95% Wilson CI 0.0-4.6%)
 Defect B: explanation does not state the RAG evidence is insufficient (keyword regex, approximated).
   Truly SSH-Patator alerts where technique abstained:      7/7 = 100.0% (95% Wilson CI 64.6-100.0%)
   Truly SSH-Patator alerts stating insufficiency:          0/7 = 0.0% (95% Wilson CI 0.0-35.4%)
   ... among SSH-Patator alerts that abstained:             0/7 = 0.0% (95% Wilson CI 0.0-35.4%)
-  All abstained alerts (any category) stating insufficiency: 11/47 = 23.4% (95% Wilson CI 13.6-37.2%)
+  All abstained alerts (any category) stating insufficiency: 0/26 = 0.0% (95% Wilson CI 0.0-12.9%)
 The prompt only asks for the insufficiency statement when technique_id is null, so the abstained denominators are the fair ones.
 
 ======================================================================
 6. THROUGHPUT (measured)
 ======================================================================
-Alerts with Ollama timing metadata: 100.
-Generation: 18654 tokens in 303.9s of decode = 61.4 tok/s pooled (per-alert median 60.4, min 52.0, max 70.8).
-Mean prompt tokens: 2192. Mean wall time per alert: 6.04s; first alert 6.08s (may include model load).
-Total LLM wall time: 604s.
+Alerts with Ollama timing metadata: 79.
+Generation: 13073 tokens in 192.5s of decode = 67.9 tok/s pooled (per-alert median 69.5, min 57.6, max 72.5).
+Mean prompt tokens: 2350. Mean wall time per alert: 10.21s; first alert 10.08s (may include model load).
+Total LLM wall time: 807s. Whole run including alert build and retrieval: 1013s.
 
 ======================================================================
 7. WHAT IS NOT MEASURED
 ======================================================================
-- Whether undecidable claims (87 of 399) are true. These are the Thai prose statements and generic remediation
+- Whether undecidable claims (7 of 324) are true. These are the Thai prose statements and generic remediation
   advice with no checkable entity. Judging them needs human raters (SOC analysts) against the retrieved chunks.
 - Whether 'supported' claims are true as sentences; only their entities and terms are grounded.
 - Semantic contradictions with no lexical trigger, for example a remediation that is wrong for the attack but uses only

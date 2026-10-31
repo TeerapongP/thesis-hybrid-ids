@@ -1,0 +1,47 @@
+======================================================================
+STEP 1: load the single source population
+======================================================================
+  cicids2017_behavioral_labeled.parquet: 2,520,961 rows x 102 columns
+  identifiers dropped from model input: ['Flow ID', 'Source IP', 'Destination IP', 'Timestamp', 'day_group']
+  network features: 92
+  of which behavioral: 12
+======================================================================
+STEP 2: stratified 60/20/20 split, no join anywhere
+======================================================================
+  train 1,512,576  val 504,192  test 504,193  total 2,520,961
+  coverage of the source population: 100.00%
+  the old path joined two CICFlowMeter extractions and kept 80.36%; this keeps all of it
+======================================================================
+STEP 3: impute, encode, scale, resample (all fitted on train only)
+======================================================================
+  model input features: 94 (92 network + 2 sentinel flags)
+  SMOTE applied: True
+  train rows: 1,512,576 -> 1,780,362 after capped SMOTE
+  wrote cicids2017_unified_train.parquet: 1,780,362 rows x 103 columns
+  wrote cicids2017_unified_val.parquet: 504,192 rows x 103 columns
+  wrote cicids2017_unified_test.parquet: 504,193 rows x 103 columns
+======================================================================
+STEP 4: LOAO zero-day splits from the same population
+======================================================================
+  categories at or above n=1000: 10
+    DoS Hulk                     train 1,929,071  zero-day test   591,890
+    DDoS                         train 1,973,903  zero-day test   547,058
+    PortScan                     train 2,011,223  zero-day test   509,738
+    DoS GoldenEye                train 2,091,631  zero-day test   429,330
+    FTP-Patator                  train 2,095,986  zero-day test   424,975
+    DoS slowloris                train 2,096,532  zero-day test   424,429
+    DoS Slowhttptest             train 2,096,689  zero-day test   424,272
+    SSH-Patator                  train 2,098,698  zero-day test   422,263
+    Bot                          train 2,099,969  zero-day test   420,992
+    Web Attack - Brute Force     train 2,100,447  zero-day test   420,514
+======================================================================
+STEP 5: what this supersedes
+======================================================================
+  Every metric measured on data/features/cicids2017_features_* or
+  data/features/behavioral/cicids2017_behavioral_features_* is now on a different
+  population and is not comparable to anything produced from these files.
+  Rerun, in order: the three member trainings, the LOAO threshold selection,
+  eval_test_set_ensemble, shap_explain, and siem_baseline.
+  M1c is NOT unblocked by this. CIC-UNSW-NB15's Data.csv carries no Source IP or
+  Timestamp, so the 12 behavioral columns cannot be computed for it and the
+  unsupervised members still cannot take part in cross-dataset evaluation.
