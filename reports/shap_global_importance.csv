@@ -1,173 +1,189 @@
-member,feature,mean_abs_shap,n_rows,rank_in_member
-autoencoder_v2,Init_Win_bytes_forward_missing,0.025287650478409873,200,1
-autoencoder_v2,PSH Flag Count,0.014358003575005352,200,2
-autoencoder_v2,FIN Flag Count,0.014162905430210634,200,3
-autoencoder_v2,Init_Win_bytes_backward_missing,0.011314823878718563,200,4
-autoencoder_v2,repeat_ratio_5m,0.011129963844839387,200,5
-autoencoder_v2,repeat_ratio_3m,0.010913655630114049,200,6
-autoencoder_v2,repeat_ratio_1m,0.007477353325504909,200,7
-autoencoder_v2,ACK Flag Count,0.00604107709491886,200,8
-autoencoder_v2,conn_count_5m,0.0053816667998897285,200,9
-autoencoder_v2,Fwd PSH Flags,0.0044129083636800705,200,10
-autoencoder_v2,URG Flag Count,0.004211329969695067,200,11
-autoencoder_v2,SYN Flag Count,0.004162138471362067,200,12
-autoencoder_v2,conn_count_3m,0.0037726543519582922,200,13
-autoencoder_v2,Idle Max,0.003634226855918874,200,14
-autoencoder_v2,Avg Bwd Segment Size,0.0031696388725383612,200,15
-autoencoder_v2,Bwd Packet Length Mean,0.002808655051426341,200,16
-autoencoder_v2,Flow IAT Max,0.00253229548009371,200,17
-autoencoder_v2,Bwd Packet Length Std,0.0025249306867606075,200,18
-autoencoder_v2,Packet Length Std,0.0025095940404266303,200,19
-autoencoder_v2,Fwd IAT Max,0.002230018196154847,200,20
-autoencoder_v2,conn_count_1m,0.002203722119552681,200,21
-autoencoder_v2,Idle Min,0.0019253663774413746,200,22
-autoencoder_v2,Packet Length Variance,0.0019224365827829385,200,23
-autoencoder_v2,Fwd IAT Total,0.0017934857369116806,200,24
-autoencoder_v2,Idle Mean,0.0017621673626935187,200,25
-autoencoder_v2,Bwd IAT Total,0.001555931923533209,200,26
-autoencoder_v2,Init_Win_bytes_backward,0.001161345240518777,200,27
-autoencoder_v2,Flow Duration,0.001088196595985899,200,28
-autoencoder_v2,Bwd Packet Length Max,0.0008292942445003359,200,29
-autoencoder_v2,Fwd IAT Std,0.0006649841849093909,200,30
-autoencoder_v2,Idle Std,0.0005707057622278404,200,31
-autoencoder_v2,uniq_dport_count_5m,0.0005677496393798783,200,32
-autoencoder_v2,Fwd IAT Mean,0.0005258828227473511,200,33
-autoencoder_v2,Bwd IAT Max,0.00047807376785682877,200,34
-autoencoder_v2,uniq_dport_count_3m,0.0004508230461487122,200,35
-autoencoder_v2,Max Packet Length,0.00040583266598774836,200,36
-autoencoder_v2,Destination Port,0.00038848685604644484,200,37
-autoencoder_v2,Packet Length Mean,0.00033716691487354803,200,38
-autoencoder_v2,Bwd IAT Std,0.000326720673395569,200,39
-autoencoder_v2,Fwd Packet Length Std,0.00026833062176862156,200,40
-autoencoder_v2,Total Length of Fwd Packets,0.00025788328400819374,200,41
-autoencoder_v2,Flow IAT Mean,0.0002467646161451128,200,42
-autoencoder_v2,Flow IAT Min,0.0002213839695582921,200,43
-autoencoder_v2,Bwd IAT Min,0.00021393513598374922,200,44
-autoencoder_v2,Avg Fwd Segment Size,0.00021370473073149671,200,45
-autoencoder_v2,uniq_dport_count_1m,0.00020518839900662998,200,46
-autoencoder_v2,Total Fwd Packets,0.00018410366724594109,200,47
-autoencoder_v2,Fwd Packets/s,0.0001771324880514921,200,48
-autoencoder_v2,fail_ratio_3m,0.0001637987297486259,200,49
-autoencoder_v2,Average Packet Size,0.00015174956301166944,200,50
-autoencoder_v2,Total Length of Bwd Packets,0.0001426603961907606,200,51
-autoencoder_v2,Init_Win_bytes_forward,0.00013293050242622618,200,52
-autoencoder_v2,Min Packet Length,0.00012615471826989336,200,53
-autoencoder_v2,Fwd Packet Length Mean,0.00011038228853478866,200,54
-autoencoder_v2,Flow IAT Std,0.00010753027121683288,200,55
-autoencoder_v2,Active Max,0.00010680172772095826,200,56
-autoencoder_v2,Active Std,0.00010673746985689022,200,57
-autoencoder_v2,Bwd IAT Mean,0.00010554907202129874,200,58
-autoencoder_v2,Fwd IAT Min,0.00010486180294655027,200,59
-autoencoder_v2,Subflow Bwd Bytes,0.0001011598963747647,200,60
-autoencoder_v2,act_data_pkt_fwd,9.506484440607823e-05,200,61
-autoencoder_v2,Fwd Packet Length Max,9.040271880121512e-05,200,62
-autoencoder_v2,Subflow Bwd Packets,8.985308655407936e-05,200,63
-autoencoder_v2,Subflow Fwd Bytes,8.888965539763625e-05,200,64
-autoencoder_v2,Subflow Fwd Packets,8.7246257849859e-05,200,65
-autoencoder_v2,Flow Bytes/s,7.77370106509006e-05,200,66
-autoencoder_v2,fail_ratio_5m,7.462223314281254e-05,200,67
-autoencoder_v2,Active Mean,7.198146813444722e-05,200,68
-autoencoder_v2,fail_ratio_1m,7.056261621241957e-05,200,69
-autoencoder_v2,Active Min,6.53239393727946e-05,200,70
-autoencoder_v2,Total Backward Packets,6.297191897155504e-05,200,71
-autoencoder_v2,Fwd Packet Length Min,6.191761582566868e-05,200,72
-autoencoder_v2,Bwd Packet Length Min,4.387121309066624e-05,200,73
-autoencoder_v2,Flow Packets/s,4.20307604240893e-05,200,74
-autoencoder_v2,Bwd Packets/s,3.741092493869197e-05,200,75
-autoencoder_v2,Down/Up Ratio,3.603313383749932e-05,200,76
-autoencoder_v2,Bwd PSH Flags,0.0,200,77
-autoencoder_v2,Fwd URG Flags,0.0,200,78
-autoencoder_v2,Bwd URG Flags,0.0,200,79
-autoencoder_v2,Fwd Header Length,0.0,200,80
-autoencoder_v2,Bwd Header Length,0.0,200,81
-autoencoder_v2,RST Flag Count,0.0,200,82
-autoencoder_v2,CWE Flag Count,0.0,200,83
-autoencoder_v2,ECE Flag Count,0.0,200,84
-autoencoder_v2,Fwd Header Length.1,0.0,200,85
-autoencoder_v2,Fwd Avg Bytes/Bulk,0.0,200,86
-autoencoder_v2,Fwd Avg Packets/Bulk,0.0,200,87
-autoencoder_v2,Fwd Avg Bulk Rate,0.0,200,88
-autoencoder_v2,Bwd Avg Bytes/Bulk,0.0,200,89
-autoencoder_v2,Bwd Avg Packets/Bulk,0.0,200,90
-autoencoder_v2,Bwd Avg Bulk Rate,0.0,200,91
-autoencoder_v2,min_seg_size_forward,0.0,200,92
-random_forest,Destination Port,0.05040038774154289,300,1
-random_forest,Bwd Packet Length Min,0.030639452922648774,300,2
-random_forest,Init_Win_bytes_forward,0.028982017448725958,300,3
-random_forest,Packet Length Variance,0.02220942050130131,300,4
-random_forest,Init_Win_bytes_backward,0.021489874837648294,300,5
-random_forest,Bwd Packet Length Std,0.020771358608125616,300,6
-random_forest,min_seg_size_forward,0.019750985875472027,300,7
-random_forest,Max Packet Length,0.01842394956180629,300,8
-random_forest,Bwd Packet Length Mean,0.016917638338718545,300,9
-random_forest,Bwd Packets/s,0.016518265350986754,300,10
-random_forest,Avg Bwd Segment Size,0.016086594526830266,300,11
-random_forest,Bwd Packet Length Max,0.01574318655047062,300,12
-random_forest,Average Packet Size,0.015236898719176502,300,13
-random_forest,Packet Length Std,0.015198007977313882,300,14
-random_forest,Packet Length Mean,0.014504688710579874,300,15
-random_forest,Subflow Bwd Bytes,0.014231624178715242,300,16
-random_forest,Total Length of Fwd Packets,0.014183991300850064,300,17
-random_forest,Flow IAT Std,0.013180630877810825,300,18
-random_forest,Fwd Packet Length Max,0.012216947756815776,300,19
-random_forest,Total Length of Bwd Packets,0.012084925885827541,300,20
-random_forest,Flow IAT Mean,0.01157252828875609,300,21
-random_forest,PSH Flag Count,0.011451933071718814,300,22
-random_forest,Flow Duration,0.011213361774123857,300,23
-random_forest,Flow Packets/s,0.011013692744402464,300,24
-random_forest,Fwd Packet Length Mean,0.011013115090090597,300,25
-random_forest,Fwd IAT Mean,0.010931719416494255,300,26
-random_forest,Flow IAT Max,0.010732376298205868,300,27
-random_forest,Subflow Fwd Bytes,0.010584251948429291,300,28
-random_forest,Fwd IAT Std,0.010552915457400199,300,29
-random_forest,Fwd IAT Max,0.00993653778147734,300,30
-random_forest,Flow IAT Min,0.009660072206424432,300,31
-random_forest,Fwd Packets/s,0.009625159098286148,300,32
-random_forest,Bwd IAT Mean,0.008937308623529563,300,33
-random_forest,Fwd IAT Total,0.008732257758558163,300,34
-random_forest,Fwd IAT Min,0.008674971605913266,300,35
-random_forest,Total Fwd Packets,0.007537865534644898,300,36
-random_forest,Total Backward Packets,0.007493271231336746,300,37
-random_forest,Bwd IAT Std,0.007470982609426153,300,38
-random_forest,Avg Fwd Segment Size,0.007459784240075174,300,39
-random_forest,Flow Bytes/s,0.007445233075954048,300,40
-random_forest,Subflow Fwd Packets,0.007225187725221396,300,41
-random_forest,Subflow Bwd Packets,0.007204494494217825,300,42
-random_forest,Min Packet Length,0.007028465140642521,300,43
-random_forest,Bwd IAT Total,0.00674712770041767,300,44
-random_forest,Bwd IAT Max,0.006437277646355969,300,45
-random_forest,act_data_pkt_fwd,0.0060082090657773484,300,46
-random_forest,Bwd IAT Min,0.005853840581035444,300,47
-random_forest,Fwd Packet Length Std,0.005840114246193645,300,48
-random_forest,ACK Flag Count,0.005675003904171679,300,49
-random_forest,URG Flag Count,0.005584854029327382,300,50
-random_forest,Fwd Packet Length Min,0.004478541215787802,300,51
-random_forest,Idle Mean,0.004477282612742909,300,52
-random_forest,Bwd Header Length,0.004195126778195612,300,53
-random_forest,Idle Max,0.003993880266324495,300,54
-random_forest,Init_Win_bytes_forward_missing,0.003928093264368211,300,55
-random_forest,Idle Min,0.0038592798551378405,300,56
-random_forest,Down/Up Ratio,0.0035567721064952975,300,57
-random_forest,Init_Win_bytes_backward_missing,0.0027999816387207967,300,58
-random_forest,Fwd Header Length,0.002099109579336692,300,59
-random_forest,Active Mean,0.0018828012689298531,300,60
-random_forest,Active Max,0.0017921693602596608,300,61
-random_forest,Active Min,0.0017867754137946986,300,62
-random_forest,SYN Flag Count,0.0014097790405867782,300,63
-random_forest,Fwd Header Length.1,0.0013164825849602138,300,64
-random_forest,Fwd PSH Flags,0.0012833084732427895,300,65
-random_forest,FIN Flag Count,0.0008094790490844368,300,66
-random_forest,Idle Std,0.00038037354061502794,300,67
-random_forest,Active Std,0.0002959079019605588,300,68
-random_forest,ECE Flag Count,1.6180658368218707e-06,300,69
-random_forest,CWE Flag Count,8.571394982898583e-08,300,70
-random_forest,Fwd URG Flags,4.347757138627765e-08,300,71
-random_forest,RST Flag Count,7.142773759723388e-10,300,72
-random_forest,Bwd PSH Flags,0.0,300,73
-random_forest,Bwd URG Flags,0.0,300,74
-random_forest,Fwd Avg Bytes/Bulk,0.0,300,75
-random_forest,Fwd Avg Packets/Bulk,0.0,300,76
-random_forest,Fwd Avg Bulk Rate,0.0,300,77
-random_forest,Bwd Avg Bytes/Bulk,0.0,300,78
-random_forest,Bwd Avg Packets/Bulk,0.0,300,79
-random_forest,Bwd Avg Bulk Rate,0.0,300,80
+member,feature,mean_abs_shap
+if_ae_fallback,Init_Win_bytes_forward_missing,0.017791802921789446
+if_ae_fallback,URG Flag Count,0.014541611135162273
+if_ae_fallback,PSH Flag Count,0.0035750348648204444
+if_ae_fallback,Init_Win_bytes_backward_missing,0.003463044048651735
+if_ae_fallback,Destination Port,0.002793365692237091
+if_ae_fallback,ACK Flag Count,0.0025634228899148394
+if_ae_fallback,Bwd IAT Min,0.0025187572712084077
+if_ae_fallback,Protocol,0.0022092056767538722
+if_ae_fallback,Fwd PSH Flags,0.0021899694904856507
+if_ae_fallback,SYN Flag Count,0.0020602144290923392
+if_ae_fallback,Avg Bwd Segment Size,0.0019513510710204962
+if_ae_fallback,Flow Packets/s,0.001278220644161116
+if_ae_fallback,Average Packet Size,0.0010598007621562577
+if_ae_fallback,Packet Length Std,0.0010466575675285718
+if_ae_fallback,FIN Flag Count,0.0010245195509232012
+if_ae_fallback,Flow Duration,0.0009879709235593598
+if_ae_fallback,Flow IAT Min,0.0008639632173534035
+if_ae_fallback,Bwd Packet Length Min,0.0008597947814108609
+if_ae_fallback,Subflow Fwd Bytes,0.0008565716333291671
+if_ae_fallback,Bwd Packet Length Max,0.000855603798434909
+if_ae_fallback,Bwd Packet Length Mean,0.0008478739858389066
+if_ae_fallback,Bwd Packets/s,0.0008452750373718723
+if_ae_fallback,fail_ratio_5m,0.0007848278165909689
+if_ae_fallback,Max Packet Length,0.0007635144808794957
+if_ae_fallback,Total Backward Packets,0.000683768080553472
+if_ae_fallback,Subflow Bwd Packets,0.0006747227575749101
+if_ae_fallback,fail_ratio_3m,0.0006551492355829316
+if_ae_fallback,Flow IAT Mean,0.0005963975232234221
+if_ae_fallback,Fwd Packet Length Mean,0.0005791054693166866
+if_ae_fallback,Bwd IAT Total,0.0005752514117067219
+if_ae_fallback,act_data_pkt_fwd,0.0005422436632297761
+if_ae_fallback,Init_Win_bytes_forward,0.0005395870129523071
+if_ae_fallback,Total Fwd Packets,0.0005311699105736196
+if_ae_fallback,Idle Min,0.0005236868853424961
+if_ae_fallback,conn_count_3m,0.0005030063331817805
+if_ae_fallback,Fwd Packet Length Min,0.000501864634204757
+if_ae_fallback,Fwd IAT Total,0.000497942212376421
+if_ae_fallback,Flow IAT Std,0.00048643118637089024
+if_ae_fallback,Bwd IAT Max,0.00047266334262524297
+if_ae_fallback,Flow Bytes/s,0.000456318232088525
+if_ae_fallback,uniq_dport_count_5m,0.0004363441539428307
+if_ae_fallback,conn_count_1m,0.00043439599697054406
+if_ae_fallback,Subflow Bwd Bytes,0.00042530909570541215
+if_ae_fallback,Active Max,0.0004234853637890113
+if_ae_fallback,Init_Win_bytes_backward,0.00041252262715983195
+if_ae_fallback,Fwd IAT Min,0.0003993807935343342
+if_ae_fallback,Fwd Packet Length Std,0.0003941760301007027
+if_ae_fallback,Fwd Packet Length Max,0.0003439675060185125
+if_ae_fallback,Fwd Packets/s,0.00033630902975165743
+if_ae_fallback,Bwd IAT Std,0.0003142475347267443
+if_ae_fallback,Avg Fwd Segment Size,0.0003030111737711003
+if_ae_fallback,conn_count_5m,0.0002979415677003936
+if_ae_fallback,Idle Max,0.00028047942967806617
+if_ae_fallback,Idle Mean,0.0002802376507871489
+if_ae_fallback,Total Length of Fwd Packets,0.00026858346783018385
+if_ae_fallback,Packet Length Mean,0.00025365531863743033
+if_ae_fallback,Packet Length Variance,0.0002454779822607766
+if_ae_fallback,uniq_dport_count_1m,0.00023603455609428608
+if_ae_fallback,fail_ratio_1m,0.00022308351142246216
+if_ae_fallback,Active Mean,0.0002169766588912064
+if_ae_fallback,Down/Up Ratio,0.0002089298400007516
+if_ae_fallback,Fwd IAT Mean,0.00020596406265299428
+if_ae_fallback,Bwd IAT Mean,0.00019032800734540038
+if_ae_fallback,Total Length of Bwd Packets,0.0001897500895903331
+if_ae_fallback,Min Packet Length,0.00016688379535889555
+if_ae_fallback,Flow IAT Max,0.00016378615430709845
+if_ae_fallback,Fwd IAT Max,0.00014699632765455476
+if_ae_fallback,Subflow Fwd Packets,0.0001405622620680181
+if_ae_fallback,Bwd Packet Length Std,0.00013677403178325942
+if_ae_fallback,uniq_dport_count_3m,0.00011962838540956962
+if_ae_fallback,Fwd IAT Std,0.00011935809321135337
+if_ae_fallback,Source Port,0.000116329831001972
+if_ae_fallback,repeat_ratio_1m,0.00010533025530138463
+if_ae_fallback,Active Std,0.0001034482725650579
+if_ae_fallback,Active Min,0.00010025793791897418
+if_ae_fallback,Idle Std,6.049415752784237e-05
+if_ae_fallback,repeat_ratio_3m,4.987798824273126e-05
+if_ae_fallback,Bwd PSH Flags,0.0
+if_ae_fallback,Fwd URG Flags,0.0
+if_ae_fallback,Bwd URG Flags,0.0
+if_ae_fallback,Fwd Header Length,0.0
+if_ae_fallback,Bwd Header Length,0.0
+if_ae_fallback,RST Flag Count,0.0
+if_ae_fallback,CWE Flag Count,0.0
+if_ae_fallback,ECE Flag Count,0.0
+if_ae_fallback,Fwd Header Length.1,0.0
+if_ae_fallback,Fwd Avg Bytes/Bulk,0.0
+if_ae_fallback,Fwd Avg Packets/Bulk,0.0
+if_ae_fallback,Fwd Avg Bulk Rate,0.0
+if_ae_fallback,Bwd Avg Bytes/Bulk,0.0
+if_ae_fallback,Bwd Avg Packets/Bulk,0.0
+if_ae_fallback,Bwd Avg Bulk Rate,0.0
+if_ae_fallback,min_seg_size_forward,0.0
+if_ae_fallback,repeat_ratio_5m,0.0
+random_forest,uniq_dport_count_5m,0.0517425434610622
+random_forest,uniq_dport_count_3m,0.04168534527675533
+random_forest,Destination Port,0.035032043022880384
+random_forest,conn_count_1m,0.03454532274335832
+random_forest,uniq_dport_count_1m,0.02834578065975378
+random_forest,conn_count_3m,0.02804603387640606
+random_forest,repeat_ratio_1m,0.02723344468369463
+random_forest,conn_count_5m,0.02433357951435151
+random_forest,repeat_ratio_5m,0.01834546649013612
+random_forest,repeat_ratio_3m,0.017582793974570028
+random_forest,Source Port,0.016996158461906493
+random_forest,Avg Bwd Segment Size,0.016773512763242276
+random_forest,Bwd Packet Length Mean,0.011968825182518713
+random_forest,Bwd Packet Length Max,0.011179710857017348
+random_forest,min_seg_size_forward,0.011048247622722607
+random_forest,Init_Win_bytes_forward,0.010907478616772147
+random_forest,fail_ratio_5m,0.009943004308586915
+random_forest,Packet Length Mean,0.009191666319636064
+random_forest,Bwd Packet Length Min,0.008596716617253298
+random_forest,Bwd Packet Length Std,0.007927347725718709
+random_forest,Init_Win_bytes_backward,0.007408134320543084
+random_forest,Total Length of Bwd Packets,0.007181096152815153
+random_forest,Max Packet Length,0.007041404562819992
+random_forest,Fwd Packet Length Max,0.007029312517343262
+random_forest,Subflow Bwd Bytes,0.0070089410556979604
+random_forest,Packet Length Std,0.006971069066375974
+random_forest,Average Packet Size,0.006965466638439328
+random_forest,Bwd Packets/s,0.006932874912229471
+random_forest,Flow IAT Mean,0.006856313519119415
+random_forest,PSH Flag Count,0.006816844367676064
+random_forest,Flow IAT Max,0.006659373441850272
+random_forest,Fwd IAT Max,0.006635810905607866
+random_forest,Total Length of Fwd Packets,0.006413209208568434
+random_forest,Bwd IAT Mean,0.005826813668562477
+random_forest,Fwd IAT Mean,0.005695762974508143
+random_forest,Avg Fwd Segment Size,0.005625799232533899
+random_forest,Fwd IAT Total,0.005271237529386415
+random_forest,Flow Duration,0.005225462673499528
+random_forest,Flow IAT Std,0.005219209073783678
+random_forest,Min Packet Length,0.005136873436302077
+random_forest,Fwd Packet Length Mean,0.0050814813542039705
+random_forest,Fwd IAT Min,0.005076775541951451
+random_forest,Packet Length Variance,0.0048491052260633705
+random_forest,Bwd IAT Std,0.004796507811579173
+random_forest,Fwd Packet Length Min,0.00469714904349021
+random_forest,Subflow Fwd Bytes,0.004628717213342446
+random_forest,Init_Win_bytes_backward_missing,0.004607775572488985
+random_forest,Fwd IAT Std,0.0044454052348086165
+random_forest,Flow Bytes/s,0.00435332343873409
+random_forest,Fwd Packets/s,0.004199700829876646
+random_forest,Total Backward Packets,0.004121494353069476
+random_forest,Bwd IAT Total,0.004066895360899334
+random_forest,Flow IAT Min,0.004009355204915343
+random_forest,Flow Packets/s,0.003986893825084565
+random_forest,Bwd IAT Max,0.0038828631457998902
+random_forest,Init_Win_bytes_forward_missing,0.0036915463485890933
+random_forest,Fwd Packet Length Std,0.0036436005158709986
+random_forest,Subflow Bwd Packets,0.0035688449492594456
+random_forest,Subflow Fwd Packets,0.003432523023126389
+random_forest,Protocol,0.0032743463083030446
+random_forest,Bwd IAT Min,0.0031442382210509
+random_forest,act_data_pkt_fwd,0.002951285733920817
+random_forest,Total Fwd Packets,0.0026796117511035332
+random_forest,fail_ratio_3m,0.002518666042531761
+random_forest,Bwd Header Length,0.0024727336217128856
+random_forest,Down/Up Ratio,0.0024719369265547445
+random_forest,ACK Flag Count,0.0024470083502900106
+random_forest,Idle Mean,0.0017295800481233726
+random_forest,Active Mean,0.0014890759006539502
+random_forest,Idle Max,0.0014183936870958425
+random_forest,Idle Min,0.0013832071838689411
+random_forest,URG Flag Count,0.0012934975459820276
+random_forest,Active Max,0.0011765944109524602
+random_forest,Active Min,0.0011398172307672614
+random_forest,Fwd Header Length.1,0.0010337509508295177
+random_forest,SYN Flag Count,0.0008127131163802942
+random_forest,Fwd PSH Flags,0.0007897463209263215
+random_forest,Fwd Header Length,0.0005397608628763125
+random_forest,Active Std,0.00034208156396765377
+random_forest,fail_ratio_1m,0.0003362310024298388
+random_forest,Idle Std,0.00030832808168246376
+random_forest,FIN Flag Count,0.0001945939322794929
+random_forest,CWE Flag Count,5.831233417684317e-08
+random_forest,Fwd URG Flags,1.634967547398445e-08
+random_forest,ECE Flag Count,1.2521993063938999e-08
+random_forest,RST Flag Count,6.155677382564481e-19
+random_forest,Bwd PSH Flags,0.0
+random_forest,Bwd URG Flags,0.0
+random_forest,Fwd Avg Bytes/Bulk,0.0
+random_forest,Fwd Avg Packets/Bulk,0.0
+random_forest,Fwd Avg Bulk Rate,0.0
+random_forest,Bwd Avg Bytes/Bulk,0.0
+random_forest,Bwd Avg Packets/Bulk,0.0
+random_forest,Bwd Avg Bulk Rate,0.0

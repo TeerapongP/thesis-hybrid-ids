@@ -88,8 +88,7 @@
     "Isolation Forest is the single best zero-day detector on DoS Slowhttptest (argmax recall 0.839 against AE's 0.241 and RF's 0.055) yet carries 0.09-0.15 FPR in every fold. Excluding it as an independent trigger is a measured trade-off, not a free win, and this category is where it costs recall.",
     "FTP-Patator and Web Attack - Brute Force have no redundancy: both unsupervised members are blind to them (recall <= 0.05), so RF alone carries those categories. PortScan is the mirror image -- AE 0.785 against RF 0.000 at argmax.",
     "In-dataset metrics on this population are saturated (RF val F1 0.9997) and cannot discriminate between candidates. Only zero-day LOAO separates them.",
-    "Normalized scores are intentionally unclipped, so fused_score can exceed 1.0; consumers must clamp at the presentation boundary.",
-    "src/modeling/shap_explain.py has NOT been migrated to this strategy. It was written for the OR rule, passes zeros as the Isolation Forest score (valid then, because IF did not affect the decision; invalid now, because the cascade uses it) and keys off the retired model_used value 'autoencoder_v2'. It raises rather than emitting wrong attributions."
+    "Normalized scores are intentionally unclipped, so fused_score can exceed 1.0; consumers must clamp at the presentation boundary."
   ],
   "superseded_history": {
     "rf_ae_or": {
@@ -133,5 +132,24 @@
     "if_solo_f1": 0.5667,
     "honest_reading": "RF solo BEATS the deployed cascade in-dataset, on both F1 (0.9995 vs 0.9966) and FPR (0.000093 vs 0.000983, a 10x difference). The cascade's advantage exists only on zero-day LOAO, and there it is 0.45pp. Report both directions: the ensemble trades in-dataset precision for zero-day generalization, and on this dataset that trade is narrow enough that a reader could reasonably prefer RF alone.",
     "per_category_note": "Ensemble beats RF solo on only two categories -- Web Attack - XSS (0.985 vs 0.969) and Infiltration (0.857 vs 0.571, n=7, not interpretable) -- and loses or ties everywhere else, notably Bot (0.895 vs 0.956) and Web Attack - Sql Injection (0.750 vs 1.000, n=4, not interpretable)."
+  },
+  "explainability": {
+    "module": "src/modeling/shap_explain.py",
+    "status": "migrated to confidence_weighted",
+    "contract": "attributes the branch named by model_used, in fused-score units, so base_value + sum(shap) reconstructs the row's fused_score",
+    "faithfulness_max_abs_gap": {
+      "random_forest": 1.961e-10,
+      "if_ae_fallback": 4.657e-09
+    },
+    "latency_s_per_alert": {
+      "random_forest": 0.258,
+      "if_ae_fallback": 0.184
+    },
+    "branch_mix_in_dataset": {
+      "random_forest": 0.99785,
+      "if_ae_fallback": 0.00215,
+      "measured_on": "random 60,000-row slice of the unified test split"
+    },
+    "note": "The fallback is attributable only because the unified population gives IF and AE one feature space; under the two-population design the composite spanned incompatible spaces. Isolation Forest therefore influences fallback attributions, where the old module passed zeros in its place."
   }
 }

@@ -1,54 +1,62 @@
 """
-shap_explain.py -- SHAP explainability over the deployed `rf_ae_or` fusion layer.
+shap_explain.py -- SHAP explainability over the deployed `confidence_weighted` fusion layer.
 
 ATTRIBUTION CONTRACT (decided, and why)
 ---------------------------------------
-The deployed score is `fused = max(rf_attack_probability, ae_norm)` (src/modeling/fusion_layer.py).
-The two members read DIFFERENT feature spaces (RF: 80 columns of
-data/features/cicids2017_features_*.parquet; AE-v2: 92 columns of the behavioral parquet, which
-adds 12 per-source-IP window features and 2 missing-flags), they are joined on
-`orig_row_index` <-> RF `row_index`, and `max()` is not differentiable and has no single input
-space. Any one "blended" attribution would have to invent a common feature space, and would
-attribute a decision to features of a model that did not make it. This module does not do that.
+The deployed score is a cascade (src/modeling/fusion_layer.py):
 
-The contract is therefore:
+    fused = rf_attack_probability        where |rf_prob - 0.5| * 2 >= 0.95
+            (if_norm + ae_norm) / 2     otherwise
 
-  1. Compute both members' scores exactly as the deployed code does and take
-     `fusion_layer.fuse_with_metadata` -> `model_used` (the member that supplied the max).
-  2. Attribute ONLY that member, in THAT member's own feature space:
-       - "random_forest":  shap.TreeExplainer on the RF. The explained quantity is
-         `rf_attack_probability = 1 - P(BENIGN)`, i.e. exactly what enters the max. SHAP values
-         for class BENIGN are negated, so base_value + sum(shap) == rf_attack_probability
-         (checked by `additivity_gap`, exact for TreeExplainer).
-       - "autoencoder_v2": shap.KernelExplainer over `ae_norm = (MSE - AE_MIN)/(AE_MAX - AE_MIN)`
-         (the same train-fitted constants as the deployed fusion), so SHAP values are in
-         fused-score units and base_value + sum(shap) == ae_norm. The AE is not a classifier;
-         the explained function is the reconstruction error, so a positive shap value means
-         "this feature value pushes the row's reconstruction error up relative to the background".
-  3. The record's `fused_score` and `risk_score` are the real fused values. `shap_value`s are in
-     the units of the deciding member's score, which equals the fused score when that member
-     supplied the max, so they sum (with `base_value`) to `fused_score` for that row.
-  4. The non-deciding member is deliberately not attributed: it did not set the score.
+Each row is therefore decided by exactly one of two mechanisms, and `fuse_with_metadata`
+names it in `model_used`. This module attributes the mechanism that actually decided the row,
+and attributes it in the units of the fused score, so `base_value + sum(shap) == fused_score`
+holds for every record. That additivity is checked, not asserted -- see `additivity_gap`.
 
-AE BACKGROUND. 100 BENIGN rows sampled (seed 42) from the behavioral TRAIN split. The AE was
-trained on BENIGN only, so "normal" is the right reference: a row's attribution answers "which
-features make this row reconstruct worse than a typical benign flow".
+  * "random_forest" rows -> `shap.TreeExplainer` on the RF, explaining
+    `rf_attack_probability = 1 - P(BENIGN)`. SHAP values for class BENIGN are negated so the
+    sum reconstructs the attack probability, which IS the fused score on these rows.
 
-RISK SCORE. Identical to src/notifications/alert_dispatcher.assemble_alert_record:
-`round(float(fused_score) * 100)`. The dispatcher does not clamp, and the fused score is
-intentionally unclipped (fusion_layer docstring), so it can exceed 100. This record clamps to
-0-100 at the presentation boundary, as the fusion layer's docstring prescribes; the two agree for
-every fused_score <= 1.0. The dispatcher itself is not modified here.
+  * "if_ae_fallback" rows -> `shap.KernelExplainer` over the COMPOSITE function
+    `(if_norm + ae_norm) / 2`, evaluated through the same deployed normalization constants.
+    This is the quantity that set the score, so the attribution explains the decision rather
+    than one input to it.
 
-Feature values reported are the model-input values (MinMax-scaled by feature_extractor), not
-raw packet counts.
+WHY THE COMPOSITE IS ATTRIBUTABLE AT ALL, which it was not before. This module previously
+served the retired `rf_ae_or` rule, where RF read 80 columns and the AE read a separate
+92-column behavioral matrix joined on `orig_row_index`. Averaging two scores across two
+incompatible feature spaces has no meaningful attribution, and `max()` has no single input
+space either. On the unified population all three members read the SAME 94 columns, so the
+composite is an ordinary scalar function of one feature vector and KernelExplainer applies
+directly. The data-layer fix is what made this explainable; it was not a code problem.
+
+A property worth stating: on fallback rows the Isolation Forest genuinely influences the
+attribution. Under the OR rule IF provably could not affect the decision, and this module
+used to pass `np.zeros` in its place. Doing that now would change the fused score and
+mislabel every fallback row, so it is gone.
+
+BACKGROUND SET. 100 BENIGN rows sampled (seed 42) from the unified TRAIN split, shared by
+both explainers. The AE is trained on BENIGN only and the IF's notion of normal is the bulk of
+the data, so "a typical benign flow" is the right reference for both: an attribution answers
+"which feature values push this row away from normal".
+
+RISK SCORE. Matches src/notifications/alert_dispatcher.assemble_alert_record
+(`round(fused * 100)`), clamped to 0-100 here because the fused score is intentionally
+unclipped and the dispatcher does not clamp. The two agree for every fused_score <= 1.0.
+
+Feature values reported are model-input values (MinMax-scaled), not raw packet counts.
+
+Run the report: python -m src.modeling.shap_explain
 """
 
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Literal, TypedDict
+
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 
 import joblib
 import numpy as np
@@ -61,49 +69,38 @@ from src.modeling import fusion_layer
 
 ROOT = Path(__file__).resolve().parents[2]
 
-NON_FEATURE_COLS_RF = [
+NON_FEATURE_COLS = [
     "Label", "attack_cat", "technique_id", "technique_name", "tactic", "mapping_confidence",
     "technique_id_encoded", "tactic_encoded", "mapping_confidence_encoded", "is_known_technique",
+    "orig_row_index",
 ]
-NON_FEATURE_COLS_AE = NON_FEATURE_COLS_RF + ["orig_row_index"]
 
-RF_PATH = ROOT / "models/random_forest.pkl"
-AE_PATH = ROOT / "models/autoencoder_behavioral_v2.pt"
-AE_CONFIG_PATH = ROOT / "models/autoencoder_behavioral_v2_config.json"
-BEHAVIORAL_TRAIN_PATH = ROOT / "data/features/behavioral/cicids2017_behavioral_features_train.parquet"
+RF_PATH = ROOT / "models/random_forest_unified.pkl"
+IF_PATH = ROOT / "models/isolation_forest_unified.pkl"
+AE_PATH = ROOT / "models/autoencoder_unified.pt"
+AE_CONFIG_PATH = ROOT / "models/autoencoder_unified_config.json"
+TRAIN_PATH = ROOT / "data/features/unified/cicids2017_unified_train.parquet"
+TEST_PATH = ROOT / "data/features/unified/cicids2017_unified_test.parquet"
+REPORT_PATH = ROOT / "reports/shap_explainability_report.txt"
+IMPORTANCE_PATH = ROOT / "reports/shap_global_importance.csv"
 
-AE_BACKGROUND_ROWS = 100
-AE_KERNEL_NSAMPLES = 500
+BACKGROUND_ROWS = 100
+KERNEL_NSAMPLES = 500
+EXPECTED_FEATURES = 94
 SEED = 42
 
-ModelUsed = Literal["random_forest", "autoencoder_v2"]
-
-# ---------------------------------------------------------------------------
-# NOT MIGRATED to the deployed `confidence_weighted` cascade. Fails fast here rather than
-# emitting attributions that look fine and are wrong.
-#
-# Three things in this module are specific to the retired `rf_ae_or` rule:
-#   1. `explain_rows` passes np.zeros as the Isolation Forest score. That was correct under
-#      the OR, where IF provably did not affect the decision. The cascade's fallback path is
-#      (if_norm + ae_norm) / 2, so zeroing IF changes the fused score and the decision.
-#   2. It branches on model_used == "autoencoder_v2", a value fusion_layer no longer emits.
-#      Every fallback row would come back as None instead of an explanation.
-#   3. It loads the 80-feature random_forest.pkl and the 92-feature behavioral AE. The
-#      deployed models are the 94-feature unified ones.
-#
-# Migrating it is not a rename. Under the cascade a fallback row is decided by the MEAN of
-# two models, so there is no single member to attribute to -- though the unified population
-# does make this tractable for the first time, since IF and AE now share one feature space
-# and a KernelExplainer can attribute the composite (if_norm + ae_norm) / 2 directly.
-_WRITTEN_FOR_STRATEGY = "rf_ae_or"
-if fusion_layer.CHOSEN_STRATEGY != _WRITTEN_FOR_STRATEGY:
+# Guard against the module silently serving a strategy it was not written for -- the failure
+# it replaced was exactly that, and it produced attributions that looked fine.
+WRITTEN_FOR_STRATEGY = "confidence_weighted"
+if fusion_layer.CHOSEN_STRATEGY != WRITTEN_FOR_STRATEGY:
     raise RuntimeError(
-        f"shap_explain was written for fusion strategy '{_WRITTEN_FOR_STRATEGY}' but the "
-        f"deployed strategy is '{fusion_layer.CHOSEN_STRATEGY}'. Running it as-is would "
-        f"zero out the Isolation Forest score the cascade depends on, mislabel every "
-        f"fallback row, and score 94-feature data with 80/92-feature models. See the comment "
-        f"above this check and known_limitations in models/fusion_config.json."
+        f"shap_explain is written for fusion strategy '{WRITTEN_FOR_STRATEGY}' but the deployed "
+        f"strategy is '{fusion_layer.CHOSEN_STRATEGY}'. Attributions would explain a decision "
+        f"rule that is not in use. Migrate this module before running it."
     )
+
+ModelUsed = Literal["random_forest", "if_ae_fallback"]
+assert set(fusion_layer.MODEL_USED_VALUES) == {"random_forest", "if_ae_fallback"}
 
 
 class FeatureAttribution(TypedDict):
@@ -120,7 +117,8 @@ class Explanation(TypedDict):
     top_features: list[FeatureAttribution]
 
 
-def numeric_feature_columns(df: pd.DataFrame, excluded: list[str]) -> list[str]:
+def numeric_feature_columns(df: pd.DataFrame, excluded: list[str] = None) -> list[str]:
+    excluded = NON_FEATURE_COLS if excluded is None else excluded
     return [c for c in df.columns if c not in excluded and pd.api.types.is_numeric_dtype(df[c])]
 
 
@@ -130,7 +128,7 @@ def risk_score_from_fused(fused_score: float) -> int:
 
 
 class _Autoencoder(nn.Module):
-    """Same architecture as notebooks/06 and eval_test_set_ensemble.py."""
+    """Same architecture as train_unified_ensemble.py and autoencoder_unified_config.json."""
 
     def __init__(self, d, hidden, bottleneck):
         super().__init__()
@@ -151,7 +149,7 @@ class _Autoencoder(nn.Module):
         return self.decoder(self.encoder(x))
 
 
-def _top_k(names: list[str], values: np.ndarray, shap_vals: np.ndarray, k: int) -> list[FeatureAttribution]:
+def _top_k(names, values, shap_vals, k) -> list[FeatureAttribution]:
     order = np.argsort(-np.abs(shap_vals))[:k]
     return [
         FeatureAttribution(
@@ -165,40 +163,56 @@ def _top_k(names: list[str], values: np.ndarray, shap_vals: np.ndarray, k: int) 
 
 
 class FusionExplainer:
-    """Loads the deployed RF and AE-v2 once; explains rows by the member that decided them."""
+    """Loads the three deployed unified models once; explains rows by the branch that decided them."""
 
-    def __init__(self, ae_background: pd.DataFrame | None = None):
+    def __init__(self, background: pd.DataFrame | None = None):
         self.rf = joblib.load(RF_PATH)
         self.benign_idx = list(self.rf.classes_).index("BENIGN")
+        self.iso = joblib.load(IF_PATH)
 
         cfg = json.loads(AE_CONFIG_PATH.read_text(encoding="utf-8"))
         self.ae = _Autoencoder(cfg["input_dim"], cfg["hidden_dims"], cfg["bottleneck_dim"])
         self.ae.load_state_dict(torch.load(AE_PATH, map_location="cpu"))
         self.ae.eval()
 
-        if ae_background is None:
-            ae_background = self._load_ae_background()
-        self.ae_columns = numeric_feature_columns(ae_background, NON_FEATURE_COLS_AE)
-        assert len(self.ae_columns) == cfg["input_dim"], len(self.ae_columns)
-        self.ae_background = ae_background[self.ae_columns].to_numpy(dtype=np.float32)
+        if background is None:
+            background = self._load_background()
+        self.columns = numeric_feature_columns(background)
+        assert len(self.columns) == EXPECTED_FEATURES, \
+            f"expected {EXPECTED_FEATURES} features, got {len(self.columns)}"
+        assert len(self.columns) == cfg["input_dim"], \
+            f"AE expects {cfg['input_dim']} inputs, population has {len(self.columns)}"
+        self.background = background[self.columns].to_numpy(dtype=np.float64)
 
         self.rf_tree = shap.TreeExplainer(self.rf)
-        self.ae_kernel = shap.KernelExplainer(self._ae_norm_fn, self.ae_background)
-        self.rf_columns: list[str] | None = None
+        # One KernelExplainer over the composite the cascade actually thresholds.
+        self.fallback_kernel = shap.KernelExplainer(self._fallback_fn, self.background)
 
     @staticmethod
-    def _load_ae_background() -> pd.DataFrame:
-        train = pd.read_parquet(BEHAVIORAL_TRAIN_PATH)
+    def _load_background() -> pd.DataFrame:
+        train = pd.read_parquet(TRAIN_PATH)
         benign = train[train["Label"] == "BENIGN"]
-        return benign.sample(AE_BACKGROUND_ROWS, random_state=SEED)
+        return benign.sample(BACKGROUND_ROWS, random_state=SEED)
 
+    # ── member scores, computed exactly as the deployed code does ────
     def _ae_mse(self, x: np.ndarray) -> np.ndarray:
         with torch.no_grad():
             t = torch.as_tensor(np.asarray(x, dtype=np.float32))
             return torch.mean((self.ae(t) - t) ** 2, dim=1).numpy()
 
-    def _ae_norm_fn(self, x: np.ndarray) -> np.ndarray:
-        return fusion_layer.normalize_ae_score(self._ae_mse(x))
+    def _if_raw(self, x: np.ndarray) -> np.ndarray:
+        return -self.iso.score_samples(np.asarray(x, dtype=np.float64))
+
+    def _fallback_fn(self, x: np.ndarray) -> np.ndarray:
+        """The cascade's fallback score: the mean of both normalized unsupervised scores.
+
+        This is the function KernelExplainer attributes, so the SHAP values explain the
+        quantity that set the row's fused score rather than one contributor to it.
+        """
+        x = np.atleast_2d(np.asarray(x, dtype=np.float64))
+        if_norm = fusion_layer.normalize_if_score(self._if_raw(x))
+        ae_norm = fusion_layer.normalize_ae_score(self._ae_mse(x))
+        return (if_norm + ae_norm) / 2.0
 
     def _rf_attack_shap(self, x: np.ndarray) -> tuple[np.ndarray, float]:
         """(n, features) SHAP of rf_attack_probability = 1 - P(BENIGN), and its base value."""
@@ -207,42 +221,32 @@ class FusionExplainer:
         base = np.atleast_1d(self.rf_tree.expected_value)[self.benign_idx]
         return -benign, float(1.0 - base)
 
-    def explain(
-        self,
-        rf_frame: pd.DataFrame,
-        behavioral_rows: pd.DataFrame,
-        top_k: int = 5,
-    ) -> list[Explanation]:
-        """Explain a batch of alerts.
+    # ── public API ───────────────────────────────────────────────────
+    def explain(self, rows: pd.DataFrame, top_k: int = 5) -> list[Explanation]:
+        """Explain a batch of rows from the unified population.
 
-        rf_frame: the full RF feature frame (positional index == RF `row_index`).
-        behavioral_rows: rows of the behavioral frame, carrying `orig_row_index`. The RF row for
-            each is `rf_frame.iloc[orig_row_index]`; positional alignment between the two frames
-            is never assumed.
+        One frame, one feature space -- the predecessor took two frames and an
+        `orig_row_index` join because its members lived in different populations.
         """
-        if self.rf_columns is None:
-            self.rf_columns = numeric_feature_columns(rf_frame, NON_FEATURE_COLS_RF)
-        rf_x = rf_frame.iloc[behavioral_rows["orig_row_index"].to_numpy()][self.rf_columns].to_numpy()
-        ae_x = behavioral_rows[self.ae_columns].to_numpy(dtype=np.float32)
-
-        proba = self.rf.predict_proba(rf_x)
-        rf_prob = 1.0 - proba[:, self.benign_idx]
-        ae_err = self._ae_mse(ae_x)
-        fused, _, _, model_used = fusion_layer.fuse_with_metadata(rf_prob, np.zeros(len(rf_prob)), ae_err)
+        x = rows[self.columns].to_numpy(dtype=np.float64)
+        rf_prob = 1.0 - self.rf.predict_proba(x)[:, self.benign_idx]
+        if_raw, ae_err = self._if_raw(x), self._ae_mse(x)
+        fused, _, _, model_used = fusion_layer.fuse_with_metadata(rf_prob, if_raw, ae_err)
 
         records: list[Explanation | None] = [None] * len(fused)
         rf_rows = np.flatnonzero(model_used == "random_forest")
-        ae_rows = np.flatnonzero(model_used == "autoencoder_v2")
+        fb_rows = np.flatnonzero(model_used == "if_ae_fallback")
 
         if len(rf_rows):
-            sv, _ = self._rf_attack_shap(rf_x[rf_rows])
+            sv, _ = self._rf_attack_shap(x[rf_rows])
             for j, i in enumerate(rf_rows):
-                records[i] = self._record(fused[i], "random_forest", self.rf_columns, rf_x[i], sv[j], top_k)
-        for i in ae_rows:
+                records[i] = self._record(fused[i], "random_forest", self.columns, x[i], sv[j], top_k)
+        for i in fb_rows:
             sv = np.asarray(
-                self.ae_kernel.shap_values(ae_x[i : i + 1], nsamples=AE_KERNEL_NSAMPLES, silent=True)
+                self.fallback_kernel.shap_values(x[i:i + 1], nsamples=KERNEL_NSAMPLES, silent=True)
             ).reshape(-1)
-            records[i] = self._record(fused[i], "autoencoder_v2", self.ae_columns, ae_x[i], sv, top_k)
+            records[i] = self._record(fused[i], "if_ae_fallback", self.columns, x[i], sv, top_k)
+        assert all(r is not None for r in records), "a row was decided by no known branch"
         return records  # type: ignore[return-value]
 
     @staticmethod
@@ -254,26 +258,30 @@ class FusionExplainer:
             top_features=_top_k(names, values, shap_vals, k),
         )
 
-    def additivity_gap(self, member: ModelUsed, rf_frame, behavioral_rows) -> float:
-        """Max |base + sum(shap) - member_score| over the rows; a faithfulness check."""
+    def additivity_gap(self, member: ModelUsed, rows: pd.DataFrame) -> float:
+        """Max |base + sum(shap) - the branch's own score| over the rows. A faithfulness check.
+
+        If this is not tiny, the attribution does not explain the deployed score and the
+        numbers in the report are decoration.
+        """
+        x = rows[self.columns].to_numpy(dtype=np.float64)
         if member == "random_forest":
-            cols = self.rf_columns or numeric_feature_columns(rf_frame, NON_FEATURE_COLS_RF)
-            x = rf_frame.iloc[behavioral_rows["orig_row_index"].to_numpy()][cols].to_numpy()
             sv, base = self._rf_attack_shap(x)
             target = 1.0 - self.rf.predict_proba(x)[:, self.benign_idx]
             return float(np.max(np.abs(base + sv.sum(1) - target)))
-        x = behavioral_rows[self.ae_columns].to_numpy(dtype=np.float32)
-        sv = np.asarray(self.ae_kernel.shap_values(x, nsamples=AE_KERNEL_NSAMPLES, silent=True))
-        base = float(np.atleast_1d(self.ae_kernel.expected_value)[0])
-        return float(np.max(np.abs(base + sv.reshape(len(x), -1).sum(1) - self._ae_norm_fn(x))))
+        sv = np.asarray(
+            self.fallback_kernel.shap_values(x, nsamples=KERNEL_NSAMPLES, silent=True)
+        ).reshape(len(x), -1)
+        base = float(np.atleast_1d(self.fallback_kernel.expected_value)[0])
+        return float(np.max(np.abs(base + sv.sum(1) - self._fallback_fn(x))))
 
 
 # ----------------------------------------------------------------------------
 # Report generation: python -m src.modeling.shap_explain
 # ----------------------------------------------------------------------------
 GLOBAL_RF_ROWS = 300
-GLOBAL_AE_ROWS = 200
-LATENCY_ROWS = 100
+GLOBAL_FALLBACK_ROWS = 60   # KernelExplainer over the composite is the slow path
+LATENCY_ROWS = 60
 
 
 def _balanced_sample(frame: pd.DataFrame, n: int, seed: int) -> pd.DataFrame:
@@ -284,94 +292,147 @@ def _balanced_sample(frame: pd.DataFrame, n: int, seed: int) -> pd.DataFrame:
     )
 
 
+def _split_by_branch(explainer: FusionExplainer, frame: pd.DataFrame):
+    """Partition rows by the branch that decides them, and report the measured mix.
+
+    The fallback branch fires on roughly 0.2% of in-dataset rows, so a random sample would
+    almost never contain one and that path would go unmeasured. It is therefore sampled
+    deliberately. Stating the mix matters more than the convenience: RF is decisive on
+    virtually all in-dataset traffic, while on the synthetic overlay -- out-of-distribution
+    input -- RF abstained on every flow and the fallback carried all of it.
+    """
+    x = frame[explainer.columns].to_numpy(dtype=np.float64)
+    rf_prob = 1.0 - explainer.rf.predict_proba(x)[:, explainer.benign_idx]
+    decisive = np.abs(rf_prob - 0.5) * 2 >= fusion_layer.CONFIDENCE_THRESHOLD
+    return frame[decisive], frame[~decisive], float(decisive.mean())
+
+
 def main() -> None:
     import time
 
-    rf_frame = pd.read_parquet(ROOT / "data/features/cicids2017_features_test.parquet")
-    behavioral = pd.read_parquet(ROOT / "data/features/behavioral/cicids2017_behavioral_features_test.parquet")
+    test = pd.read_parquet(TEST_PATH)
     explainer = FusionExplainer()
+    cols = explainer.columns
 
-    latency_sample = _balanced_sample(behavioral, LATENCY_ROWS, SEED)
-    timings: dict[str, list[float]] = {"random_forest": [], "autoencoder_v2": []}
+    # Find real rows of each branch. Scoring a 60k slice is enough to collect a fallback
+    # sample without scoring all 504k.
+    scan = test.sample(60_000, random_state=SEED)
+    rf_pool, fb_pool, rf_share = _split_by_branch(explainer, scan)
+    fb_available = len(fb_pool)
+    rf_sample = _balanced_sample(rf_pool, min(GLOBAL_RF_ROWS, len(rf_pool)), SEED)
+    fb_sample = fb_pool.sample(min(GLOBAL_FALLBACK_ROWS, fb_available), random_state=SEED + 1)
+
+    # ── global importance per branch ─────────────────────────────────
+    rf_sv, _ = explainer._rf_attack_shap(rf_sample[cols].to_numpy(dtype=np.float64))
+    fb_sv = np.asarray(
+        explainer.fallback_kernel.shap_values(
+            fb_sample[cols].to_numpy(dtype=np.float64), nsamples=KERNEL_NSAMPLES, silent=True
+        )
+    ).reshape(len(fb_sample), -1)
+    importance = pd.concat([
+        pd.DataFrame({"member": "random_forest", "feature": cols,
+                      "mean_abs_shap": np.abs(rf_sv).mean(0)}),
+        pd.DataFrame({"member": "if_ae_fallback", "feature": cols,
+                      "mean_abs_shap": np.abs(fb_sv).mean(0)}),
+    ]).sort_values(["member", "mean_abs_shap"], ascending=[True, False])
+    importance.to_csv(IMPORTANCE_PATH, index=False)
+
+    # ── faithfulness ─────────────────────────────────────────────────
+    gaps = {
+        "random_forest": explainer.additivity_gap("random_forest", rf_sample.iloc[:20]),
+        "if_ae_fallback": explainer.additivity_gap("if_ae_fallback", fb_sample.iloc[:20]),
+    }
+
+    # ── latency and branch mix ───────────────────────────────────────
+    # Half from each branch, so both latencies are actually measured.
+    half = LATENCY_ROWS // 2
+    latency_sample = pd.concat([
+        rf_pool.sample(min(half, len(rf_pool)), random_state=SEED + 2),
+        fb_pool.sample(min(half, fb_available), random_state=SEED + 2),
+    ])
+    timings: dict[str, list[float]] = {"random_forest": [], "if_ae_fallback": []}
     chosen: list[Explanation] = []
     for i in range(len(latency_sample)):
-        row = latency_sample.iloc[[i]]
+        row = latency_sample.iloc[i:i + 1]
         start = time.perf_counter()
-        (record,) = explainer.explain(rf_frame, row)
-        timings[record["model_used"]].append(time.perf_counter() - start)
-        chosen.append(record)
+        rec = explainer.explain(row, top_k=5)[0]
+        timings[rec["model_used"]].append(time.perf_counter() - start)
+        chosen.append(rec)
+    decided = pd.Series([r["model_used"] for r in chosen]).value_counts().to_dict()
 
-    rf_sample = _balanced_sample(behavioral, GLOBAL_RF_ROWS, SEED + 1)
-    rf_x = rf_frame.iloc[rf_sample["orig_row_index"].to_numpy()][explainer.rf_columns].to_numpy()
-    rf_sv, _ = explainer._rf_attack_shap(rf_x)
-    ae_sample = _balanced_sample(behavioral, GLOBAL_AE_ROWS, SEED + 2)
-    ae_x = ae_sample[explainer.ae_columns].to_numpy(dtype=np.float32)
-    ae_sv = np.asarray(explainer.ae_kernel.shap_values(ae_x, nsamples=AE_KERNEL_NSAMPLES, silent=True)).reshape(
-        len(ae_x), -1
-    )
-
-    importance = pd.concat(
-        [
-            pd.DataFrame({"member": "random_forest", "feature": explainer.rf_columns,
-                          "mean_abs_shap": np.abs(rf_sv).mean(0), "n_rows": len(rf_sv)}),
-            pd.DataFrame({"member": "autoencoder_v2", "feature": explainer.ae_columns,
-                          "mean_abs_shap": np.abs(ae_sv).mean(0), "n_rows": len(ae_sv)}),
-        ]
-    )
-    importance["rank_in_member"] = importance.groupby("member")["mean_abs_shap"].rank(ascending=False, method="first").astype(int)
-    importance = importance.sort_values(["member", "rank_in_member"])
-    importance.to_csv(ROOT / "reports/shap_global_importance.csv", index=False)
-
-    gaps = {
-        m: explainer.additivity_gap(m, rf_frame, rf_sample.iloc[:20] if m == "random_forest" else ae_sample.iloc[:20])
-        for m in ("random_forest", "autoencoder_v2")
-    }
-    decided = pd.Series([r["model_used"] for r in chosen]).groupby(
-        latency_sample["Label"].ne("BENIGN").map({True: "attack", False: "benign"}).to_numpy()
-    ).value_counts()
-
-    lines = ["SHAP EXPLAINABILITY REPORT", "=" * 26, "", "1. ATTRIBUTION CONTRACT", "-" * 23,
-             "Deployed rule: fused = max(rf_attack_probability, ae_norm), threshold 0.05.",
-             "The members use different feature spaces (RF 80, AE-v2 92) and are joined on",
-             "orig_row_index <-> row_index. max() has no single input space, so no blended",
-             "attribution is produced. Each alert is explained by the member that supplied the max",
-             "(fusion_layer.fuse_with_metadata -> model_used), in that member's own features, using",
-             "TreeExplainer (RF, target 1 - P(BENIGN)) or KernelExplainer (AE-v2, target ae_norm).",
-             "The non-deciding member is not attributed. Full argument in the module docstring.", "",
-             "2. FAITHFULNESS CHECKS (base + sum(shap) vs member score, max abs gap over 20 rows)", "-" * 70]
-    lines += [f"{m}: {g:.3e}" for m, g in gaps.items()]
-    lines += ["", "3. AE-v2 BACKGROUND SAMPLE", "-" * 26,
-              f"{AE_BACKGROUND_ROWS} BENIGN rows, random_state={SEED}, from the behavioral TRAIN split.",
-              "The AE is trained on BENIGN only, so attributions read as 'what makes this flow",
-              f"reconstruct worse than a typical benign flow'. KernelExplainer nsamples={AE_KERNEL_NSAMPLES}.", "",
-              "4. WALL-CLOCK PER EXPLANATION (measured, end to end, single-row calls, CPU)", "-" * 72,
-              f"{LATENCY_ROWS} test rows, half attack / half BENIGN. Includes RF predict_proba, AE scoring, fusion, SHAP."]
-    for m, t in timings.items():
-        if t:
-            a = np.array(t)
-            lines.append(f"{m}: n={len(a)} mean={a.mean():.3f}s median={np.median(a):.3f}s p95={np.percentile(a, 95):.3f}s max={a.max():.3f}s")
-    lines += ["RF is slow because the forest is 200 trees of depth ~66 over 15 classes; TreeExplainer",
-              "computes all classes though only BENIGN is used. Batching does not help (measured ~1.0s/row",
-              "at batch 1, 10 and 50). Fine for per-alert use, impractical for bulk scoring of flow streams.", "",
-              "5. WHICH MEMBER DECIDED (latency sample)", "-" * 40, decided.to_string(), ""]
-    for section, member in ((6, "random_forest"), (7, "autoencoder_v2")):
-        n = len(rf_sv) if member == "random_forest" else len(ae_sv)
-        top = importance[importance["member"] == member].head(10)
-        lines += [f"{section}. GLOBAL TOP FEATURES, {member} (mean |SHAP| over {n} balanced attack/benign test rows)", "-" * 70]
-        lines += [f"{r.rank_in_member:2d}. {r.feature}: {r.mean_abs_shap:.5f}" for r in top.itertuples()]
-        lines.append("")
-    lines += ["Units: RF shap is in attack-probability units, AE shap in ae_norm units. Importances",
-              "are not comparable across members. Feature values are scaled model inputs.", "",
-              "8. FINDINGS", "-" * 11,
-              "- The dispatcher's risk_score (round(fused*100)) is unclamped and can exceed 100 when",
-              "  ae_norm > 1; this module clamps. Not changed in the dispatcher.",
-              "- Rows where both members score near 0 are explained by RF (tie goes to RF); those",
-              "  attributions describe a benign-looking row and are low-magnitude. In the latency sample 48 of 50",
-              "  BENIGN rows were decided by AE-v2 (its tiny reconstruction error edged RF's ~0 probability).",
-              "- RF's top global feature is Destination Port, a dataset-specific cue that may not transfer;",
-              "  worth knowing when an analyst reads an RF explanation."]
-    (ROOT / "reports/shap_explainability_report.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print("\n".join(lines))
+    bar = "=" * 74
+    L = [bar, "SHAP EXPLAINABILITY OVER THE DEPLOYED FUSION LAYER", bar,
+         "Command: python -m src.modeling.shap_explain", ""]
+    L += [bar, "1. WHAT IS ATTRIBUTED", bar,
+          f"Deployed strategy: {fusion_layer.CHOSEN_STRATEGY} "
+          f"(confidence {fusion_layer.CONFIDENCE_THRESHOLD}, "
+          f"threshold {fusion_layer.FUSED_DECISION_THRESHOLD}).",
+          "Each row is decided by one branch, named by fusion_layer.fuse_with_metadata, and only",
+          "that branch is attributed -- in the units of the fused score, so base + sum(shap)",
+          "reconstructs the row's fused_score.",
+          "  random_forest   TreeExplainer on 1 - P(BENIGN), which IS the fused score on these rows.",
+          "  if_ae_fallback  KernelExplainer on the COMPOSITE (if_norm + ae_norm) / 2, the quantity",
+          "                  the cascade thresholds. Both members share one 94-column feature space",
+          f"                  on the unified population, which is what makes this attributable;",
+          "                  under the retired two-population design it was not.",
+          f"Feature space: {len(cols)} columns, identical for all three members.",
+          f"Background: {BACKGROUND_ROWS} BENIGN rows from the unified TRAIN split (seed {SEED}).", ""]
+    L += [bar, "2. FAITHFULNESS (max |base + sum(shap) - branch score|)", bar]
+    for k, v in gaps.items():
+        L.append(f"  {k:16s} {v:.3e}")
+    L += ["If either number were not tiny, the attributions would not explain the deployed score.", ""]
+    L += [bar, "3. MEASURED LATENCY PER ALERT", bar]
+    for k, v in timings.items():
+        if v:
+            L.append(f"  {k:16s} n={len(v):3d}  mean {np.mean(v):.3f}s  median {np.median(v):.3f}s")
+        else:
+            L.append(f"  {k:16s} no rows in the latency sample took this branch")
+    # Which path is slower is MEASURED, not asserted. A hand-written claim here was wrong on
+    # the first run: KernelExplainer over the composite looks like it should dominate, but the
+    # TreeExplainer pass over 200 trees x 15 classes costs more.
+    means = {k: float(np.mean(v)) for k, v in timings.items() if v}
+    if len(means) == 2:
+        slow, fast = max(means, key=means.get), min(means, key=means.get)
+        L.append(f"The slower path here is {slow} ({means[slow]:.3f}s vs {means[fast]:.3f}s).")
+        if slow == "random_forest":
+            L += ["That is the opposite of what the shapes suggest: KernelExplainer evaluates the",
+                  f"composite over {KERNEL_NSAMPLES} coalitions against {BACKGROUND_ROWS} background",
+                  "rows, running an Isolation Forest pass and an AE forward pass each time, yet the",
+                  "TreeExplainer pass over 200 trees x 15 output classes still costs more."]
+        else:
+            L += [f"KernelExplainer evaluates the composite over {KERNEL_NSAMPLES} coalitions against",
+                  f"{BACKGROUND_ROWS} background rows, running an Isolation Forest pass and an AE",
+                  "forward pass each time, which is why it dominates."]
+    L += ["Both are usable per alert and impractical for bulk scoring -- unchanged conclusion.", ""]
+    L += [bar, "4. BRANCH MIX", bar,
+          f"Measured on a random 60,000-row slice of the unified test split:",
+          f"  random_forest decisive : {rf_share * 100:.3f}%",
+          f"  if_ae_fallback         : {(1 - rf_share) * 100:.3f}%  ({fb_available:,} rows)",
+          "The fallback is rare in-dataset, so it is sampled DELIBERATELY above rather than at",
+          "random -- a random sample of 60 rows would contain none and the path would go",
+          "unmeasured. The contrast is the interesting part: on the synthetic overlay, which is",
+          "out-of-distribution input, RF abstained on every flow and the fallback decided 100% of",
+          "the alerts (reports/mttd_report.txt). The fallback exists for that case.",
+          f"Latency sample, after deliberate stratification: {decided}", ""]
+    L += [bar, "5. TOP GLOBAL FEATURES PER BRANCH (mean |SHAP|)", bar]
+    for member in ("random_forest", "if_ae_fallback"):
+        sub = importance[importance["member"] == member].head(10)
+        n = len(rf_sample) if member == "random_forest" else len(fb_sample)
+        L.append(f"{member} (n={n} rows)")
+        L.append(sub[["feature", "mean_abs_shap"]].to_string(index=False,
+                                                             float_format=lambda v: f"{v:.6f}"))
+        L.append("")
+    L += [bar, "6. CAVEATS", bar,
+          "Feature values in a record are MinMax-scaled model inputs, not raw packet counts;",
+          "translate before showing an analyst.",
+          "Global importance is a sample statistic over the rows listed above, not over the full",
+          "test split, and the fallback sample is small because that path is slow.",
+          "A high mean |SHAP| means a feature moves this model's score, not that it is causal.",
+          ""]
+    REPORT_PATH.write_text("\n".join(L) + "\n", encoding="utf-8")
+    print("\n".join(L))
+    print(f"[saved] {REPORT_PATH}")
+    print(f"[saved] {IMPORTANCE_PATH}")
 
 
 if __name__ == "__main__":
