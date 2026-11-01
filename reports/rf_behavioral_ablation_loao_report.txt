@@ -1,0 +1,85 @@
+==========================================================================
+RF behavioral-column ablation on the unified LOAO folds
+==========================================================================
+  identical folds, seed, imputation, scaler, SMOTE and hyperparameters as the main run
+  the only change: 12 behavioral columns dropped, 94 -> 82 features
+  Isolation Forest and the Autoencoder are not re-run; RF's feature set does not
+  change their scores, so re-deriving them would reproduce identical numbers.
+
+[1/10] DoS Hulk
+    RF (82 feat)  argmax recall 0.0086  fpr 0.0001   (277s)
+
+[2/10] PortScan
+    RF (82 feat)  argmax recall 0.0014  fpr 0.0002   (281s)
+
+[3/10] DDoS
+    RF (82 feat)  argmax recall 0.6187  fpr 0.0003   (285s)
+
+[4/10] DoS GoldenEye
+    RF (82 feat)  argmax recall 0.2846  fpr 0.0003   (298s)
+
+[5/10] FTP-Patator
+    RF (82 feat)  argmax recall 0.0577  fpr 0.0003   (280s)
+
+[6/10] SSH-Patator
+    RF (82 feat)  argmax recall 0.0016  fpr 0.0003   (326s)
+
+[7/10] DoS slowloris
+    RF (82 feat)  argmax recall 0.4546  fpr 0.0002   (308s)
+
+[8/10] DoS Slowhttptest
+    RF (82 feat)  argmax recall 0.2749  fpr 0.0003   (284s)
+
+[9/10] Bot
+    RF (82 feat)  argmax recall 0.0000  fpr 0.0002   (298s)
+
+[10/10] Web Attack - Brute Force
+    RF (82 feat)  argmax recall 0.8395  fpr 0.0003   (292s)
+==========================================================================
+per-fold argmax results (82 features)
+==========================================================================
+                category  n_attack_rows  rf_argmax_recall  rf_argmax_fpr
+                DoS Hulk         172846            0.0086         0.0001
+                PortScan          90694            0.0014         0.0002
+                    DDoS         128014            0.6187         0.0003
+           DoS GoldenEye          10286            0.2846         0.0003
+             FTP-Patator           5931            0.0577         0.0003
+             SSH-Patator           3219            0.0016         0.0003
+           DoS slowloris           5385            0.4546         0.0002
+        DoS Slowhttptest           5228            0.2749         0.0003
+                     Bot           1948            0.0000         0.0002
+Web Attack - Brute Force           1470            0.8395         0.0003
+==========================================================================
+nested threshold selection, pooled -- the comparable number
+==========================================================================
+  pooled rows 4,615,461   attack rows 425,021
+  RF solo, 82 features:  P 0.8719  R 0.7942  F1 0.8312  FPR 0.0118
+
+  against the two reference runs (both nested, pooled):
+    unified, 94 features (with behavioral)     F1 0.9737  R 0.9593  FPR 0.0011
+    old joined population, 80 features         F1 0.8327  R 0.7705  FPR 0.0106
+==========================================================================
+what this says
+==========================================================================
+  dropping the behavioral columns costs +0.1651 recall on the same population.
+  the remaining gap to the old joined-population run is +0.0237 recall.
+  The behavioral columns account for most of the change: RF's zero-day recall came
+  from the features, so Option A's conclusion that behavioral features could not
+  help RF was wrong, and the fusion rule's lost margin is a real consequence of
+  finally giving RF those columns.
+  Either way this is one ablation on one dataset and does not establish which fusion
+  rule to deploy; it establishes what caused the number to move.
+==========================================================================
+per-category, nested selection
+==========================================================================
+                category  selected_threshold  n_attack_rows  precision  recall     f1    fpr
+                DoS Hulk              0.0100         172846     0.9760  0.9942 0.9850 0.0101
+                PortScan              0.0250          90694     0.7275  0.0754 0.1366 0.0061
+                    DDoS              0.0100         128014     0.9588  0.9981 0.9780 0.0131
+           DoS GoldenEye              0.0100          10286     0.6552  0.9955 0.7903 0.0129
+             FTP-Patator              0.0100           5931     0.5166  1.0000 0.6813 0.0132
+             SSH-Patator              0.0100           3219     0.3649  0.9997 0.5347 0.0134
+           DoS slowloris              0.0100           5385     0.4995  0.9996 0.6662 0.0129
+        DoS Slowhttptest              0.0100           5228     0.4713  0.9229 0.6239 0.0129
+                     Bot              0.0100           1948     0.0111  0.0308 0.0164 0.0127
+Web Attack - Brute Force              0.0100           1470     0.2401  0.9980 0.3871 0.0111

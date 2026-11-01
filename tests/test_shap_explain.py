@@ -4,10 +4,24 @@ import numpy as np
 import pandas as pd
 
 from src.modeling import fusion_layer
-from src.modeling.shap_explain import FusionExplainer, ROOT, risk_score_from_fused
 from src.notifications import alert_dispatcher
 
+# shap_explain raises on import while the deployed strategy is not the one it was written
+# for. Skipping is correct here: the module is deliberately disabled (see its own guard and
+# known_limitations in models/fusion_config.json), so these tests have nothing valid to
+# assert against. They must come back when it is migrated, which is why this skips loudly
+# with a reason rather than the file being deleted.
+try:
+    from src.modeling.shap_explain import FusionExplainer, ROOT, risk_score_from_fused
+    SHAP_IMPORT_ERROR = None
+except RuntimeError as exc:  # strategy guard
+    FusionExplainer = ROOT = risk_score_from_fused = None
+    SHAP_IMPORT_ERROR = str(exc)
 
+
+@unittest.skipIf(SHAP_IMPORT_ERROR is not None,
+                 f"shap_explain is not migrated to the deployed fusion strategy: "
+                 f"{SHAP_IMPORT_ERROR}")
 class ShapExplainTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

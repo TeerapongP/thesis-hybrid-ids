@@ -132,7 +132,7 @@ def metrics_row(name, yt, yp, sc):
                 f1=f1_score(yt,yp), auc_roc=roc_auc_score(yt,sc))
 
 rows=[]
-rows.append(metrics_row("Ensemble (rf_ae_or)", y, fused_pred, fused_score))
+rows.append(metrics_row("Ensemble (confidence_weighted)", y, fused_pred, fused_score))
 rows.append(metrics_row("RF solo (argmax, multi-class)", y, scores["rf_pred_binary"].values, scores["rf_attack_probability"].values))
 AE_THR = cfg["chosen_threshold"]
 rows.append(metrics_row("AE-v2 solo (99th pct thr)", y, (scores["ae_reconstruction_error"].values>AE_THR).astype(int), ae_norm))
@@ -190,7 +190,7 @@ provenance = {
     "ae_solo_threshold": AE_THR,
     "test_rows": len(test_df),
     "fused_test_rows": len(scores),
-    "rf_feature_count": len(rf_cols),
+    "feature_count_all_members": len(feature_cols),
     "feature_count": len(feature_cols),
 }
 for key, value in provenance.items():
@@ -217,7 +217,7 @@ report_sections = [
     f"Autoencoder weights SHA-256: {provenance['autoencoder_weights_sha256']}",
     f"Test rows (all models): {len(test_df)}",
     f"Fused joined test rows: {len(scores)}",
-    f"RF feature count: {len(rf_cols)}",
+    f"Feature count (all three members): {len(feature_cols)}",
     f"Feature count: {len(feature_cols)}",
     "",
     "Aggregate model metrics",

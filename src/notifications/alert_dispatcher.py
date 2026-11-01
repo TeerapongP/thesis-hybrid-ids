@@ -86,7 +86,11 @@ def load_env_config(env_path: Path = NOTIFICATION_ENV_PATH) -> dict[str, Any]:
 
 def derive_model_used(alert_context: dict[str, Any], llm_output: dict[str, Any]) -> str:
     model_used = alert_context.get("model_used")
-    if model_used not in ("random_forest", "autoencoder_v2"):
+    # Must match fusion_layer.MODEL_USED_VALUES, which is the source of truth. It is
+    # duplicated rather than imported because fusion_layer pulls in numpy and this service
+    # runs on the lean .venv; tests/test_fusion_model_used_contract.py asserts the two stay equal.
+    # A rename there without one here silently relabels every affected alert "unknown".
+    if model_used not in ("random_forest", "if_ae_fallback"):
         logger.warning("[alert_dispatcher] no valid pipeline model_used -- model_used='unknown'")
         return "unknown"
     return model_used

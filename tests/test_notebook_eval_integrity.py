@@ -55,11 +55,15 @@ class NotebookEvalIntegrityTests(unittest.TestCase):
         self.assertIn("0.10                0.30", output)
         self.assertIn("0.996529", output)
         self.assertIn("confidence_weighted  chosen threshold=0.300", output)
+        # The notebook's own val-swept thresholds (0.10 / 0.30) must survive in the config as
+        # history, and must NOT be what is deployed: val selection is what this whole trail
+        # moved away from. The deployed pair is nested-LOAO-selected on the unified population.
         config = json.loads((ROOT / "models" / "fusion_config.json").read_text(encoding="utf-8"))
-        self.assertEqual(config["superseded_history"]["val_selected_thresholds"][:24],
-                         "confidence_threshold=0.1")
-        self.assertEqual(config["fused_decision_threshold"], 0.05)
-        self.assertIn("Nested LOAO", config["tuning_objective"])
+        prior = config["superseded_history"]["prior_superseded_entries"]
+        self.assertEqual(prior["val_selected_thresholds"][:24], "confidence_threshold=0.1")
+        self.assertEqual(config["fused_decision_threshold"], 0.03)
+        self.assertEqual(config["confidence_threshold"], 0.95)
+        self.assertIn("Nested LOAO", config["parameter_selection"])
 
 
 if __name__ == "__main__":

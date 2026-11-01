@@ -78,6 +78,33 @@ SEED = 42
 
 ModelUsed = Literal["random_forest", "autoencoder_v2"]
 
+# ---------------------------------------------------------------------------
+# NOT MIGRATED to the deployed `confidence_weighted` cascade. Fails fast here rather than
+# emitting attributions that look fine and are wrong.
+#
+# Three things in this module are specific to the retired `rf_ae_or` rule:
+#   1. `explain_rows` passes np.zeros as the Isolation Forest score. That was correct under
+#      the OR, where IF provably did not affect the decision. The cascade's fallback path is
+#      (if_norm + ae_norm) / 2, so zeroing IF changes the fused score and the decision.
+#   2. It branches on model_used == "autoencoder_v2", a value fusion_layer no longer emits.
+#      Every fallback row would come back as None instead of an explanation.
+#   3. It loads the 80-feature random_forest.pkl and the 92-feature behavioral AE. The
+#      deployed models are the 94-feature unified ones.
+#
+# Migrating it is not a rename. Under the cascade a fallback row is decided by the MEAN of
+# two models, so there is no single member to attribute to -- though the unified population
+# does make this tractable for the first time, since IF and AE now share one feature space
+# and a KernelExplainer can attribute the composite (if_norm + ae_norm) / 2 directly.
+_WRITTEN_FOR_STRATEGY = "rf_ae_or"
+if fusion_layer.CHOSEN_STRATEGY != _WRITTEN_FOR_STRATEGY:
+    raise RuntimeError(
+        f"shap_explain was written for fusion strategy '{_WRITTEN_FOR_STRATEGY}' but the "
+        f"deployed strategy is '{fusion_layer.CHOSEN_STRATEGY}'. Running it as-is would "
+        f"zero out the Isolation Forest score the cascade depends on, mislabel every "
+        f"fallback row, and score 94-feature data with 80/92-feature models. See the comment "
+        f"above this check and known_limitations in models/fusion_config.json."
+    )
+
 
 class FeatureAttribution(TypedDict):
     feature: str
