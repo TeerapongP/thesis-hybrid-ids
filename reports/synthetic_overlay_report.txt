@@ -37,9 +37,9 @@ inject_timestamp values are authoritative and must not be recomputed.
 ======================================================================
 4. SCHEMA AND FIDELITY
 ======================================================================
-Rows are in the scaled 92-feature space of cicids2017_behavioral_features_*.parquet. Raw values
-are drawn first, then scaled with the real train-split min/max (the pipeline's MinMaxScaler,
-reconstructed from data/processed/behavioral). Verification on 2,000 real test rows: max abs
+Rows are in the scaled 94-feature space of cicids2017_unified_*.parquet. Raw values
+are drawn first, then scaled with the real unified train-split min/max (the pipeline's own
+MinMaxScaler, re-derived from source and verified against its scaled output). Verification:
 difference between this scaling and the pipeline's scaled values = 2.22e-16.
 Real columns also exceed [0,1] slightly because test rows fall outside the train range; no clipping.
 

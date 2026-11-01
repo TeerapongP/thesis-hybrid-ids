@@ -7,11 +7,11 @@ for Mean Time To Detect; nothing downstream may recompute it.
 Organizing structure: PROFILES, a registry with one AttackProfile per attack class. Adding
 a class means appending a profile; `generate_overlay` never branches on a class name.
 
-Output rows are in the scaled 92-feature space of
-data/features/behavioral/cicids2017_behavioral_features_*.parquet, so they can be scored by
-the behavioral IF/AE models and the fusion layer. Flows are first drawn in raw CICFlowMeter
-units, then scaled with the min/max of the real train split (the MinMaxScaler
-feature_extractor_behavioral.py fit), reconstructed from data/processed/behavioral.
+Output rows are in the scaled 94-feature space of
+data/features/unified/cicids2017_unified_*.parquet, so they can be scored by the three
+deployed models and the fusion layer. Flows are first drawn in raw CICFlowMeter units, then
+scaled with the min/max of the real unified TRAIN split, re-derived from the same source with
+the same seed and verified against the pipeline's own scaled output (see verify_scaler).
 
 Run from the repo root: python -m src.ingestion.synthetic_overlay
 """
@@ -553,9 +553,9 @@ def write_report(overlay, n_benign, scaler_err, path=OUT_REPORT):
     w(bar)
     w("4. SCHEMA AND FIDELITY")
     w(bar)
-    w("Rows are in the scaled 92-feature space of cicids2017_behavioral_features_*.parquet. Raw values")
-    w("are drawn first, then scaled with the real train-split min/max (the pipeline's MinMaxScaler,")
-    w("reconstructed from data/processed/behavioral). Verification on 2,000 real test rows: max abs")
+    w("Rows are in the scaled 94-feature space of cicids2017_unified_*.parquet. Raw values")
+    w("are drawn first, then scaled with the real unified train-split min/max (the pipeline's own")
+    w("MinMaxScaler, re-derived from source and verified against its scaled output). Verification:")
     w(f"difference between this scaling and the pipeline's scaled values = {scaler_err:.2e}.")
     w("Real columns also exceed [0,1] slightly because test rows fall outside the train range; no clipping.")
     w("")
