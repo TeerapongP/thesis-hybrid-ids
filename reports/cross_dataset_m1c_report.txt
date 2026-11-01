@@ -1,0 +1,64 @@
+============================================================================
+M1c CROSS-DATASET GENERALIZABILITY (Random Forest only)
+============================================================================
+  Random Forest is the only member that can take part: the 12 behavioral columns
+  derive from Source IP and Timestamp, which CIC-UNSW-NB15's Data.csv does not carry,
+  so IF and AE cannot be scored on the target at all. This measures the supervised
+  member in isolation and says nothing about the deployed cascade.
+  Binary attack-vs-benign on both sides: the two attack taxonomies do not align, so a
+  multi-class cross-dataset score would need a category mapping that does not exist.
+
+============================================================================
+cicids2017 -> unswnb15
+============================================================================
+  source train 1,780,264 rows | full features 80 | shared features 76
+  target test  61,235 rows
+  dropped to reach the shared set (4): ['Destination Port', 'Fwd Header Length.1', 'Init_Win_bytes_backward_missing', 'Init_Win_bytes_forward_missing']
+  target attack prevalence 26.51% vs source test 16.89%
+    trained cicids2017 full (80f): 1,780,264 rows x 80 features in 161s
+    in-dataset, full:   P 0.9957 R 0.9960 F1 0.9958 AUC 0.9998 FPR 0.0009
+    trained cicids2017 shared (76f): 1,780,264 rows x 76 features in 159s
+    in-dataset, shared: P 0.9944 R 0.9972 F1 0.9958 AUC 0.9999 FPR 0.0011
+    cross-dataset:      P 1.0000 R 0.0003 F1 0.0006 AUC 0.3220 FPR 0.0000
+
+  cost of dropping to the shared set: F1 0.9958 -> 0.9958 (-0.0001)
+  generalization gap:                 F1 0.9958 -> 0.0006 (-0.9952)
+
+============================================================================
+unswnb15 -> cicids2017
+============================================================================
+  source train 185,001 rows | full features 76 | shared features 76
+  target test  504,160 rows
+  dropped to reach the shared set (0): []
+  target attack prevalence 16.89% vs source test 26.51%
+    trained unswnb15 full (76f): 185,001 rows x 76 features in 7s
+    in-dataset, full:   P 0.9283 R 0.9834 F1 0.9551 AUC 0.9933 FPR 0.0274
+    trained unswnb15 shared (76f): 185,001 rows x 76 features in 7s
+    in-dataset, shared: P 0.9283 R 0.9834 F1 0.9551 AUC 0.9933 FPR 0.0274
+    cross-dataset:      P 0.1061 R 0.1229 F1 0.1139 AUC 0.5034 FPR 0.2103
+
+  cost of dropping to the shared set: F1 0.9551 -> 0.9551 (+0.0000)
+  generalization gap:                 F1 0.9551 -> 0.1139 (-0.8412)
+
+============================================================================
+SUMMARY
+============================================================================
+           direction                     model                    evaluated_on      n  precision  recall     f1  auc_roc    fpr
+cicids2017->unswnb15   cicids2017 RF, full 80f    cicids2017 test (in-dataset) 504160     0.9957  0.9960 0.9958   0.9998 0.0009
+cicids2017->unswnb15 cicids2017 RF, shared 76f    cicids2017 test (in-dataset) 504160     0.9944  0.9972 0.9958   0.9999 0.0011
+cicids2017->unswnb15 cicids2017 RF, shared 76f   unswnb15 test (cross-dataset)  61235     1.0000  0.0003 0.0006   0.3220 0.0000
+unswnb15->cicids2017     unswnb15 RF, full 76f      unswnb15 test (in-dataset)  61235     0.9283  0.9834 0.9551   0.9933 0.0274
+unswnb15->cicids2017   unswnb15 RF, shared 76f      unswnb15 test (in-dataset)  61235     0.9283  0.9834 0.9551   0.9933 0.0274
+unswnb15->cicids2017   unswnb15 RF, shared 76f cicids2017 test (cross-dataset) 504160     0.1061  0.1229 0.1139   0.5034 0.2103
+============================================================================
+HOW TO READ THIS
+============================================================================
+  Compare the three rows of a direction in order. The first-to-second step is the price
+  of restricting to the shared columns; the second-to-third step is generalization.
+  Attributing the whole drop to generalization would overstate it, which is exactly the
+  mistake the middle row exists to prevent.
+  Prevalence differs between the two test sets, so precision is not comparable across
+  directions at face value. Recall, FPR and AUC are.
+  A cross-dataset collapse is a finding, not a failure of the experiment: these are two
+  different testbeds with different attack tooling, captured years apart. What it
+  establishes is the boundary of the single-dataset claim.

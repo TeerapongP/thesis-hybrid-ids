@@ -91,7 +91,7 @@ python -m src.features.feature_extractor
 
 Run the cross-dataset eval builder (read-only against `feature_extractor.py`'s six output files — never modifies them). Computes the intersection of column names between `cicids2017_features_train.parquet` and `unswnb15_features_train.parquet`, ordered by CICIDS-2017's column order, then writes a parallel `{dataset}_features_{split}_crossdataset.parquet` for all 6 dataset/split combinations **This script was rewritten and no longer just intersects already-scaled columns.** It now fits sentinel imputation and the `MinMaxScaler` on the SOURCE train split and applies that same transform to the TARGET's raw features, in each direction. Column-name alignment alone was not enough: each dataset previously got its own scaler, so the same physical flow mapped to different values on each side. Output goes to `data/features/crossdataset_eval/{source}_to_{target}_test.parquet`, 81 columns = **76 shared network features** + 5 reference columns. The 4 label-derived CTI columns are excluded, as are `Destination Port`, `Fwd Header Length.1` and both missing flags (CICIDS-only) and `attack_cat` (UNSW-only).
 
-**M1c therefore requires retraining, which is easy to miss.** The saved `random_forest.pkl` expects **80** features; the shared set is **76**, so scoring it directly raises a sklearn `ValueError`. A cross-dataset run needs an RF retrained on the 76 shared columns, and needs a third number to be interpretable: 80-feature RF on CICIDS (F1 0.9958), 76-feature RF on CICIDS, and 76-feature RF on UNSW. Without the middle one you cannot tell a generalization gap from the cost of dropping 4 features. **IF-v2/AE-v2 cannot take part in M1c at all** — their 12 behavioral columns derive from `Source IP`/`Timestamp`, which CIC-UNSW-NB15's `Data.csv` does not carry, so M1c measures Random Forest only — this is the feature layer for the M1c cross-dataset generalizability evaluation (`cicids2017_features_train.parquet`/`unswnb15_features_train.parquet` themselves stay untouched and keep being used for the in-dataset M1a train/val/test cycle and LOAO). Must run after `feature_extractor.py` (needs all 6 `*_features_{train,val,test}.parquet` files):
+**M1c has been run; see "M1c cross-dataset generalizability" below for the results.** `src/evaluation/eval_cross_dataset.py` does the retraining this requires: the saved 80-feature RF cannot score the 76-column shared set (sklearn `ValueError`), and a third number is needed to interpret the result at all — full-feature in-dataset, shared-feature in-dataset, then cross-dataset. The middle one is what separates a generalization gap from the cost of dropping 4 columns, and it showed that cost to be ~0.0000 F1, so the measured collapse is generalization in full. **IF-v2/AE-v2 cannot take part in M1c at all** — their 12 behavioral columns derive from `Source IP`/`Timestamp`, which CIC-UNSW-NB15's `Data.csv` does not carry, so M1c measures Random Forest only — this is the feature layer for the M1c cross-dataset generalizability evaluation (`cicids2017_features_train.parquet`/`unswnb15_features_train.parquet` themselves stay untouched and keep being used for the in-dataset M1a train/val/test cycle and LOAO). Must run after `feature_extractor.py` (needs all 6 `*_features_{train,val,test}.parquet` files):
 ```bash
 python -m src.evaluation.build_cross_dataset_eval
 ```
@@ -195,6 +195,33 @@ M1c is **not** unblocked by this. CIC-UNSW-NB15's `Data.csv` carries no `Source 
 XGBoost does not win on detection, and loses per-category recall nearly everywhere (Bot 0.931 vs 0.972, PortScan 0.986 vs 1.000, SSH-Patator 0.983 vs 1.000). But **it trains 6x faster and infers 5.8x faster**, and that belongs in the write-up next to the F1 column: scikit-learn has no GPU backend at all, so Random Forest is CPU-bound by the library, not by a configuration choice. What this run settles is only that no untested alternative is dramatically better — not that RF is optimal.
 
 The per-category table carries an `n` column and flags every category with n < 100 as uninterpretable. Three qualify in val: Heartbleed (n=2), Infiltration (n=7), Web Attack - Sql Injection (n=4). XGBoost's 0.500 on Sql Injection is 2 rows out of 4, not a model weakness. One-Class SVM is deliberately **not** added: the unsupervised side already has its answer, since IF-v2 and AE-v2 correlate at 0.925-0.977 on per-category recall and the LOAO ablation already removed IF from the deployed decision.
+
+### M1c cross-dataset generalizability — measured, and it collapses
+
+`src/evaluation/eval_cross_dataset.py`. **Random Forest only, and that is a limitation rather than a choice**: the 12 behavioral columns derive from `Source IP`/`Timestamp`, which CIC-UNSW-NB15's `Data.csv` does not carry, so IF and AE cannot be scored on the target at all. This measures the supervised member in isolation and says **nothing** about the deployed cascade's generalizability — do not report it as an ensemble result. Binary attack-vs-benign on both sides, because the two attack taxonomies do not align (DoS Hulk is not Exploits) and a multi-class mapping does not exist.
+
+**Three rows per direction, not two.** A cross-dataset score alone cannot distinguish "fails to generalize" from "the shared feature set is weaker", so each direction also trains a model on the shared columns and evaluates it in-dataset. That middle row is what makes the third interpretable.
+
+| direction | model | evaluated on | n | precision | recall | F1 | AUC | FPR |
+|---|---|---|---|---|---|---|---|---|
+| cicids→unsw | CICIDS RF, full 80f | CICIDS test | 504,160 | 0.9957 | 0.9960 | 0.9958 | 0.9998 | 0.0009 |
+| cicids→unsw | CICIDS RF, shared 76f | CICIDS test | 504,160 | 0.9944 | 0.9972 | 0.9958 | 0.9999 | 0.0011 |
+| cicids→unsw | CICIDS RF, shared 76f | **UNSW test** | 61,235 | 1.0000 | **0.0003** | **0.0006** | **0.3220** | 0.0000 |
+| unsw→cicids | UNSW RF, full 76f | UNSW test | 61,235 | 0.9283 | 0.9834 | 0.9551 | 0.9933 | 0.0274 |
+| unsw→cicids | UNSW RF, shared 76f | UNSW test | 61,235 | 0.9283 | 0.9834 | 0.9551 | 0.9933 | 0.0274 |
+| unsw→cicids | UNSW RF, shared 76f | **CICIDS test** | 504,160 | 0.1061 | **0.1229** | **0.1139** | 0.5034 | 0.2103 |
+
+**The collapse is entirely generalization, not the feature reduction.** Dropping to the shared set costs −0.0001 F1 in one direction and exactly 0.0000 in the other. Without the middle row the whole drop could have been blamed on dropping four columns; it cannot.
+
+**CICIDS→UNSW has AUC 0.3220, which is below 0.5 — the ranking is inverted.** That is stronger than failing to generalize: the model systematically scores UNSW's attack rows as *more benign* than its benign rows. Recall 0.0003 means it detects essentially nothing while its precision of 1.0000 is an artifact of firing almost never (it is a ratio over ~20 predictions). Quote recall and AUC, never that precision.
+
+**UNSW→CICIDS is differently bad**: AUC 0.5034 is indistinguishable from random, with recall 0.1229 at FPR 0.2103 — it fires on a fifth of all benign traffic. So the failure is bidirectional but not symmetric: one direction inverts, the other is noise.
+
+**The in-dataset reproduction is a control that passed**: CICIDS full-80f F1 **0.9958** matches the figure already recorded for `random_forest.pkl` exactly, confirming this pipeline measures the same thing the earlier work did.
+
+**Two incidental findings worth keeping.** `Destination Port` — the feature SHAP ranks at the top for RF and which CLAUDE.md already flags as a possibly non-transferring dataset cue — is one of the four dropped columns, and removing it costs **nothing** in-dataset. It is prominent but redundant, not load-bearing. And prevalence differs between the two test sets (UNSW 26.51% attack, CICIDS 16.89%), so precision is not comparable across directions at face value; recall, FPR and AUC are.
+
+**What this establishes.** The boundary of the single-dataset claim. These are two testbeds with different attack tooling captured years apart, and a model trained on one does not transfer to the other through shared CICFlowMeter statistics. That is a finding to report plainly, not a failed experiment — and it is the strongest available argument that in-dataset F1 near 0.9996 should not be read as a claim about deployment on new traffic.
 
 ### Fusion Layer — `confidence_weighted` is deployed; `rf_ae_or` is retired
 
