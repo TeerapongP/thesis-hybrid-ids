@@ -1,0 +1,9 @@
+{
+  "rf_seconds": 0.14377529988996685,
+  "if_seconds": 0.025382500141859055,
+  "ae_seconds": 0.09322929987683892,
+  "total_seconds": 0.2623870999086648,
+  "per_flow_latency_s": 2.0245918202829074e-05,
+  "device": "cuda",
+  "n_flows": 12960
+}

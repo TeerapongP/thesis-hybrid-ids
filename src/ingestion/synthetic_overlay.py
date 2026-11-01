@@ -35,9 +35,15 @@ TARGET_RATIO = 0.03
 SPAN_HOURS = 24
 ANCHOR = pd.Timestamp("2026-01-01T00:00:00Z")
 
-FEATURES_TEST = "data/features/behavioral/cicids2017_behavioral_features_test.parquet"
-PROCESSED_TRAIN = "data/processed/behavioral/cicids2017_behavioral_train.parquet"
-PROCESSED_TEST = "data/processed/behavioral/cicids2017_behavioral_test.parquet"
+# The unified population. The overlay has to live in the SAME feature space as the deployed
+# models or it cannot be scored at all: the 92-column behavioral space it used to target is
+# missing `Source Port` and `Protocol`, which the unified 94-column space has.
+#
+# There is no saved raw counterpart to the unified splits -- build_unified_population.py splits
+# in memory and persists only the scaled output -- so the scaler is re-derived from the same
+# source with the same seed, read-only, and then VERIFIED against the pipeline's own scaled
+# test parquet (verify_scaler below). Recovery error is ~2e-16, i.e. exact.
+UNIFIED_TEST = "data/features/unified/cicids2017_unified_test.parquet"
 MITRE_CSV = "config/mitre_mapping.csv"
 OUT_PARQUET = "data/synthetic/cicids2017_overlay.parquet"
 OUT_REPORT = "reports/synthetic_overlay_report.txt"
@@ -240,10 +246,33 @@ def load_mitre_lookup(path=MITRE_CSV):
     return m[["technique_id", "technique_name", "tactic"]].to_dict("index")
 
 
-def feature_columns(features_path=FEATURES_TEST):
-    cols = list(pd.read_parquet(features_path).columns[:92])
-    assert cols[-2:] == ["Init_Win_bytes_forward_missing", "Init_Win_bytes_backward_missing"]
+NON_FEATURE_COLS = [
+    "Label", "attack_cat", "technique_id", "technique_name", "tactic", "mapping_confidence",
+    "technique_id_encoded", "tactic_encoded", "mapping_confidence_encoded", "is_known_technique",
+    "orig_row_index",
+]
+
+
+def feature_columns(features_path=UNIFIED_TEST):
+    """The deployed models' 94 input columns, in the population's own column order.
+
+    Selected by exclusion rather than by position: the previous version took the first 92
+    columns and asserted the last two were the missing flags, which silently depended on the
+    writer's column ordering.
+    """
+    frame = pd.read_parquet(features_path)
+    cols = [c for c in frame.columns
+            if c not in NON_FEATURE_COLS and pd.api.types.is_numeric_dtype(frame[c])]
+    assert len(cols) == 94, f"expected 94 unified features, got {len(cols)}"
+    assert set(cols[-2:]) == {"Init_Win_bytes_forward_missing", "Init_Win_bytes_backward_missing"}
     return cols
+
+
+def _unified_splits():
+    """Re-derive the in-memory unified splits. Imported, not reimplemented, so the split
+    cannot drift from the one the deployed models were trained on."""
+    from src.features import build_unified_population as BUP
+    return BUP.split_population(pd.read_parquet(BUP.SOURCE))
 
 
 @dataclass(frozen=True)
@@ -257,27 +286,34 @@ class RealScaler:
         return (df[list(self.cols)].to_numpy(float) - self.lo) / self.span
 
 
-def fit_real_scaler(cols, train_path=PROCESSED_TRAIN):
+def fit_real_scaler(cols, train_df=None):
+    """Recover the pipeline's MinMaxScaler from the unified TRAIN split's raw min/max.
+
+    Fitting on train only is not a detail here: the overlay's scaled values have to land on
+    the same axis the deployed models were trained on, or every synthetic flow is scored
+    against the wrong scale.
+    """
     scaled_cols = [c for c in cols if not c.endswith("_missing")]
-    tr = pd.read_parquet(train_path, columns=scaled_cols)
-    lo, hi = tr.min().to_numpy(float), tr.max().to_numpy(float)
+    tr = _unified_splits()[0] if train_df is None else train_df
+    lo, hi = tr[scaled_cols].min().to_numpy(float), tr[scaled_cols].max().to_numpy(float)
     span = np.where(hi - lo == 0, 1.0, hi - lo)
-    return RealScaler(tuple(scaled_cols), lo, span, {c: float(tr[c].median()) for c in SENTINEL_COLS})
+    return RealScaler(tuple(scaled_cols), lo, span,
+                      {c: float(tr[c].median(skipna=True)) for c in SENTINEL_COLS})
 
 
-def verify_scaler(scaler, n=2000, test_path=PROCESSED_TEST, features_path=FEATURES_TEST):
-    """Max abs error between our scaling of raw test rows and the pipeline's own scaled rows."""
-    raw = pd.read_parquet(test_path)
-    feat = pd.read_parquet(features_path).set_index("orig_row_index")
-    raw = raw.set_index("orig_row_index")
-    ids = raw.index.intersection(feat.index)
-    ids = pd.Index(np.random.default_rng(SEED).choice(ids, min(n, len(ids)), replace=False))
-    r = raw.loc[ids]
-    r = r.copy()
+def verify_scaler(scaler, raw_test=None, features_path=UNIFIED_TEST):
+    """Max abs error between our scaling of the raw test split and the pipeline's own output.
+
+    This is what makes the re-derived scaler trustworthy rather than assumed. The join is
+    POSITIONAL, which is valid only because the unified val/test splits get no SMOTE and are
+    written in split order with the index reset -- train is resampled and would not line up.
+    """
+    r = (_unified_splits()[2] if raw_test is None else raw_test).copy()
     for c in SENTINEL_COLS:
         r[c] = r[c].fillna(scaler.medians[c])
+    ref = pd.read_parquet(features_path, columns=list(scaler.cols)).to_numpy(float)
     mine = scaler.transform(r)
-    ref = feat.loc[ids, list(scaler.cols)].to_numpy(float)
+    assert mine.shape == ref.shape, f"row counts differ: {mine.shape} vs {ref.shape}"
     return float(np.abs(mine - ref).max())
 
 
@@ -331,6 +367,11 @@ def raw_flow_columns(p, rng, n, dports):
     z = np.zeros(n)
     has_both = nb > 0
     cols = {
+        # Every profile is TCP by construction -- they all model handshake/flag behaviour --
+        # so Protocol is 6 rather than drawn. Source ports are ephemeral, which is what a
+        # client-initiated attack actually looks like on the wire.
+        "Source Port": rng.integers(32768, 61000, n).astype(float),
+        "Protocol": np.full(n, 6.0),
         "Destination Port": dports.astype(float), "Flow Duration": dur,
         "Total Fwd Packets": nf, "Total Backward Packets": nb,
         "Total Length of Fwd Packets": tf, "Total Length of Bwd Packets": tb,
@@ -485,7 +526,7 @@ def write_report(overlay, n_benign, scaler_err, path=OUT_REPORT):
     w(bar)
     w("1. INJECTION RATIO (MEASURED)")
     w(bar)
-    w(f"Benign baseline: BENIGN rows of {FEATURES_TEST} = {n_benign:,}")
+    w(f"Benign baseline: BENIGN rows of {UNIFIED_TEST} = {n_benign:,}")
     w(f"Synthetic flows injected                              = {n:,}")
     w(f"Achieved ratio = {n:,} / ({n_benign:,} + {n:,}) = {ratio:.6f} ({ratio*100:.3f}%)")
     w(f"Ceiling {MAX_RATIO*100:.0f}%: {'HELD' if ratio <= MAX_RATIO else 'VIOLATED'}; "
@@ -570,10 +611,11 @@ def write_report(overlay, n_benign, scaler_err, path=OUT_REPORT):
 def main():
     import os
     cols = feature_columns()
-    benign = pd.read_parquet(FEATURES_TEST, columns=["Label"])["Label"]
+    benign = pd.read_parquet(UNIFIED_TEST, columns=["Label"])["Label"]
     n_benign = int((benign == "BENIGN").sum())
-    scaler = fit_real_scaler(cols)
-    err = verify_scaler(scaler)
+    train_df, _, test_df = _unified_splits()
+    scaler = fit_real_scaler(cols, train_df=train_df)
+    err = verify_scaler(scaler, raw_test=test_df)
     assert err < 1e-6, f"scaler reconstruction does not match pipeline: {err}"
     overlay = generate_overlay(n_benign, scaler, cols)
     os.makedirs(os.path.dirname(OUT_PARQUET), exist_ok=True)

@@ -12,7 +12,7 @@ class SyntheticOverlayTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.cols = so.feature_columns()
-        cls.n_benign = int((pd.read_parquet(so.FEATURES_TEST, columns=["Label"])["Label"] == "BENIGN").sum())
+        cls.n_benign = int((pd.read_parquet(so.UNIFIED_TEST, columns=["Label"])["Label"] == "BENIGN").sum())
         cls.scaler = so.fit_real_scaler(cls.cols)
         cls.overlay = so.generate_overlay(cls.n_benign, cls.scaler, cls.cols)
 
@@ -43,7 +43,10 @@ class SyntheticOverlayTests(unittest.TestCase):
 
     def test_schema_matches_real_feature_columns(self):
         self.assertEqual(list(self.overlay.columns[len(so.META_COLS):]), self.cols)
-        self.assertEqual(len(self.cols), 92)
+        # 94, not 92: the overlay generates into the unified population, whose feature set
+        # adds Source Port and Protocol. Scoring it with the deployed models requires the
+        # column sets to match exactly, so this count is a real contract, not a tally.
+        self.assertEqual(len(self.cols), 94)
 
     def test_new_profile_is_added_without_touching_generation(self):
         base = so.PROFILES[0]

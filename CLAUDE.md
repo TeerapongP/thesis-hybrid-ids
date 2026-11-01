@@ -303,13 +303,31 @@ On the unified test split (n=504,193): P 0.8297 / R 0.8980 / **F1 0.8625** / FPR
 
 Rules live in a `RULES` table, one row per rule; adding a rule is adding a row, never editing control flow. **Every threshold is a percentile of the train-BENIGN distribution**, never hand-written, because the features are MinMax-scaled. Three findings worth citing, all reproduced on the unified population: the port-scan rule **R1 fires on zero attack rows** while producing 4,240 false positives, so PortScan's 0.93 recall comes from the volume rule R3 instead; the brute-force rule **R2 catches DoS Hulk and DDoS rather than the Patators it targets** (target recall 0.000 against overall recall 0.630); and the beaconing rule R5 fires on nothing at all. Two rules were recorded as **not implementable** rather than faked: distributed credential stuffing needs per-destination aggregation across source IPs (every behavioral column is per source IP), and web-exploit signatures need payload inspection that CICFlowMeter flow statistics do not carry.
 
-### Synthetic attack overlay and MTTD
+### Synthetic attack overlay and MTTD (M1b) — measured
 
-`src/ingestion/synthetic_overlay.py` writes `data/synthetic/cicids2017_overlay.parquet`: 9,895 flows = **2.9995%** of the BENIGN baseline, under the 5% ceiling (enforced in code, `ValueError` above 5%). Five classes in a `PROFILES` registry, deterministic under seed 42: brute_force 2,474, credential_stuffing 2,474, port_scan 1,979, c2_beacon 1,979, data_exfil 989. Every row carries `inject_id`, a tz-aware `inject_timestamp`, `synthetic`, `attack_class`, `campaign_id`, and `Label="SYNTHETIC"`.
+`src/ingestion/synthetic_overlay.py` now targets the **unified** population, because the 92-column behavioral space it used to generate into is missing `Source Port` and `Protocol` and so could not be scored by the deployed models at all. It writes `data/synthetic/cicids2017_overlay.parquet`: 12,960 flows = **3.0000%** of the unified test BENIGN baseline (419,045), under the 5% ceiling enforced in code. Five classes in a `PROFILES` registry, deterministic under seed 42: brute_force 3,240, credential_stuffing 3,240, c2_beacon 2,592, port_scan 2,592, data_exfil 1,296, across 228 campaigns. Every row carries `inject_id`, a tz-aware `inject_timestamp`, `synthetic`, `attack_class`, `campaign_id`, and `Label="SYNTHETIC"`.
 
-**This is what makes MTTD (M1b) measurable at all** — nothing else in the pipeline records when an attack entered the stream. `mttd_seconds(overlay, detections, per="flow"|"campaign")` computes it as first-alert-time minus `inject_timestamp`, counting undetected campaigns separately rather than averaging them away.
+There is no saved raw counterpart to the unified splits, so the generator re-derives the `MinMaxScaler` from the same source with the same seed (read-only, importing `build_unified_population.split_population` so it cannot drift) and then **verifies** it against the pipeline's own scaled test parquet. Recovery error is ~2e-16, i.e. exact. `feature_columns()` now selects the 94 by exclusion rather than taking the first 92 positionally, which silently depended on the writer's column order.
 
-**Do not read detection rates on this overlay as detection evidence.** Its distributions are hand-set from attack mechanics, not fitted to real captures. The report states per column which are genuinely modelled, which are derived, which are heuristic, and which are placeholders. The real parquet has no timestamps, so anyone merging the overlay into a replay must assign benign times; `inject_timestamp` stays authoritative.
+**MTTD is measured** by `src/evaluation/mttd_eval.py`: it scores every injected flow with the three unified models, applies `fusion_layer.fuse`, and sets `detected_at = inject_timestamp + measured per-flow scoring latency` (23 µs, measured in-run). Transport, enrichment, RAG and LLM time are excluded deliberately — none is live-verified end to end, and all sit *after* the detection decision.
+
+**The headline per-campaign MTTD is degenerate and must not be quoted.** It comes out at 0.0000 s because the first flow of all 228 campaigns is detected. The cause is identified, not guessed: a campaign's earliest flow carries an **all-zero behavioral vector** (physically correct — a source IP has no prior window activity), and the deployed rule scores those flows at a mean fused score of **8.94** against the 0.03 threshold, ~300x over. So that figure measures the generator's window initialization, not timeliness. Note the all-zero pattern is *not* itself anomalous in the real data (4.58% of real BENIGN test rows, 0.004% of attack rows), so the detection is not spurious — it is just free.
+
+**Cite the de-artifacted variant instead** (`reports/mttd_metrics_excluding_first_flow.csv`), which drops each campaign's earliest flow and asks how long the campaign then runs unseen. It discriminates, and sensibly:
+
+| attack class | campaigns | MTTD mean | median | max |
+|---|---|---|---|---|
+| port_scan | 4 | 0.00 s | 0.00 s | 0.01 s |
+| credential_stuffing | 6 | 0.14 s | 0.15 s | 0.31 s |
+| brute_force | 10 | 0.98 s | 0.53 s | 2.63 s |
+| c2_beacon | 34 | **193.27 s** | 204.15 s | 482.94 s |
+| data_exfil | 174 | **451.53 s** | 417.41 s | 888.97 s |
+
+Burst classes are caught essentially immediately; the low-and-slow classes take 3–7 minutes, which is the expected and reportable shape. No campaign went undetected in either variant.
+
+**A result about the cascade worth keeping:** **100% of alerting flows were decided by `if_ae_fallback`, zero by `random_forest`.** RF never reached confidence ≥ 0.95 on any synthetic flow, so the supervised member abstained on all of them and the unsupervised fallback carried the entire overlay. That is the fallback doing exactly the job it exists for on out-of-distribution input, and it is an argument for the cascade over RF solo that the LOAO table does not show.
+
+**Do not read detection rates on this overlay as detection evidence**, and there is now a measured reason rather than only a caveat: the overlay's behavioral columns are far weaker than real traffic's — `conn_count_1m` tops out at **0.014** against **1.0** in the real unified test split, and `uniq_dport_count_1m` at 0.32 against 1.0. The synthetic port scan is much less aggressive than a real one on exactly the features Option A added. The report also states per column which are genuinely modelled, which derived, which heuristic, which placeholder. The real parquet has no timestamps, so anyone merging the overlay into a replay must assign benign times; `inject_timestamp` stays authoritative.
 
 ### OpenCTI enrichment service
 

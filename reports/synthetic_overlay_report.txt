@@ -6,30 +6,30 @@ Seed: 42   Generator: src/ingestion/synthetic_overlay.py   Output: data/syntheti
 ======================================================================
 1. INJECTION RATIO (MEASURED)
 ======================================================================
-Benign baseline: BENIGN rows of data/features/behavioral/cicids2017_behavioral_features_test.parquet = 319,994
-Synthetic flows injected                              = 9,895
-Achieved ratio = 9,895 / (319,994 + 9,895) = 0.029995 (2.999%)
+Benign baseline: BENIGN rows of data/features/unified/cicids2017_unified_test.parquet = 419,045
+Synthetic flows injected                              = 12,960
+Achieved ratio = 12,960 / (419,045 + 12,960) = 0.030000 (3.000%)
 Ceiling 5%: HELD; generate_overlay raises ValueError above the ceiling, so a violating file cannot be written.
 
 ======================================================================
 2. PER-CLASS COUNTS
 ======================================================================
-brute_force          flows= 2,474  campaigns=  7  MITRE=T1110.001
+brute_force          flows= 3,240  campaigns= 10  MITRE=T1110.001
                      pattern: one source, one SSH target, steady jittered stream of completed handshakes
-port_scan            flows= 1,979  campaigns=  3  MITRE=T1046
+port_scan            flows= 2,592  campaigns=  4  MITRE=T1046
                      pattern: single-source burst of SYN probes across many distinct ports; closed ports answer RST
-data_exfil           flows=   989  campaigns=132  MITRE=none in config/mitre_mapping.csv
+data_exfil           flows= 1,296  campaigns=174  MITRE=none in config/mitre_mapping.csv
                      pattern: few long, upload-heavy flows from an internal host to one external endpoint, minutes apart
-c2_beacon            flows= 1,979  campaigns= 24  MITRE=T1071.001
+c2_beacon            flows= 2,592  campaigns= 34  MITRE=T1071.001
                      pattern: fixed-period check-ins with roughly 15% gaussian jitter to one external C2 host
-credential_stuffing  flows= 2,474  campaigns=  5  MITRE=T1110
+credential_stuffing  flows= 3,240  campaigns=  6  MITRE=T1110
                      pattern: bursts of short failed-login HTTP requests spread over a small proxy pool, then pauses
 
 ======================================================================
 3. TEMPORAL SPAN
 ======================================================================
 Stream window: 2026-01-01T00:00:00+00:00 for 24 h (fixed anchor, not wall clock, for reproducibility).
-First inject: 2026-01-01T00:02:59.550282+00:00   Last inject: 2026-01-01T23:59:25.265363+00:00   Span: 0 days 23:56:25.715081
+First inject: 2026-01-01T00:05:40.344767+00:00   Last inject: 2026-01-01T23:59:02.068666+00:00   Span: 0 days 23:53:21.723899
 The real parquet files carry no timestamps (stripped for privacy), so the benign baseline has no
 clock. Whoever merges the overlay into a replay assigns benign timestamps; the overlay's own
 inject_timestamp values are authoritative and must not be recomputed.
@@ -84,7 +84,7 @@ Report the mean (and median) across detected campaigns per attack_class. Campaig
 misses: count them separately; do not drop them silently or assign them an MTTD.
 Code: mttd_seconds(overlay, detections, per='flow'|'campaign'), detections = [inject_id, detected_at].
 Worked example (HYPOTHETICAL detection time, to show the arithmetic):
-  inject_id inj-c2_beacon-000514 has inject_timestamp 2026-01-01T00:02:59.550282+00:00.
-  Suppose the first alert for it is at 2026-01-01T00:03:07.050282+00:00.
-  MTTD_flow = 2026-01-01T00:03:07.050282+00:00 - 2026-01-01T00:02:59.550282+00:00 = 7.5 s.
+  inject_id inj-c2_beacon-001157 has inject_timestamp 2026-01-01T00:05:40.344767+00:00.
+  Suppose the first alert for it is at 2026-01-01T00:05:47.844767+00:00.
+  MTTD_flow = 2026-01-01T00:05:47.844767+00:00 - 2026-01-01T00:05:40.344767+00:00 = 7.5 s.
 

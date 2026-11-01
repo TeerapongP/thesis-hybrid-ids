@@ -1,0 +1,6 @@
+attack_class,n_flows,flows_detected,flow_detection_rate,n_campaigns,campaigns_detected,campaigns_undetected,mttd_campaign_mean_s,mttd_campaign_median_s,mttd_campaign_max_s,mttd_flow_mean_s
+brute_force,3240,3240,1.0,10,10,0,2.0245e-05,2.0245e-05,2.0245e-05,2.0245000000000004e-05
+c2_beacon,2592,2103,0.8113425925925926,34,34,0,2.0245e-05,2.0245e-05,2.0245e-05,2.0245e-05
+credential_stuffing,3240,205,0.06327160493827161,6,6,0,2.0245000000000004e-05,2.0245e-05,2.0245e-05,2.0245000000000004e-05
+data_exfil,1296,1296,1.0,174,174,0,2.0245e-05,2.0245e-05,2.0245e-05,2.0245000000000007e-05
+port_scan,2592,2592,1.0,4,4,0,2.0245e-05,2.0245e-05,2.0245e-05,2.0245000000000007e-05
