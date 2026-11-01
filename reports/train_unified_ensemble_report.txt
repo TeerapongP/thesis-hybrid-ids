@@ -1,0 +1,41 @@
+======================================================================
+STEP 0: load the unified population
+======================================================================
+  train 1,780,362  val 504,192  features 94  device cuda
+  all three members read these same columns; no join, no second feature set
+======================================================================
+STEP 1: Random Forest (multi-class, supervised)
+======================================================================
+  fitted in 231.5s
+  saved models/random_forest_unified.pkl
+  val  P 0.9996  R 0.9997  F1 0.9997  AUC 1.0000
+======================================================================
+STEP 2: Isolation Forest (unsupervised)
+======================================================================
+  fitted in 6.6s
+  saved models/isolation_forest_unified.pkl
+  val  P 0.5347  R 0.6034  F1 0.5670  AUC 0.8738
+======================================================================
+STEP 3: Autoencoder (unsupervised, BENIGN rows only)
+======================================================================
+  BENIGN training rows: 1,257,131
+  trained 30 epochs in 7.5s
+  threshold (p99 of internal-val BENIGN error): 0.00210879
+  val  P 0.9457  R 0.8436  F1 0.8918  AUC 0.9792
+  saved models/autoencoder_unified.pt and autoencoder_unified_config.json
+======================================================================
+STEP 4: train-fitted normalization constants for the fusion layer
+======================================================================
+  if_min: 0.3281090131
+  if_max: 0.7170432566
+  ae_min: 0.0000058904
+  ae_max: 0.0966144800
+  fit on TRAIN, never val or test: the LOAO-selected threshold only transfers on this basis
+======================================================================
+STEP 5: deployed rf_ae_or rule on val, for reference only
+======================================================================
+  thr 0.05  P 0.9789  R 1.0000  F1 0.9893  AUC 1.0000
+  thr 0.27  P 0.9986  R 0.9999  F1 0.9993  AUC 1.0000
+  thr 0.50  P 0.9995  R 0.9998  F1 0.9996  AUC 1.0000
+  these are in-dataset numbers and do not select the operating point;
+  the threshold must be re-selected by nested LOAO on this population

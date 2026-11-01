@@ -1,0 +1,60 @@
+======================================================================
+STEP 0: load the unified population
+======================================================================
+  train 1,780,362  val 504,192  features 94  classes 15
+  identical population, features and split for every candidate below
+======================================================================
+STEP 1: Random Forest (incumbent, scikit-learn, CPU only)
+======================================================================
+  loaded the already-trained model; val F1 0.9997  AUC 1.0000
+  train time is not comparable here because it was trained by another script
+======================================================================
+STEP 2: XGBoost (GPU)
+======================================================================
+  trained in 34.8s   val F1 0.9907  AUC 0.9961
+  saved models/xgboost_unified.json
+======================================================================
+STEP 3: LightGBM (CPU, optional)
+======================================================================
+  SKIPPED: lightgbm is not installed. Not an error; XGBoost already covers
+  the gradient-boosted-tree family for this comparison.
+======================================================================
+STEP 4: comparison
+======================================================================
+                      model  train_seconds  infer_seconds  precision  recall     f1  auc_roc
+RandomForest (sklearn, CPU)            NaN         5.0282     0.9996  0.9997 0.9997   1.0000
+              XGBoost (GPU)        34.8271         0.8772     0.9864  0.9950 0.9907   0.9961
+======================================================================
+STEP 5: per-category recall on val
+======================================================================
+                                n  RandomForest  XGBoost
+category                                                
+Bot                           390        0.9718   0.9308
+DDoS                        25603        1.0000   0.9986
+DoS GoldenEye                2057        0.9990   0.9922
+DoS Hulk                    34569        1.0000   0.9986
+DoS Slowhttptest             1045        0.9990   0.9943
+DoS slowloris                1077        0.9963   0.9870
+FTP-Patator                  1186        0.9992   0.9992
+Heartbleed                      2        1.0000   1.0000
+Infiltration                    7        0.5714   0.4286
+PortScan                    18139        0.9999   0.9857
+SSH-Patator                   644        1.0000   0.9829
+Web Attack - Brute Force      294        1.0000   0.9898
+Web Attack - Sql Injection      4        1.0000   0.5000
+Web Attack - XSS              131        1.0000   0.9924
+
+  recall is not interpretable for n < 100: Heartbleed, Infiltration, Web Attack - Sql Injection
+  one row changes those figures by more than any real model difference
+======================================================================
+STEP 6: how to read this
+======================================================================
+  These are IN-DATASET numbers on a split the models trained against, and
+  CICIDS-2017 saturates there: differences of a few thousandths of F1 do not
+  establish that one model is better. The metric that separates candidates in
+  this thesis is zero-day LOAO, which this script does not run.
+  Wall-clock is not a like-for-like comparison either. scikit-learn has no GPU
+  backend, so Random Forest is CPU-bound by the library, not by configuration.
+  What this run does settle is the previously unanswerable question of whether
+  an untested alternative is dramatically better on the same data. It is not a
+  reason on its own to replace Random Forest.

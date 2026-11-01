@@ -59,34 +59,34 @@ def run_relevant_changes_present():
     )
     return bool(result.stdout.strip())
 
-NFC_RF = ["Label","attack_cat","technique_id","technique_name","tactic","mapping_confidence",
-          "technique_id_encoded","tactic_encoded","mapping_confidence_encoded","is_known_technique"]
-NFC_B  = NFC_RF + ["orig_row_index"]
+# One population, one feature list, one split. This script used to read two separate test
+# matrices -- 80 features for RF, 92 for the unsupervised members -- and merge them on
+# orig_row_index, a join that reconciled only 80.36% of the rows. build_unified_population.py
+# removed the join, so there is nothing left to merge and no coverage caveat to report.
+NON_FEATURE_COLS = ["Label","attack_cat","technique_id","technique_name","tactic",
+                    "mapping_confidence","technique_id_encoded","tactic_encoded",
+                    "mapping_confidence_encoded","is_known_technique","orig_row_index"]
 numeric_feature_columns = lambda df, excluded: [
     c for c in df.columns if c not in excluded and pd.api.types.is_numeric_dtype(df[c])
 ]
 
-rf_test = pd.read_parquet(ROOT / "data/features/cicids2017_features_test.parquet")
-rf_cols = numeric_feature_columns(rf_test, NFC_RF); assert len(rf_cols)==80, len(rf_cols)
-rf = joblib.load(ROOT / "models/random_forest.pkl")
-t0=time.time(); proba = rf.predict_proba(rf_test[rf_cols].values); rf_infer_s=time.time()-t0
+test_df = pd.read_parquet(ROOT / "data/features/unified/cicids2017_unified_test.parquet")
+feature_cols = numeric_feature_columns(test_df, NON_FEATURE_COLS)
+assert len(feature_cols)==94, len(feature_cols)
+X = test_df[feature_cols].values
+Xb = X.astype(np.float32)
+rf = joblib.load(ROOT / "models/random_forest_unified.pkl")
+t0=time.time(); proba = rf.predict_proba(X); rf_infer_s=time.time()-t0
 benign_idx = list(rf.classes_).index("BENIGN")
 rf_attack_prob = 1.0 - proba[:, benign_idx]
 rf_pred_label = rf.classes_[proba.argmax(1)]
-rf_df = pd.DataFrame({"row_index": np.arange(len(rf_test)), "Label": rf_test["Label"].values,
-                      "rf_attack_probability": rf_attack_prob,
-                      "rf_pred_binary": (rf_pred_label!="BENIGN").astype(int)})
-print(f"RF inference: {rf_infer_s:.1f}s for {len(rf_test):,} rows -> {rf_infer_s/len(rf_test)*1e6:.2f} us/flow")
+print(f"RF inference: {rf_infer_s:.1f}s for {len(test_df):,} rows -> {rf_infer_s/len(test_df)*1e6:.2f} us/flow")
 
-b_test = pd.read_parquet(ROOT / "data/features/behavioral/cicids2017_behavioral_features_test.parquet")
-b_cols = numeric_feature_columns(b_test, NFC_B); assert len(b_cols)==92, len(b_cols)
-Xb = b_test[b_cols].values.astype(np.float32)
-
-iso = joblib.load(ROOT / "models/isolation_forest_behavioral_v2.pkl")
+iso = joblib.load(ROOT / "models/isolation_forest_unified.pkl")
 t0=time.time(); if_score = -iso.score_samples(Xb); if_infer_s=time.time()-t0
 print(f"IF-v2 inference: {if_infer_s:.1f}s -> {if_infer_s/len(Xb)*1e6:.2f} us/flow")
 
-ae_config_path = ROOT / "models/autoencoder_behavioral_v2_config.json"
+ae_config_path = ROOT / "models/autoencoder_unified_config.json"
 cfg = json.loads(ae_config_path.read_text(encoding="utf-8"))
 class AE(nn.Module):
     def __init__(s, d, h, b, act="relu"):
@@ -106,7 +106,7 @@ class AE(nn.Module):
 
 dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ae = AE(cfg["input_dim"], cfg["hidden_dims"], cfg["bottleneck_dim"], cfg["activation"]).to(dev)
-ae_weights_path = ROOT / "models/autoencoder_behavioral_v2.pt"
+ae_weights_path = ROOT / "models/autoencoder_unified.pt"
 ae.load_state_dict(torch.load(ae_weights_path, map_location=dev)); ae.eval()
 errs=[]; t0=time.time()
 with torch.no_grad():
@@ -116,16 +116,16 @@ with torch.no_grad():
 ae_err = np.concatenate(errs); ae_infer_s=time.time()-t0
 print(f"AE-v2 inference ({dev}): {ae_infer_s:.1f}s -> {ae_infer_s/len(Xb)*1e6:.2f} us/flow")
 
-b_df = pd.DataFrame({"orig_row_index": b_test["orig_row_index"].values,
-                     "if_anomaly_score": if_score, "ae_reconstruction_error": ae_err})
+scores = pd.DataFrame({"row_index": np.arange(len(test_df)), "Label": test_df["Label"].values,
+                       "rf_attack_probability": rf_attack_prob,
+                       "rf_pred_binary": (rf_pred_label!="BENIGN").astype(int),
+                       "if_anomaly_score": if_score, "ae_reconstruction_error": ae_err})
+print(f"\nTest population: {len(scores):,} rows, 100% of the test split (no join)")
+y = (scores["Label"]!="BENIGN").astype(int).values
 
-joined_scores = b_df.merge(rf_df, left_on="orig_row_index", right_on="row_index", validate="1:1")
-print(f"\nFused test population: {len(joined_scores):,} / RF full {len(rf_df):,} = {len(joined_scores)/len(rf_df)*100:.2f}%")
-y = (joined_scores["Label"]!="BENIGN").astype(int).values
-
-fused_score, fused_pred = FL.fuse(joined_scores["rf_attack_probability"].values, joined_scores["if_anomaly_score"].values, joined_scores["ae_reconstruction_error"].values)
-if_norm = FL.normalize_if_score(joined_scores["if_anomaly_score"].values)
-ae_norm = FL.normalize_ae_score(joined_scores["ae_reconstruction_error"].values)
+fused_score, fused_pred = FL.fuse(scores["rf_attack_probability"].values, scores["if_anomaly_score"].values, scores["ae_reconstruction_error"].values)
+if_norm = FL.normalize_if_score(scores["if_anomaly_score"].values)
+ae_norm = FL.normalize_ae_score(scores["ae_reconstruction_error"].values)
 
 def metrics_row(name, yt, yp, sc):
     return dict(model=name, precision=precision_score(yt,yp,zero_division=0), recall=recall_score(yt,yp),
@@ -133,33 +133,28 @@ def metrics_row(name, yt, yp, sc):
 
 rows=[]
 rows.append(metrics_row("Ensemble (rf_ae_or)", y, fused_pred, fused_score))
-rows.append(metrics_row("RF solo (argmax, multi-class)", y, joined_scores["rf_pred_binary"].values, joined_scores["rf_attack_probability"].values))
+rows.append(metrics_row("RF solo (argmax, multi-class)", y, scores["rf_pred_binary"].values, scores["rf_attack_probability"].values))
 AE_THR = cfg["chosen_threshold"]
-rows.append(metrics_row("AE-v2 solo (99th pct thr)", y, (joined_scores["ae_reconstruction_error"].values>AE_THR).astype(int), ae_norm))
-if_pred = iso.predict(Xb); if_pred = (if_pred==-1).astype(int)
-b_df["if_pred"]=if_pred
-joined_if_predictions = b_df[["orig_row_index","if_pred"]].merge(rf_df[["row_index"]], left_on="orig_row_index", right_on="row_index")
-rows.append(metrics_row("IF-v2 solo (contamination=0.2)", y, joined_if_predictions["if_pred"].values, if_norm))
+rows.append(metrics_row("AE-v2 solo (99th pct thr)", y, (scores["ae_reconstruction_error"].values>AE_THR).astype(int), ae_norm))
+if_pred = (iso.predict(Xb)==-1).astype(int)
+rows.append(metrics_row("IF solo (contamination=0.2)", y, if_pred, if_norm))
 res=pd.DataFrame(rows)
-print("\n=== TEST SET (CICIDS-2017), binary attack-vs-BENIGN, fused population n={:,} ===".format(len(joined_scores)))
+print("\n=== TEST SET (CICIDS-2017 unified), binary attack-vs-BENIGN, n={:,} ===".format(len(scores)))
 print(res.to_string(index=False, float_format=lambda v: f"{v:.4f}"))
-
-yf = (rf_df["Label"]!="BENIGN").astype(int).values
-print("\nRF solo on FULL test population (n={:,}): P={:.4f} R={:.4f} F1={:.4f} AUC={:.4f}".format(
-    len(rf_df), precision_score(yf, rf_df["rf_pred_binary"]), recall_score(yf, rf_df["rf_pred_binary"]),
-    f1_score(yf, rf_df["rf_pred_binary"]), roc_auc_score(yf, rf_df["rf_attack_probability"])))
+# There is no longer a "fused population vs. full population" split to report: every model
+# scores every row, so RF solo above IS RF on the full test split.
 
 from sklearn.metrics import f1_score as f1s
 print("RF multi-class macro F1 (full test): {:.4f} | weighted F1: {:.4f}".format(
-    f1s(rf_test["Label"].values, rf_pred_label, average="macro"),
-    f1s(rf_test["Label"].values, rf_pred_label, average="weighted")))
+    f1s(test_df["Label"].values, rf_pred_label, average="macro"),
+    f1s(test_df["Label"].values, rf_pred_label, average="weighted")))
 
-joined_scores["fused_pred"]=fused_pred
-per = joined_scores[joined_scores["Label"]!="BENIGN"].groupby("Label").agg(n=("Label","size"), ensemble_recall=("fused_pred","mean"))
-per["rf_recall"]=joined_scores[joined_scores["Label"]!="BENIGN"].groupby("Label")["rf_pred_binary"].mean()
+scores["fused_pred"]=fused_pred
+per = scores[scores["Label"]!="BENIGN"].groupby("Label").agg(n=("Label","size"), ensemble_recall=("fused_pred","mean"))
+per["rf_recall"]=scores[scores["Label"]!="BENIGN"].groupby("Label")["rf_pred_binary"].mean()
 print("\n=== per-category recall on TEST (ensemble vs RF solo) ===")
 print(per.sort_values("n", ascending=False).to_string(float_format=lambda v: f"{v:.4f}"))
-ben = joined_scores[joined_scores["Label"]=="BENIGN"]
+ben = scores[scores["Label"]=="BENIGN"]
 print(f"\nEnsemble FPR on test BENIGN: {ben['fused_pred'].mean():.6f}  (n={len(ben):,})")
 print(f"RF solo   FPR on test BENIGN: {ben['rf_pred_binary'].mean():.6f}")
 fusion_config_path = ROOT / "models/fusion_config.json"
@@ -188,18 +183,15 @@ provenance = {
     "fusion_source_sha256": sha256_file(Path(FL.__file__)),
     "git_head_revision": git_head_revision(),
     "run_relevant_worktree_changes_present": run_relevant_changes_present(),
-    "rf_test_data_sha256": sha256_file(ROOT / "data/features/cicids2017_features_test.parquet"),
-    "behavioral_test_data_sha256": sha256_file(
-        ROOT / "data/features/behavioral/cicids2017_behavioral_features_test.parquet"
-    ),
-    "random_forest_model_sha256": sha256_file(ROOT / "models/random_forest.pkl"),
-    "isolation_forest_model_sha256": sha256_file(ROOT / "models/isolation_forest_behavioral_v2.pkl"),
+    "test_data_sha256": sha256_file(ROOT / "data/features/unified/cicids2017_unified_test.parquet"),
+    "random_forest_model_sha256": sha256_file(ROOT / "models/random_forest_unified.pkl"),
+    "isolation_forest_model_sha256": sha256_file(ROOT / "models/isolation_forest_unified.pkl"),
     "autoencoder_weights_sha256": sha256_file(ae_weights_path),
     "ae_solo_threshold": AE_THR,
-    "rf_test_rows": len(rf_test),
-    "fused_test_rows": len(joined_scores),
+    "test_rows": len(test_df),
+    "fused_test_rows": len(scores),
     "rf_feature_count": len(rf_cols),
-    "behavioral_feature_count": len(b_cols),
+    "feature_count": len(feature_cols),
 }
 for key, value in provenance.items():
     res[key] = value
@@ -219,15 +211,14 @@ report_sections = [
     f"Fusion source SHA-256: {provenance['fusion_source_sha256']}",
     f"Git HEAD revision: {provenance['git_head_revision']}",
     f"Run-relevant working tree changes present: {provenance['run_relevant_worktree_changes_present']}",
-    f"RF test data SHA-256: {provenance['rf_test_data_sha256']}",
-    f"Behavioral test data SHA-256: {provenance['behavioral_test_data_sha256']}",
+    f"Test data SHA-256: {provenance['test_data_sha256']}",
     f"Random Forest model SHA-256: {provenance['random_forest_model_sha256']}",
     f"Isolation Forest model SHA-256: {provenance['isolation_forest_model_sha256']}",
     f"Autoencoder weights SHA-256: {provenance['autoencoder_weights_sha256']}",
-    f"RF full test rows: {len(rf_test)}",
-    f"Fused joined test rows: {len(joined_scores)}",
+    f"Test rows (all models): {len(test_df)}",
+    f"Fused joined test rows: {len(scores)}",
     f"RF feature count: {len(rf_cols)}",
-    f"Behavioral feature count: {len(b_cols)}",
+    f"Feature count: {len(feature_cols)}",
     "",
     "Aggregate model metrics",
     res.drop(columns=list(provenance)).to_string(index=False, float_format=lambda value: f"{value:.6f}"),
@@ -237,7 +228,7 @@ report_sections = [
     "",
     f"Ensemble false-positive rate on test BENIGN: {ben['fused_pred'].mean():.6f} (n={len(ben)})",
     f"RF false-positive rate on test BENIGN: {ben['rf_pred_binary'].mean():.6f}",
-    f"RF full-population rows: {len(rf_df)}",
+    f"Test rows: {len(scores)}",
 ]
 with open_artifact_outputs_exclusively(artifact_paths) as outputs:
     res.to_csv(outputs["metrics"], index=False)

@@ -1,0 +1,80 @@
+==========================================================================
+unified-population LOAO: component models, train-fold normalization
+==========================================================================
+  device cuda   signature e7d65c9e9b16cc84
+  checkpoints  E:\thesis\reports\fusion_layer_loao_unified_checkpoints\e7d65c9e9b16cc84
+  fused metrics are NOT computed here; run fusion_or_sweep.py for nested selection
+
+[1/10] DoS Hulk
+    RF   recall 0.4682  fpr 0.0001   (322s, 2,227,644 rows after capped SMOTE)
+    IF   recall 0.9858  fpr 0.1488
+    AE   recall 0.9634  fpr 0.0096   (threshold 0.00118778)
+
+[2/10] PortScan
+    RF   recall 0.0000  fpr 0.0001   (317s, 2,309,796 rows after capped SMOTE)
+    IF   recall 0.0201  fpr 0.0920
+    AE   recall 0.7853  fpr 0.0094   (threshold 0.00127813)
+
+[3/10] DDoS
+    RF   recall 0.9466  fpr 0.0001   (323s, 2,272,476 rows after capped SMOTE)
+    IF   recall 0.6826  fpr 0.1240
+    AE   recall 0.9487  fpr 0.0097   (threshold 0.00223303)
+
+[4/10] DoS GoldenEye
+    RF   recall 0.2465  fpr 0.0001   (302s, 2,350,490 rows after capped SMOTE)
+    IF   recall 0.4755  fpr 0.1078
+    AE   recall 0.3186  fpr 0.0096   (threshold 0.00156858)
+
+[5/10] FTP-Patator
+    RF   recall 0.3170  fpr 0.0001   (300s, 2,350,490 rows after capped SMOTE)
+    IF   recall 0.0002  fpr 0.1039
+    AE   recall 0.0005  fpr 0.0096   (threshold 0.00192897)
+
+[6/10] SSH-Patator
+    RF   recall 0.0665  fpr 0.0001   (301s, 2,350,490 rows after capped SMOTE)
+    IF   recall 0.0081  fpr 0.1048
+    AE   recall 0.0009  fpr 0.0097   (threshold 0.00202509)
+
+[7/10] DoS slowloris
+    RF   recall 0.2243  fpr 0.0001   (296s, 2,350,490 rows after capped SMOTE)
+    IF   recall 0.5952  fpr 0.1065
+    AE   recall 0.5883  fpr 0.0097   (threshold 0.00156855)
+
+[8/10] DoS Slowhttptest
+    RF   recall 0.0549  fpr 0.0001   (304s, 2,350,490 rows after capped SMOTE)
+    IF   recall 0.8391  fpr 0.1075
+    AE   recall 0.2414  fpr 0.0099   (threshold 0.00176557)
+
+[9/10] Bot
+    RF   recall 0.0000  fpr 0.0000   (315s, 2,361,530 rows after capped SMOTE)
+    IF   recall 0.0226  fpr 0.1084
+    AE   recall 0.0200  fpr 0.0096   (threshold 0.00179065)
+
+[10/10] Web Attack - Brute Force
+    RF   recall 0.9109  fpr 0.0001   (324s, 2,371,090 rows after capped SMOTE)
+    IF   recall 0.0503  fpr 0.1035
+    AE   recall 0.0000  fpr 0.0096   (threshold 0.00148423)
+==========================================================================
+per-category component results
+==========================================================================
+                category  n_attack_rows  rf_recall  if_recall  ae_recall  rf_fpr  if_fpr  ae_fpr
+                DoS Hulk         172846     0.4682     0.9858     0.9634  0.0001  0.1488  0.0096
+                PortScan          90694     0.0000     0.0201     0.7853  0.0001  0.0920  0.0094
+                    DDoS         128014     0.9466     0.6826     0.9487  0.0001  0.1240  0.0097
+           DoS GoldenEye          10286     0.2465     0.4755     0.3186  0.0001  0.1078  0.0096
+             FTP-Patator           5931     0.3170     0.0002     0.0005  0.0001  0.1039  0.0096
+             SSH-Patator           3219     0.0665     0.0081     0.0009  0.0001  0.1048  0.0097
+           DoS slowloris           5385     0.2243     0.5952     0.5883  0.0001  0.1065  0.0097
+        DoS Slowhttptest           5228     0.0549     0.8391     0.2414  0.0001  0.1075  0.0099
+                     Bot           1948     0.0000     0.0226     0.0200  0.0000  0.1084  0.0096
+Web Attack - Brute Force           1470     0.9109     0.0503     0.0000  0.0001  0.1035  0.0096
+==========================================================================
+how to read this
+==========================================================================
+  Recall is not comparable across rows at face value: each zero-day fold keeps that
+  category's natural prevalence, which ranges from about 29% attack rows down to
+  0.35%. Report per category, never as an unweighted mean.
+  These are component numbers. No fusion rule has been applied and no threshold has
+  been selected, because selecting one on these same folds and then reporting them
+  is the error that made the retired cascade look competitive.
+  Next: python -m src.evaluation.fusion_or_sweep --checkpoint-dir fusion_layer_loao_unified_checkpoints

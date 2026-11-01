@@ -1,0 +1,9 @@
+{
+  "if_min": 0.32810901309066537,
+  "if_max": 0.71704325655017,
+  "ae_min": 5.890430657018442e-06,
+  "ae_max": 0.09661448001861572,
+  "fit_population": "data/features/unified/cicids2017_unified_train.parquet",
+  "fit_rows": 1780362,
+  "feature_count": 94
+}

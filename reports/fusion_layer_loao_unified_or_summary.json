@@ -1,0 +1,32 @@
+{
+  "source_signature": "e7d65c9e9b16cc84",
+  "normalization": "train_fold_fitted",
+  "pooled_rows": 4615461,
+  "nested_pooled_f1": {
+    "fusion: confidence_weighted": 0.9781557688357229,
+    "OR: RF or AE (2 thresholds)": 0.974475776864385,
+    "RF solo": 0.9736588837384803,
+    "OR: max(RF, AE)": 0.9723792609896554,
+    "AND: RF and AE": 0.950354802416012,
+    "AE-v2 solo": 0.8736291916190245,
+    "IF-v2 solo": 0.4370599978984974
+  },
+  "nested_pooled_recall": {
+    "fusion: confidence_weighted": 0.9634841572534063,
+    "OR: RF or AE (2 thresholds)": 0.9608372292192621,
+    "RF solo": 0.959263189348291,
+    "OR: max(RF, AE)": 0.9558633573399903,
+    "AND: RF and AE": 0.9062493382679915,
+    "AE-v2 solo": 0.8175901896612168,
+    "IF-v2 solo": 0.450182461572487
+  },
+  "nested_pooled_fpr": {
+    "fusion: confidence_weighted": 0.0006610284361546759,
+    "OR: RF or AE (2 thresholds)": 0.0011330552400225275,
+    "RF solo": 0.0011325779631733183,
+    "OR: max(RF, AE)": 0.0010311566327163735,
+    "AND: RF and AE": 9.450081614341215e-05,
+    "AE-v2 solo": 0.00548916104275446,
+    "IF-v2 solo": 0.06185651148805376
+  }
+}

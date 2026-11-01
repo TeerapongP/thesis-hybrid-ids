@@ -30,6 +30,7 @@ Selection protocols, same as the sibling sweep script:
 Run from the repo root:  python -m src.evaluation.fusion_or_sweep
 """
 
+import argparse
 import json
 import os
 from pathlib import Path
@@ -41,9 +42,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
 REPORTS_DIR = ROOT / "reports"
-CHECKPOINT_DIR = REPORTS_DIR / "fusion_layer_loao_trainnorm_checkpoints"
-OUT_CSV = REPORTS_DIR / "fusion_layer_loao_trainnorm_or_comparison.csv"
-OUT_JSON = REPORTS_DIR / "fusion_layer_loao_trainnorm_or_summary.json"
+DEFAULT_CHECKPOINT_DIR = REPORTS_DIR / "fusion_layer_loao_trainnorm_checkpoints"
 
 CATEGORIES = [
     "DoS Hulk", "PortScan", "DDoS", "DoS GoldenEye", "FTP-Patator", "SSH-Patator",
@@ -86,6 +85,10 @@ def pred_ae(d, p):
     return (d["ae"] > p[0]).astype(int)
 
 
+def pred_if(d, p):
+    return (d["if_"] > p[0]).astype(int)
+
+
 def pred_maxor(d, p):
     return (np.maximum(d["rf"], d["ae"]) > p[0]).astype(int)
 
@@ -107,6 +110,7 @@ def pred_cascade(d, p):
 CANDIDATES = {
     "RF solo":                     (pred_rf,      [GRID_1D]),
     "AE-v2 solo":                  (pred_ae,      [GRID_1D]),
+    "IF-v2 solo":                  (pred_if,      [GRID_1D]),
     "fusion: confidence_weighted": (pred_cascade, [CONF_GRID, GRID_1D]),
     "OR: max(RF, AE)":             (pred_maxor,   [GRID_1D]),
     "OR: RF or AE (2 thresholds)": (pred_or2,     [GRID_2D, GRID_2D]),
@@ -132,7 +136,7 @@ def best_params(d, fn, grids):
     return best[1]
 
 
-def load_scores():
+def load_scores(CHECKPOINT_DIR):
     if not CHECKPOINT_DIR.exists():
         raise SystemExit(f"no checkpoint dir: {CHECKPOINT_DIR}")
     for dirpath in sorted((p for p in CHECKPOINT_DIR.iterdir() if p.is_dir()),
@@ -160,8 +164,26 @@ def subset(pooled, mask):
     }
 
 
+def parse_args():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--checkpoint-dir", default=str(DEFAULT_CHECKPOINT_DIR),
+                    help="directory of per-fold *_scores.parquet checkpoints; a bare name is "
+                         "resolved under reports/")
+    ap.add_argument("--out-prefix", default=None,
+                    help="basename for the output CSV/JSON; defaults to the checkpoint "
+                         "directory name with _or_comparison/_or_summary appended")
+    return ap.parse_args()
+
+
 def main():
-    pooled, signature = load_scores()
+    args = parse_args()
+    ckpt = Path(args.checkpoint_dir)
+    if not ckpt.is_absolute() and not ckpt.exists():
+        ckpt = REPORTS_DIR / args.checkpoint_dir
+    prefix = args.out_prefix or ckpt.name.replace("_checkpoints", "")
+    OUT_CSV = REPORTS_DIR / f"{prefix}_or_comparison.csv"
+    OUT_JSON = REPORTS_DIR / f"{prefix}_or_summary.json"
+    pooled, signature = load_scores(ckpt)
     cat_arr = pooled["category"].to_numpy()
     all_mask = np.ones(len(pooled), dtype=bool)
     d_all = subset(pooled, all_mask)
@@ -200,10 +222,11 @@ def main():
 
     header = [
         "# RF+AE decision-level OR vs. the deployed cascade and the solo baselines.",
-        "# Scores: TRAIN-FOLD-NORMALIZED LOAO checkpoints (no retraining; see",
-        "# src/evaluation/fusion_loao_trainnorm.py). IF-v2 is used only inside the cascade's",
-        "# fallback -- it is not an OR member (LOAO FPR ~0.095 makes it unusable as an",
-        "# independent trigger).",
+        "# Scores: TRAIN-FOLD-NORMALIZED LOAO checkpoints, read back without retraining.",
+        f"# Source checkpoint directory: {ckpt}",
+        "# IF-v2 is reported solo and used inside the cascade's fallback, but is not an OR",
+        "# member: its LOAO FPR is roughly 10x the other two, so ORing it in buys recall at a",
+        "# false-positive cost a SOC cannot absorb.",
         f"# Source checkpoint signature: {signature}",
         f"# Pooled rows: {len(pooled)}  attack rows: {int(pooled['y_true'].sum())}",
         "# 'nested' = thresholds selected on the other 9 categories; cite these, not tuned-on-all.",

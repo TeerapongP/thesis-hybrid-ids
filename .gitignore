@@ -28,5 +28,20 @@ skills-lock.json
 # 483 MB and was removed from history on 2026-10-24 so this branch could be pushed at all.
 # Regenerate it by running notebooks/02_random_forest.ipynb; models/fusion_config.json and
 # reports/random_forest_*.csv carry the hyperparameters and the metrics it must reproduce.
+# models/random_forest_unified.pkl is 108 MB and excluded for the same reason; regenerate it
+# with `python -m src.modeling.train_unified_ensemble`, whose reports/unified_val_metrics.csv
+# and reports/unified_norm_constants.json carry the metrics and constants it must reproduce.
 # Every other models/* artifact is small and stays tracked.
 models/random_forest.pkl
+models/random_forest_unified.pkl
+
+# Per-fold LOAO score checkpoints. These exist so thresholds can be re-swept without
+# retraining ten folds, and they are large (114 MB for the unified run alone) and fully
+# regenerable from the scripts that wrote them. The summary CSVs next to them are the
+# actual results and stay tracked.
+reports/fusion_layer_loao_trainnorm_checkpoints/
+reports/fusion_layer_loao_unified_checkpoints/
+reports/fusion_loao_calibrated_checkpoints/
+reports/loao_behavioral_checkpoints/
+reports/loao_behavioral_v2_checkpoints/
+reports/fusion_layer_loao_checkpoints/
