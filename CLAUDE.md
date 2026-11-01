@@ -295,11 +295,13 @@ Faithfulness gap (`base + sum(shap)` vs the member's own score) is 1.1e-12 for R
 
 ### Rule-based SIEM baseline
 
-`src/evaluation/siem_baseline.py` gives the 4-way ablation its missing floor. Overall on the test split: P 0.8624 / R 0.8962 / **F1 0.8790** / FPR 0.0380, against the hybrid's F1 0.9865 / FPR 0.0073.
+`src/evaluation/siem_baseline.py` gives the 4-way ablation its missing floor. It now reads the **unified** population, so it is scored on the same test split as the ensemble it is compared against — it previously read the behavioral population while the ensemble had moved to the unified one, which made the headline comparison two different test sets reported as one.
 
-**The aggregate is misleading and must be reported per-category.** It is carried almost entirely by DDoS 0.987, DoS Hulk 0.983 and PortScan 0.930, while **7 of 14 categories score exactly 0.000** (Bot, FTP-/SSH-Patator, all three Web Attack types, Heartbleed).
+On the unified test split (n=504,193): P 0.8297 / R 0.8980 / **F1 0.8625** / FPR 0.0375. On the same split the deployed cascade reaches F1 0.9966 (FPR 0.000983) and Random Forest alone F1 0.9995 (FPR 0.000093).
 
-Rules live in a `RULES` table, one row per rule; adding a rule is adding a row, never editing control flow. **Every threshold is a percentile of the train-BENIGN distribution**, never hand-written, because the features are MinMax-scaled. Two findings worth citing: the port-scan rule R1 fires on **zero** attack rows while producing 3,065 false positives, so PortScan's 0.93 recall comes from the volume rule instead; and the brute-force rule R2 catches DoS Hulk/DDoS rather than the Patators it targets. Two rules were recorded as **not implementable** rather than faked: distributed credential stuffing needs per-destination aggregation across source IPs (every behavioral column is per source IP), and web-exploit signatures need payload inspection that CICFlowMeter flow statistics do not carry.
+**The aggregate is misleading and must be reported per-category.** It is carried almost entirely by DDoS 0.988, DoS Hulk 0.983 and PortScan 0.933, while **8 of 14 categories score exactly 0.000** (Bot, FTP-/SSH-Patator, all three Web Attack types, Heartbleed, Infiltration) and two more are within rounding of it (DoS slowloris 0.006, DoS Slowhttptest 0.007). DoS GoldenEye manages 0.130.
+
+Rules live in a `RULES` table, one row per rule; adding a rule is adding a row, never editing control flow. **Every threshold is a percentile of the train-BENIGN distribution**, never hand-written, because the features are MinMax-scaled. Three findings worth citing, all reproduced on the unified population: the port-scan rule **R1 fires on zero attack rows** while producing 4,240 false positives, so PortScan's 0.93 recall comes from the volume rule R3 instead; the brute-force rule **R2 catches DoS Hulk and DDoS rather than the Patators it targets** (target recall 0.000 against overall recall 0.630); and the beaconing rule R5 fires on nothing at all. Two rules were recorded as **not implementable** rather than faked: distributed credential stuffing needs per-destination aggregation across source IPs (every behavioral column is per source IP), and web-exploit signatures need payload inspection that CICFlowMeter flow statistics do not carry.
 
 ### Synthetic attack overlay and MTTD
 

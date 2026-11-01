@@ -18,8 +18,12 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
-TRAIN_PATH = ROOT / "data/features/behavioral/cicids2017_behavioral_features_train.parquet"
-TEST_PATH = ROOT / "data/features/behavioral/cicids2017_behavioral_features_test.parquet"
+# The unified population, so this arm of the ablation is scored on the SAME test split as
+# the ensemble it is compared against. It previously read the behavioral population while
+# the ensemble moved to the unified one, which made the headline comparison two different
+# test sets reported as if they were one.
+TRAIN_PATH = ROOT / "data/features/unified/cicids2017_unified_train.parquet"
+TEST_PATH = ROOT / "data/features/unified/cicids2017_unified_test.parquet"
 MITRE_PATH = ROOT / "config/mitre_mapping.csv"
 METRICS_PATH = ROOT / "reports/siem_baseline_metrics.csv"
 REPORT_PATH = ROOT / "reports/siem_baseline_report.txt"
@@ -156,7 +160,7 @@ def write_outputs(test, thresholds, hits, y_true, techniques, rules=RULES):
         cat_rule.to_csv(f, index=False)
 
     bar = "=" * 70
-    L = [bar, "RULE-BASED SIEM BASELINE (CICIDS-2017, behavioral test split)", bar,
+    L = [bar, "RULE-BASED SIEM BASELINE (CICIDS-2017, unified test split)", bar,
          "Command: python -m src.evaluation.siem_baseline", "",
          bar, "1. SCOPE", bar,
          f"Test rows: {len(test):,} ({int(y_true.sum()):,} attack, {int((~y_true).sum()):,} BENIGN).",
@@ -166,7 +170,7 @@ def write_outputs(test, thresholds, hits, y_true, techniques, rules=RULES):
          bar, "2. THRESHOLD DERIVATION", bar,
          "Features in the parquet are MinMax-scaled to the train split, so raw packet-count thresholds are",
          "meaningless. Every threshold is a percentile of that column over BENIGN rows of",
-         "cicids2017_behavioral_features_train.parquet, computed by derive_thresholds(train). Nothing is",
+         "cicids2017_unified_train.parquet, computed by derive_thresholds(train). Nothing is",
          "read from the test split except to score it. Percentiles are a-priori analyst choices (p99 for",
          "abnormally high, p25 for abnormally low rate), not searched.", ""]
     for r in implementable(rules):
@@ -175,7 +179,10 @@ def write_outputs(test, thresholds, hits, y_true, techniques, rules=RULES):
     L += ["", bar, "3. OVERALL (combined SIEM)", bar,
           f"precision {overall['precision']:.4f}  recall {overall['recall']:.4f}  F1 {overall['f1']:.4f}  FPR {overall['fpr']:.4f}",
           f"TP {overall['tp']:,}  FP {overall['fp']:,}  FN {overall['fn']:,}  TN {overall['tn']:,}",
-          "Reference: the ML ensemble reaches F1 0.9865 on this same test split.", "",
+          "Reference: on this SAME test split the deployed confidence_weighted ensemble reaches F1 0.9966",
+          "(FPR 0.000983) and Random Forest alone reaches F1 0.9995 (FPR 0.000093) -- see",
+          "src/evaluation/eval_test_set_ensemble.py. Both are far above this baseline, but note that",
+          "the aggregate below is carried by a few high-volume categories; compare per category.", "",
           bar, "4. PER RULE", bar, rule_df.to_string(index=False, float_format=lambda v: f"{v:.4f}"), "",
           bar, "5. PER-CATEGORY RECALL (combined SIEM, all 14 attack categories)", bar,
           cat.to_string(index=False, float_format=lambda v: f"{v:.4f}"), "",
