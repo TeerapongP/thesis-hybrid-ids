@@ -77,15 +77,39 @@ class LlmLayerTests(unittest.TestCase):
         self.assertEqual(result["remediation"], ["ตรวจสอบเหตุการณ์"])
         self.assertNotIn("priority", LlmDraft.model_json_schema()["properties"])
 
-    def test_few_shots_share_no_entities_with_fixtures(self):
+    def test_few_shot_templates_carry_no_real_entities(self):
+        """The TEMPLATES must stay entity-free; realistic values there were copied into outputs."""
         keys = ("source_ip", "dst_ip", "dst_port", "affected_asset", "technique_id")
         fixture_values = set()
         for path in FIXTURES.glob("alert_context_*.json"):
             alert = json.loads(path.read_text(encoding="utf-8"))
             alert["technique_id"] = (alert.get("rag_top_chunk") or {}).get("technique_id")
             fixture_values |= {alert.get(k) for k in keys}
-        shot_values = {shot["input"].get(k) for shot in llm_explain.FEW_SHOTS for k in keys}
+        shot_values = {shot["input"].get(k) for shot in llm_explain.FEW_SHOT_TEMPLATES for k in keys}
         self.assertEqual((fixture_values & shot_values) - {None}, set())
+
+    def test_rendered_few_shots_carry_this_alerts_values_and_no_placeholders(self):
+        """Rendering is the root fix for the leak: the model copied {{SRC_IP}} literally on
+        100% of alerts, so there must be no placeholder left in what reaches the prompt."""
+        facts = {
+            "alert_context": {"source_ip": "10.0.0.7", "dst_ip": "10.0.0.9", "dst_port": 445,
+                              "rf_predicted_label": "PortScan"},
+            "confidence": 0.93, "technique_id": "T1046", "mitre_tactic": "Discovery",
+        }
+        rendered = llm_explain.render_few_shots(facts)
+        blob = json.dumps(rendered, ensure_ascii=False)
+        self.assertNotIn("{{", blob)
+        for token in ("10.0.0.7", "445", "T1046"):
+            self.assertIn(token, blob)
+        # the templates themselves must be untouched, so the next alert renders cleanly
+        self.assertIn("{{SRC_IP}}", json.dumps(llm_explain.FEW_SHOT_TEMPLATES, ensure_ascii=False))
+
+    def test_rendered_few_shots_tolerate_missing_context(self):
+        """A missing field must render as Thai text, not an empty string that reads as truncated."""
+        rendered = llm_explain.render_few_shots({"alert_context": {}})
+        blob = json.dumps(rendered, ensure_ascii=False)
+        self.assertNotIn("{{", blob)
+        self.assertNotIn('""', blob)
 
     def test_remediation_is_deduplicated_and_capped(self):
         from src.llm.langchain_client import MAX_REMEDIATION, LlmDraft

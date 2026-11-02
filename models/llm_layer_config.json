@@ -77,12 +77,10 @@
   },
   "quality_verified": false,
   "quality_issues": [
-    "Entity omission, not fabrication, is the dominant failure: strict entity preservation is 28/100 because the model leaves out a required IP or port, while 68/100 outputs are free of any foreign or altered entity. Roughly 72 of the 100 strict failures are omissions.",
-    "Few-shot entity copying occurred in 30/100 alerts (172.16.33.9, LMS-WEB03, DNS-INT02, 100.64.7.18); one alert was a near-verbatim copy of example 1. A two-layer control was added afterwards, see `few_shot_leak_control`. The re-measurement is not complete, so treat 30/100 as the last measured value, not the current one.",
-    "PortScan remediation suggests a WAF block in 5/7 PortScan alerts. The earlier claim that this happens 'for SMB traffic' is NOT supported: none of the 7 PortScan alerts had dst_port 139 or 445. WAF advice on a non-web port with a non-web label occurs in 8/100.",
-    "SSH-Patator explanations never state that the RAG evidence was insufficient: 0/7, although all 7 abstained so the prompt did require it. Across all 47 abstaining alerts it is stated in only 11.",
-    "The model names a technique id in its prose that was never retrieved in 7/100 alerts. The 53/53 `technique_in_hits` rate is true by construction (the draft schema has no technique field) and is a regression guard, not a measurement of the model.",
-    "87 of 399 claims are Thai prose or generic advice with no checkable entity and remain undecidable mechanically. Whether they are true needs human raters."
+    "UNRESOLVED, highest priority: 60/100 explanations echo a rendered few-shot example (>=0.80 difflib similarity) and 51/100 are verbatim. Mean similarity 0.8102, max 1.0000.",
+    "Concrete downstream harm of that echoing, counted: 12/100 explanations are self-contradictory about confidence, e.g. 'ความมั่นใจต่ำ (1.00)' -- the example's 'low confidence' wording reused while the real value 1.00 is substituted in. An analyst reading that is actively misled, so this is a factual defect and not a style complaint.",
+    "Candidate fixes NOT yet tried, deliberately: dropping to a single example, removing examples entirely (the JSON schema is enforced by with_structured_output, so format compliance does not depend on them), or making the examples describe reasoning shape without full sentences. Each needs a fresh 100-alert run to evaluate; tuning against this same run would be fitting to the data being reported.",
+    "Thai-language qualitative review by a human reader is still not done. M2 measures mechanical faithfulness (entities present and correct, techniques grounded); whether the Thai prose is actually useful to an analyst is a judgement no script here makes."
   ],
   "remediation_limit": "1-5 unique items: JSON schema maxItems plus a dedupe-and-truncate validator on LlmDraft",
   "repeat_penalty": 1.15,
@@ -115,47 +113,37 @@
     "status": "provisional: chosen to match the five tests/fixtures expectations, not tuned on data or validated with analysts"
   },
   "m2_measurement": {
-    "status": "measured once on 100 alerts; re-measurement after the few-shot fix is in flight",
+    "status": "measured on 100 alerts on the UNIFIED population (the deployed pipeline)",
+    "date": "2026-11-02",
     "script": "src/evaluation/eval_llm_faithfulness.py",
-    "evidence": "reports/llm_faithfulness_raw.jsonl (one line per alert; every rate below is recomputable from it by hand)",
-    "pre_fix_reports": [
-      "reports/llm_faithfulness_raw.before_fewshot_fix.jsonl",
-      "reports/llm_faithfulness_metrics.before_fewshot_fix.csv",
-      "reports/llm_faithfulness_report.before_fewshot_fix.txt"
-    ],
+    "evidence": "reports/llm_faithfulness_raw.jsonl (one line per alert; every rate is recomputable from it)",
     "sample": "100 alerts, seed 42, stratified over 14 CICIDS-2017 attack categories (capped at 7 each so DoS Hulk and DDoS cannot dominate) plus 10 BENIGN. Per-category rates rest on 2-7 alerts and are descriptive only, not natural-traffic rates.",
-    "pipeline": "real deployed path per alert: RF + IF-v2 + AE-v2 scores, then fuse_with_metadata, then RagRetriever.retrieve(top_k=3) queried with the RF predicted label, then the LLM. The true label is never shown to the model.",
-    "rates_before_fewshot_fix": {
-      "entity_preservation_strict": "28/100",
-      "entity_corruption_free": "68/100",
-      "few_shot_entity_leak": "30/100",
-      "prose_technique_hallucination": "7/100",
-      "abstention": "47/100",
-      "claims_total": 399,
-      "claims_supported": 174,
-      "claims_undecidable": 87,
-      "claims_unsupported": 108,
-      "claims_contradicted": 30,
-      "hallucination_rate_lower_bound": "138/399 = 0.346",
-      "hallucination_rate_among_decidable": "138/312 = 0.442",
-      "alerts_with_at_least_one_bad_claim": "55/100",
-      "llm_call_success": "100/100"
+    "pipeline": "the real deployed path per alert: the three *_unified models on one 94-feature population, fuse_with_metadata (confidence_weighted cascade), RagRetriever.retrieve(top_k=3) queried with the RF predicted label, then llm_explain.explain_alert.",
+    "results": {
+      "produced_output": "100/100",
+      "entity_pass_strict": "98/100",
+      "entity_complete": "100/100",
+      "entity_corruption_free": "98/100",
+      "hallucination_lower_bound": "0.0191 (8/419 claims)",
+      "hallucination_among_decidable": "0.0198 (8/404)",
+      "undecidable_share": "0.0358 (15/419)",
+      "waf_nonweb_context": "0/100",
+      "example_echo_alerts_ge_0.80": "60/100",
+      "example_echo_verbatim_ge_0.999": "51/100",
+      "example_echo_ratio_mean": 0.8102,
+      "example_echo_ratio_max": 1.0,
+      "gen_speed": "~60-67 tok/s on the RTX 3070, ~5.8 s/alert, no corrective retries needed"
     },
-    "throughput": "61.4 tok/s pooled (median 60.4, range 52.0-70.8); 6.04 s mean wall time per alert; 2,192 token mean prompt; about 606 s for the run",
-    "not_measured": [
-      "Whether the 87 undecidable claims are true. Needs human raters.",
-      "Whether 'supported' claims are true as whole sentences. Only their entities and terms are grounded.",
-      "Semantic errors with no lexical trigger; remediation quality or safety.",
-      "Hostname preservation on real data: CICIDS-2017 has no hostnames, so affected_asset falls back to dst_ip and the hostname check is unit-tested only.",
-      "Run-to-run variance (one draw per alert), human-vs-rule agreement, live PA-5220 alerts."
-    ],
-    "no_llm_judge": "No LLM was used to grade another LLM's output. Every rate above is either an exact string check or an explicitly-labelled lexical approximation.",
-    "thesis_criteria": "Both H2 criteria fail by a wide margin: hallucination 0.346 against a <=0.10 target, strict entity preservation 0.28 against a 1.00 target. This is not a tuning gap."
+    "supersedes": "the earlier 100-alert run, which scored random_forest.pkl (80 features) plus the behavioral_v2 IF/AE (92 features) reconciled by a row-hash join, and recorded model_used as 'autoencoder_v2' -- a value fusion_layer no longer emits. Those figures described a pipeline that is not deployed and must not be cited. Preserved as reports/llm_faithfulness_*.before_fewshot_fix.*"
   },
   "few_shot_leak_control": {
-    "problem": "The prompt had instructed the model not to copy from EXAMPLES since before the measurement, and it copied anyway in 30/100 alerts. An instruction that has already failed is not a control.",
-    "layer_1": "FEW_SHOTS now carry placeholders ({{SRC_IP}}, {{ASSET}}, {{DST_PORT}}, {{TECHNIQUE_ID}}, ...) instead of realistic values. Two earlier attempts only swapped one realistic set for another, so there was still something plausible to copy.",
-    "layer_2": "llm_explain._assert_no_foreign_entities rejects any output containing an IPv4, hostname-shaped token, or Txxxx id that is absent from FACTS. One corrective retry, then ValueError. It fails loudly on purpose: an explanation naming the wrong host sends an analyst to the wrong machine, which is worse than no explanation.",
-    "detection_is_shape_based": "find_foreign_entities matches token shape, not a blocklist of the current example values, so the check keeps working when the examples change."
+    "problem_history": [
+      "Realistic example values were copied into outputs in 30/100 alerts, one near-verbatim.",
+      "Replacing them with {{...}} placeholders was meant to leave nothing plausible to copy. The model copied the placeholders themselves, so the entity guard rejected 100% of alerts: a total outage, worse than the leak. An instruction telling the model not to copy had already failed, and an instruction that has already failed is not a control."
+    ],
+    "root_fix": "llm_explain.render_few_shots substitutes each placeholder with THIS alert's own values before the examples reach the prompt. There is no generic token left to copy, so a copied value is the correct value for that alert, and the example still demonstrates that entities must be named rather than omitted.",
+    "guard_retained": "llm_explain._assert_no_foreign_entities still rejects any IPv4, hostname-shaped token or Txxxx id absent from FACTS, with one corrective retry then ValueError. It fails loudly on purpose: an explanation naming the wrong host sends an analyst to the wrong machine.",
+    "effect_measured": "entity_pass 28/100 -> 98/100; entity omission eliminated (entity_complete 100/100).",
+    "cost_measured": "the risk it traded into is template echoing, and it is large: 60/100 explanations are >=0.80 similar to a rendered example and 51/100 are verbatim copies. This is measured by the example_echo metric rather than assumed away."
   }
 }

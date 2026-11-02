@@ -20,9 +20,13 @@ class FaithfulnessScoringTests(unittest.TestCase):
         self.assertTrue(checks["entity"]["pass"])
         self.assertEqual(checks["grounding"]["prose_ungrounded"], [])
         self.assertFalse(any(v in ("unsupported", "contradicted") for v in verdicts(rec)))
-        self.assertEqual(checks["defects"]["fewshot_leak"], [])
+        self.assertFalse(checks["defects"]["example_echo"])
 
-    def test_recorded_few_shot_copy_is_flagged(self):
+    def test_output_naming_entities_absent_from_facts_is_flagged(self):
+        """Renamed from test_recorded_few_shot_copy_is_flagged. The hardcoded-example-entity
+        check it also asserted is gone: examples now render with the alert's own values, so
+        there is no generic entity left to leak. What this fixture still proves is the part
+        that matters and is unchanged -- an output naming entities absent from FACTS fails."""
         rec = FIXTURE["fewshot_copy"]
         checks = m2.score_record(rec, KB)
         self.assertFalse(checks["entity"]["pass"])
@@ -30,11 +34,34 @@ class FaithfulnessScoringTests(unittest.TestCase):
         self.assertIn("ip:172.16.33.9", foreign)
         self.assertIn("port:8443", foreign)
         self.assertIn("technique_id:T1190", foreign)
-        self.assertIn("LMS-WEB03", checks["defects"]["fewshot_leak"])
         self.assertTrue(checks["defects"]["waf_in_remediation"])
         self.assertIn("contradicted", verdicts(rec))
         self.assertIn("T1190", checks["grounding"]["prose_technique_ids"])
         self.assertEqual(checks["grounding"]["prose_ungrounded"], ["T1190"])
+
+    def test_example_echo_is_measured_and_flagged(self):
+        """The risk rendering traded into: right entities, example's sentence.
+
+        Rendering the few-shot examples per alert means a copied value is the CORRECT value,
+        so the entity guard cannot catch template reuse. This is what catches it instead.
+        """
+        rec = copy.deepcopy(FIXTURE["good"])
+        rec["rendered_example_explanations"] = [rec["output"]["explanation_th"]]
+        checks = m2.score_record(rec, KB)
+        self.assertEqual(checks["defects"]["example_echo_ratio"], 1.0)
+        self.assertTrue(checks["defects"]["example_echo"])
+
+        rec2 = copy.deepcopy(FIXTURE["good"])
+        rec2["rendered_example_explanations"] = ["ข้อความตัวอย่างที่ไม่เกี่ยวข้องกันเลยแม้แต่น้อย"]
+        checks2 = m2.score_record(rec2, KB)
+        self.assertLess(checks2["defects"]["example_echo_ratio"], m2.EXAMPLE_ECHO_THRESHOLD)
+        self.assertFalse(checks2["defects"]["example_echo"])
+
+    def test_example_echo_without_rendered_examples_reports_zero(self):
+        """Absent examples must read as unmeasured-zero, not as a silent pass of a real check."""
+        rec = copy.deepcopy(FIXTURE["good"])
+        rec.pop("rendered_example_explanations", None)
+        self.assertEqual(m2.example_echo_ratio(rec), 0.0)
 
     def test_mutated_good_output_is_caught_by_each_rule(self):
         base = FIXTURE["good"]

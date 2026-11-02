@@ -10,6 +10,19 @@ pandas/torch/sentence-transformers, which only the Anaconda interpreter has. The
 langchain, which only the uv .venv has. The uv entry point therefore shells out to Anaconda once for
 `--stage alerts`, then runs the LLM stage itself. Everything the scoring functions need is stdlib, so
 tests import this module under uv without pandas.
+
+POPULATION: the unified one. This used to sample from the behavioral test matrix, score with
+random_forest.pkl (80 features) plus the behavioral_v2 IF/AE (92 features), and reconcile the
+two through a row-hash join -- the arrangement the unified population exists to remove. It also
+recorded `model_used` as "autoencoder_v2", a value fusion_layer no longer emits, so every M2
+figure produced that way described a pipeline that is not deployed.
+
+Identifiers are the one thing the unified feature matrix does not carry: build_unified_population
+drops Source IP, Destination IP and Timestamp from model input, because Source IP in particular
+would let a model memorise which hosts attacked in this capture. They are recovered by
+re-deriving the same split from the same source with the same seed and indexing it POSITIONALLY,
+which is valid because the unified val/test splits get no SMOTE and are written in split order
+with the index reset. The alignment is asserted on Label, not assumed.
 """
 from __future__ import annotations
 
@@ -37,10 +50,7 @@ ML_PYTHON = os.environ.get("ML_PYTHON", "C:/Users/devMrX/anaconda3/python.exe")
 SEED = 42
 PER_CATEGORY_CAP = 7
 BENIGN_N = 10
-TEST_FEATURES_RF = ROOT / "data/features/cicids2017_features_test.parquet"
-TEST_FEATURES_BEHAVIORAL = ROOT / "data/features/behavioral/cicids2017_behavioral_features_test.parquet"
-PROCESSED_TEST = ROOT / "data/processed/cicids2017_test.parquet"
-BEHAVIORAL_LABELED = ROOT / "data/processed/behavioral/cicids2017_behavioral_labeled.parquet"
+UNIFIED_TEST = ROOT / "data/features/unified/cicids2017_unified_test.parquet"
 
 # ----------------------------------------------------------------------------
 # Pure scoring functions (stdlib only)
@@ -96,8 +106,14 @@ INSUFFICIENT_RE = re.compile(
     re.IGNORECASE,
 )
 SEVERE_RE = re.compile(r"วิกฤต|ฉุกเฉิน|รุนแรงมาก")
-# Distinctive entities from llm_explain.FEW_SHOTS inputs (ports and T1190 omitted: they collide with real values).
-FEWSHOT_ENTITIES = ("172.16.33.9", "10.50.2.20", "LMS-WEB03", "100.64.7.18", "10.50.8.4", "DNS-INT02")
+# The few-shot examples are now RENDERED with each alert's own values (see
+# llm_explain.render_few_shots), so the old check for hardcoded example entities
+# (172.16.33.9, LMS-WEB03, ...) can only ever report zero -- those strings are gone from the
+# prompt. What replaced that leak is a different risk: prose that names the right host but
+# reuses the example's sentence. EXAMPLE_ECHO_THRESHOLD is the similarity above which an
+# explanation counts as echoing rather than describing. 0.80 is a judgement call, so the raw
+# ratio is recorded per alert and the rate can be recomputed at any cutoff from the JSONL.
+EXAMPLE_ECHO_THRESHOLD = 0.80
 WAF_RE = re.compile(r"\bWAF\b|web application firewall", re.IGNORECASE)
 
 
@@ -337,6 +353,23 @@ def _prose(out):
     return "\n".join([out["explanation_th"], *out["remediation"]])
 
 
+def example_echo_ratio(rec: dict[str, Any]) -> float:
+    """Highest similarity between the output's explanation and any rendered example's.
+
+    difflib, not an embedding model: this runs in the stdlib-only scoring path that tests
+    import under uv without pandas, and verbatim reuse is a surface-form question anyway.
+    Returns 0.0 when the rendered examples are unavailable, which is reported as unmeasured
+    rather than as a pass.
+    """
+    import difflib
+
+    shots = rec.get("rendered_example_explanations") or []
+    text = (rec.get("output") or {}).get("explanation_th") or ""
+    if not shots or not text:
+        return 0.0
+    return max(difflib.SequenceMatcher(None, text, shot).ratio() for shot in shots)
+
+
 def check_defects(rec: dict[str, Any]) -> dict[str, Any]:
     out = rec["output"]
     port = rec["alert_context"].get("dst_port")
@@ -346,7 +379,8 @@ def check_defects(rec: dict[str, Any]) -> dict[str, Any]:
         "waf_in_remediation": waf,
         "waf_nonweb_context": waf_nonweb,
         "technique_null": out.get("technique_id") is None,
-        "fewshot_leak": sorted({e for e in FEWSHOT_ENTITIES if e in _prose(out)}),
+        "example_echo_ratio": round(example_echo_ratio(rec), 4),
+        "example_echo": example_echo_ratio(rec) >= EXAMPLE_ECHO_THRESHOLD,
         "states_insufficient_evidence": INSUFFICIENT_RE.search(out["explanation_th"]) is not None,
     }
 
@@ -431,7 +465,10 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
     s["defect_waf_portscan_pred"] = _rate(count(lambda r: r["checks"]["defects"]["waf_in_remediation"], ps), len(ps))
     s["defect_waf_portscan_true"] = _rate(count(lambda r: r["checks"]["defects"]["waf_in_remediation"], ps_true), len(ps_true))
     s["defect_waf_portscan_true_smb"] = _rate(count(lambda r: r["checks"]["defects"]["waf_in_remediation"] and r["alert_context"]["dst_port"] in (139, 445), ps_true), count(lambda r: r["alert_context"]["dst_port"] in (139, 445), ps_true))
-    s["fewshot_leak_alerts"] = _rate(count(lambda r: r["checks"]["defects"].get("fewshot_leak")), len(ok))
+    s["example_echo_alerts"] = _rate(count(lambda r: r["checks"]["defects"].get("example_echo")), len(ok))
+    _ratios = [r["checks"]["defects"].get("example_echo_ratio", 0.0) for r in ok]
+    s["example_echo_ratio_max"] = round(max(_ratios), 4) if _ratios else 0.0
+    s["example_echo_ratio_mean"] = round(sum(_ratios) / len(_ratios), 4) if _ratios else 0.0
     s["waf_nonweb_all"] = _rate(count(lambda r: r["checks"]["defects"]["waf_nonweb_context"]), len(ok))
     s["defect_insufficient_null_all"] = _rate(count(lambda r: r["checks"]["defects"]["states_insufficient_evidence"], null_tech), len(null_tech))
     s["defect_insufficient_ssh_true"] = _rate(count(lambda r: r["checks"]["defects"]["states_insufficient_evidence"], ssh_true), len(ssh_true))
@@ -498,7 +535,7 @@ def write_metrics_csv(s: dict[str, Any], path: Path = METRICS_PATH) -> None:
         "defect_waf_portscan_pred": "measured: WAF in remediation, alerts RF-predicted PortScan",
         "defect_waf_portscan_true": "measured: WAF in remediation, alerts truly PortScan",
         "defect_waf_portscan_true_smb": "measured: WAF in remediation, truly PortScan with dst_port 139/445",
-        "fewshot_leak_alerts": "measured: prose contains a distinctive entity copied from the prompt's few-shot examples",
+        "example_echo_alerts": f"measured: explanation is >= {EXAMPLE_ECHO_THRESHOLD} similar to a rendered few-shot example (difflib ratio)",
         "waf_nonweb_all": "measured: WAF in remediation when dst_port is not a web port and label not Web Attack",
         "defect_insufficient_null_all": "approximated (keyword regex): abstained alerts whose explanation states RAG evidence insufficient",
         "defect_insufficient_ssh_true": "approximated (keyword regex): truly SSH-Patator alerts stating evidence insufficient",
@@ -508,6 +545,13 @@ def write_metrics_csv(s: dict[str, Any], path: Path = METRICS_PATH) -> None:
     for key, why in basis.items():
         r = s[key]
         rows.append([key, r["num"], r["den"], f'{r["rate"]:.6f}', f'{r["ci_lo"]:.6f}', f'{r["ci_hi"]:.6f}', why])
+    # Plain scalars, not proportions -- they have no numerator/denominator or CI, so they get
+    # their own rows rather than being forced into the rate columns.
+    for key, why in (
+        ("example_echo_ratio_max", "measured scalar: highest single-alert difflib similarity to a rendered example"),
+        ("example_echo_ratio_mean", "measured scalar: mean difflib similarity to a rendered example"),
+    ):
+        rows.append([key, "", "", f"{s[key]:.6f}", "", "", why])
     c = s["claims"]
     for key, why in (
         ("hallucination_lower_bound", "approximated: (unsupported+contradicted)/all claims; undecidable claims counted as not hallucinated, so this is a LOWER bound"),
@@ -621,7 +665,11 @@ def write_report(s: dict[str, Any], records: list[dict[str, Any]], path: Path = 
           "validation.", ""]
     L += [bar, "5. KNOWN DEFECTS FROM models/llm_layer_config.json (measured on this set)", bar]
     L += ["Defect C (new, not in quality_issues): few-shot entity copying, which quality_issues_fixed says was fixed.",
-          f"  Alerts whose prose contains a few-shot entity (172.16.33.9, LMS-WEB03, DNS-INT02, 100.64.7.18, ...): {_fmt(s['fewshot_leak_alerts'])}",
+          f"  Alerts echoing a rendered few-shot example (difflib ratio >= {EXAMPLE_ECHO_THRESHOLD}): {_fmt(s['example_echo_alerts'])}",
+          f"    highest similarity seen: {s['example_echo_ratio_max']}   mean: {s['example_echo_ratio_mean']}",
+          "    The examples now carry this alert's own values, so a copied entity is the CORRECT",
+          "    entity and the old few-shot-leak check cannot fire. Echoing the example's sentence",
+          "    is the risk that replaced it, which is what this measures.",
           "Defect A: PortScan remediation suggesting a WAF block.",
           f"  RF-predicted PortScan alerts with WAF in remediation:   {_fmt(s['defect_waf_portscan_pred'])}",
           f"  Truly PortScan alerts with WAF in remediation:          {_fmt(s['defect_waf_portscan_true'])}",
@@ -664,10 +712,12 @@ def write_report(s: dict[str, Any], records: list[dict[str, Any]], path: Path = 
 # ----------------------------------------------------------------------------
 # Stage 1 (Anaconda): sample real alerts, score them, retrieve RAG hits
 # ----------------------------------------------------------------------------
-NON_FEATURE_COLS_RF = [
+NON_FEATURE_COLS = [
     "Label", "attack_cat", "technique_id", "technique_name", "tactic", "mapping_confidence",
     "technique_id_encoded", "tactic_encoded", "mapping_confidence_encoded", "is_known_technique",
+    "orig_row_index",
 ]
+EXPECTED_FEATURES = 94
 GENERIC_ANOMALY_QUERY = "anomalous network traffic flagged by anomaly detector"
 
 
@@ -679,40 +729,49 @@ def build_alerts() -> None:
     import torch.nn as nn
 
     sys.path.insert(0, str(ROOT))
-    from src.features.validate_behavioral_join import compute_row_hash, normalize_key_dtypes
+    from src.features import build_unified_population as BUP
     from src.modeling import fusion_layer
     from src.rag.rag_retrieval import RagRetriever
 
     rng = np.random.default_rng(SEED)
-    beh = pd.read_parquet(TEST_FEATURES_BEHAVIORAL)
+    test = pd.read_parquet(UNIFIED_TEST)
     plan: list[tuple[str, int]] = []
-    for label, n_avail in beh["Label"].value_counts().items():
+    for label, n_avail in test["Label"].value_counts().items():
         plan.append((label, BENIGN_N if label == "BENIGN" else min(PER_CATEGORY_CAP, int(n_avail))))
     picks = []
     for label, n in sorted(plan):
-        idx = beh.index[beh["Label"] == label].to_numpy()
+        idx = test.index[test["Label"] == label].to_numpy()
         picks.append(rng.choice(idx, size=n, replace=False))
-    sample = beh.loc[np.concatenate(picks)].reset_index(drop=True)
+    pos_idx = np.concatenate(picks)
+    sample = test.loc[pos_idx].reset_index(drop=True)
     print(f"[alerts] sampled {len(sample)} rows: {sample['Label'].value_counts().to_dict()}")
 
-    orig = sample["orig_row_index"].to_numpy().astype(int)
-    rf_test = pd.read_parquet(TEST_FEATURES_RF)
-    rf_rows = rf_test.iloc[orig]
-    assert (rf_rows["Label"].to_numpy() == sample["Label"].to_numpy()).all(), "RF/behavioral row alignment broke"
-    rf_cols = [c for c in rf_test.columns if c not in NON_FEATURE_COLS_RF and pd.api.types.is_numeric_dtype(rf_test[c])]
-    assert len(rf_cols) == 80
-    rf = joblib.load(ROOT / "models/random_forest.pkl")
-    proba = rf.predict_proba(rf_rows[rf_cols].to_numpy())
+    # Recover the identifiers the feature matrix deliberately drops, by re-deriving the same
+    # split from the same source with the same seed. split_population is imported rather than
+    # reimplemented so it cannot drift from the split the deployed models were trained on.
+    print("[alerts] re-deriving the unified test split to recover IP/timestamp ...")
+    _, _, raw_test = BUP.split_population(pd.read_parquet(BUP.SOURCE))
+    assert len(raw_test) == len(test), f"re-derived test split has {len(raw_test)} rows, parquet has {len(test)}"
+    ctx_rows = raw_test.iloc[pos_idx].reset_index(drop=True)
+    assert (ctx_rows["Label"].to_numpy() == sample["Label"].to_numpy()).all(), \
+        "positional alignment between the feature matrix and the re-derived split is wrong"
+
+    # One feature space for all three members -- no join, no second column list.
+    feat_cols = [c for c in test.columns
+                 if c not in NON_FEATURE_COLS and pd.api.types.is_numeric_dtype(test[c])]
+    assert len(feat_cols) == EXPECTED_FEATURES, f"expected {EXPECTED_FEATURES}, got {len(feat_cols)}"
+    x = sample[feat_cols].to_numpy(dtype=np.float64)
+
+    rf = joblib.load(ROOT / "models/random_forest_unified.pkl")
+    proba = rf.predict_proba(x)
     classes = list(rf.classes_)
     rf_attack = 1.0 - proba[:, classes.index("BENIGN")]
     rf_label = np.array(classes)[proba.argmax(1)]
 
-    b_cols = [c for c in beh.columns if c not in NON_FEATURE_COLS_RF + ["orig_row_index"] and pd.api.types.is_numeric_dtype(beh[c])]
-    assert len(b_cols) == 92
-    xb = sample[b_cols].to_numpy().astype(np.float32)
-    iso = joblib.load(ROOT / "models/isolation_forest_behavioral_v2.pkl")
-    if_score = -iso.score_samples(xb)
-    cfg = json.loads((ROOT / "models/autoencoder_behavioral_v2_config.json").read_text(encoding="utf-8"))
+    iso = joblib.load(ROOT / "models/isolation_forest_unified.pkl")
+    if_score = -iso.score_samples(x)
+    xb = x.astype(np.float32)
+    cfg = json.loads((ROOT / "models/autoencoder_unified_config.json").read_text(encoding="utf-8"))
 
     def stack(dims):
         layers = []
@@ -732,26 +791,15 @@ def build_alerts() -> None:
             return self.decoder(self.encoder(x))
 
     ae = AE(cfg["input_dim"], cfg["hidden_dims"], cfg["bottleneck_dim"])
-    ae.load_state_dict(torch.load(ROOT / "models/autoencoder_behavioral_v2.pt", map_location="cpu"))
+    ae.load_state_dict(torch.load(ROOT / "models/autoencoder_unified.pt", map_location="cpu"))
     ae.eval()
     with torch.no_grad():
         t = torch.tensor(xb)
         ae_err = torch.mean((ae(t) - t) ** 2, dim=1).numpy()
     fused, pred, margin, model_used = fusion_layer.fuse_with_metadata(rf_attack, if_score, ae_err)
 
-    processed = pd.read_parquet(PROCESSED_TEST)
-    key_cols = list(processed.columns)
-    lab = pd.read_parquet(BEHAVIORAL_LABELED)
-    right_hash = compute_row_hash(normalize_key_dtypes(lab, key_cols), key_cols)
-    assert right_hash.is_unique
-    lookup = pd.Series(np.arange(len(lab)), index=right_hash.to_numpy())
-    left = processed.iloc[orig]
-    left_hash = compute_row_hash(normalize_key_dtypes(left, key_cols), key_cols).to_numpy()
-    pos = lookup.reindex(left_hash)
-    assert pos.notna().all(), f"{int(pos.isna().sum())} sampled rows have no raw-behavioral match"
-    ctx_rows = lab.iloc[pos.to_numpy().astype(int)].reset_index(drop=True)
-    assert (ctx_rows["Label"].to_numpy() == sample["Label"].to_numpy()).all()
-
+    # The row-hash join that used to live here is gone: there is only one population now,
+    # so there is nothing to reconcile. ctx_rows came from the positional re-derivation above.
     retriever = RagRetriever()
     alerts = []
     for i in range(len(sample)):
@@ -764,7 +812,7 @@ def build_alerts() -> None:
         alerts.append({
             "alert_id": f"A{i:03d}",
             "true_label": label,
-            "orig_row_index": int(orig[i]),
+            "test_row_index": int(pos_idx[i]),
             "label_mapping_technique_id": (None if pd.isna(sample.loc[i, "technique_id"]) else str(sample.loc[i, "technique_id"])),
             "alert_context": {
                 "source_ip": str(row["Source IP"]),
@@ -854,6 +902,13 @@ def run_llm(limit: int | None) -> float:
             rec["priority"] = llm_explain.derive_priority(ctx["fused_score"], ctx["fused_prediction"])
             rec["rag_hit_ids"] = [h["id"] for h in alert["rag_hits"]]
             try:
+                facts_for_shots = {
+                    "alert_context": ctx, "confidence": ctx["confidence"],
+                    "technique_id": tech_id, "mitre_tactic": tactic,
+                }
+                rec["rendered_example_explanations"] = [
+                    sh["output"]["explanation_th"] for sh in llm_explain.render_few_shots(facts_for_shots)
+                ]
                 output = llm_explain.explain_alert(ctx, alert["rag_hits"], ctx["fused_score"], ctx["fused_prediction"], ctx["confidence"], config)
                 rec.update(status="ok", error=None, output=output)
             except Exception as exc:

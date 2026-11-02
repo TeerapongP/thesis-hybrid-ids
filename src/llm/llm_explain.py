@@ -29,7 +29,21 @@ PRIORITY_HIGH_MIN_SCORE = 0.80
 # entities realistic (just changed which ones) and the model still copied them verbatim into
 # real alerts: measured at 30/100 in reports/llm_faithfulness_raw.jsonl. A placeholder has
 # nothing plausible to copy, and _assert_no_foreign_entities below rejects it if one escapes.
-FEW_SHOTS = [
+# Templates, never sent as-is. `render_few_shots` substitutes the live alert's own values
+# before they reach the prompt.
+#
+# Why this shape. Realistic example values were copied into outputs (30/100 alerts, one a
+# near-verbatim copy). Replacing them with {{...}} placeholders was meant to leave nothing
+# plausible to copy; the model copied the placeholders themselves, failing the entity guard on
+# 100% of alerts -- a total outage rather than a leak. Rendering per alert removes the generic
+# token: a copied value is now the right value for that alert, and the example still
+# demonstrates that entities must be named rather than omitted (omission was the dominant
+# failure mode at 72 of 100 strict failures).
+#
+# The risk this trades into is template-echoing: an output that names the right host but
+# reuses the example's sentence. That is measured, not assumed away -- see the
+# `example_echo` metric in src/evaluation/eval_llm_faithfulness.py.
+FEW_SHOT_TEMPLATES = [
     {
         "input": {
             "source_ip": "{{SRC_IP}}", "dst_ip": "{{DST_IP}}", "dst_port": "{{DST_PORT}}",
@@ -71,10 +85,59 @@ FEW_SHOTS = [
     },
 ]
 
+_SHOT_FIELDS = ("SRC_IP", "DST_IP", "DST_PORT", "ASSET", "LABEL", "CONFIDENCE",
+                "TECHNIQUE_ID", "TACTIC")
+
+
+def _shot_substitutions(facts: dict[str, Any]) -> dict[str, str]:
+    """Map each template placeholder to this alert's real value.
+
+    `affected_asset` falls back to dst_ip because CICIDS-2017 carries no hostnames, and the
+    asset under attack IS the destination. Anything still missing renders as a short Thai
+    description rather than an empty string, so a copied example never reads as truncated.
+    """
+    ctx = facts.get("alert_context") or {}
+    conf = facts.get("confidence")
+    return {
+        "SRC_IP": str(ctx.get("source_ip") or "ไม่ทราบต้นทาง"),
+        "DST_IP": str(ctx.get("dst_ip") or "ไม่ทราบปลายทาง"),
+        "DST_PORT": str(ctx.get("dst_port") if ctx.get("dst_port") is not None else "ไม่ทราบพอร์ต"),
+        "ASSET": str(ctx.get("affected_asset") or ctx.get("dst_ip") or "ไม่ทราบระบบปลายทาง"),
+        "LABEL": str(ctx.get("rf_predicted_label") or "ไม่ระบุ"),
+        "CONFIDENCE": (f"{conf:.2f}" if isinstance(conf, (int, float)) else "ไม่ทราบ"),
+        "TECHNIQUE_ID": str(facts.get("technique_id") or "ไม่ระบุเทคนิค"),
+        "TACTIC": str(facts.get("mitre_tactic") or "ไม่ระบุยุทธวิธี"),
+    }
+
+
+def _render_value(value: Any, subs: dict[str, str]) -> Any:
+    if isinstance(value, str):
+        for key, replacement in subs.items():
+            value = value.replace("{{" + key + "}}", replacement)
+        return value
+    if isinstance(value, list):
+        return [_render_value(v, subs) for v in value]
+    if isinstance(value, dict):
+        return {k: _render_value(v, subs) for k, v in value.items()}
+    return value
+
+
+def render_few_shots(facts: dict[str, Any]) -> list[dict[str, Any]]:
+    """The few-shot examples with every placeholder replaced by this alert's own values."""
+    subs = _shot_substitutions(facts)
+    rendered = _render_value(FEW_SHOT_TEMPLATES, subs)
+    leftover = [t for shot in rendered for t in _PLACEHOLDER_RE.findall(json.dumps(shot, ensure_ascii=False))]
+    assert not leftover, f"few-shot templates still contain unrendered placeholders: {sorted(set(leftover))}"
+    return rendered
+
+
 # Anything the model emits that looks like one of these but is absent from FACTS is a leak.
 _IPV4_RE = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b")
 _TECHNIQUE_RE = re.compile(r"\bT\d{4}(?:\.\d{3})?\b")
 _HOSTNAME_RE = re.compile(r"\b[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+){1,}\b")
+# Placeholders are example scaffolding. Emitting one verbatim is the failure mode the
+# placeholder examples introduced: measured at 100/100 before this was added to the guard.
+_PLACEHOLDER_RE = re.compile(r"\{\{[^}]*\}\}")
 
 
 def _facts_entity_pool(facts: dict[str, Any]) -> set[str]:
@@ -104,7 +167,7 @@ def find_foreign_entities(text: str, facts: dict[str, Any]) -> list[str]:
     """
     pool = _facts_entity_pool(facts)
     joined = " ".join(pool)
-    foreign: list[str] = []
+    foreign: list[str] = list(dict.fromkeys(_PLACEHOLDER_RE.findall(text)))
     for pattern in (_IPV4_RE, _TECHNIQUE_RE, _HOSTNAME_RE):
         for token in pattern.findall(text):
             if token in pool or token in joined:
@@ -186,11 +249,11 @@ def build_prompt(
         "mitre_tactic, priority หรือ confidence และต้องคัดลอกค่าจาก FACTS ตรงตัว "
         "ความรุนแรงของคำอธิบายและ remediation ต้องสอดคล้องกับ priority ใน FACTS หาก technique_id เป็น null "
         "ให้คง null อธิบายว่าหลักฐาน RAG ไม่พอ และห้ามเอ่ยถึงรหัสเทคนิคใดๆ ในคำอธิบาย "
-        "EXAMPLES ใช้ค่าตัวยึดในรูปแบบ {{...}} เท่านั้น ห้ามคัดลอกค่าใดจาก EXAMPLES "
-        "และห้ามเขียนตัวยึด {{...}} ลงในคำตอบ ให้แทนด้วยค่าจริงจาก FACTS เสมอ "
+        "EXAMPLES แสดงรูปแบบคำตอบโดยใช้ค่าจริงของเหตุการณ์นี้แล้ว ให้เลียนรูปแบบ "
+        "แต่เขียนเนื้อหาที่ตรงกับ FACTS ของเหตุการณ์นี้เอง ห้ามคัดลอกประโยคทั้งประโยค "
         f"remediation ต้องเป็นรายการข้อความภาษาไทย 1-{MAX_REMEDIATION} ข้อ ไม่ซ้ำกัน\n"
         f"SCHEMA={json.dumps(OUTPUT_FIELDS, ensure_ascii=False)}\n"
-        f"EXAMPLES={json.dumps(FEW_SHOTS, ensure_ascii=False)}\n"
+        f"EXAMPLES={json.dumps(render_few_shots(facts), ensure_ascii=False)}\n"
         f"FACTS={json.dumps(facts, ensure_ascii=False, default=str)}"
     )
 
@@ -236,7 +299,8 @@ def explain_alert(
         # One corrective retry. The instruction alone was measured at 30% leakage, so a
         # single retry is a cheap second chance, not the control; the re-check below is.
         retry_prompt = prompt + (
-            "\nคำตอบก่อนหน้ามีค่าที่ไม่ได้อยู่ใน FACTS ให้เขียนใหม่โดยใช้เฉพาะค่าจาก FACTS"
+            "\nคำตอบก่อนหน้าผิด เพราะมีชื่อเครื่อง ไอพี พอร์ต หรือรหัสเทคนิคที่ไม่ปรากฏใน FACTS "
+            "ให้เขียนใหม่โดยใช้เฉพาะค่าที่อยู่ใน FACTS เท่านั้น เช่น source_ip dst_ip dst_port technique_id"
         )
         parsed = parse_llm_response(call_llm(retry_prompt, config))
         _assert_no_foreign_entities(parsed, guard_facts)
