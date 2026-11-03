@@ -303,6 +303,12 @@ def score_stage(args) -> dict[str, Any]:
         alerts.append({
             "test_row_index": int(row_index),
             "true_label": str(sample.loc[i, "Label"]),
+            # The fusion rule has already decided this flow is not an attack. Marking it
+            # here is what stops the LLM and dispatch stages from treating it as one.
+            # derive_priority maps a non-attack to LOW, which answers "how urgent is this
+            # alert" -- a fair question only once something has decided an alert exists.
+            # That decision belongs here, not there.
+            "suppressed": int(pred[i]) != 1,
             "alert_context": ctx,
             "scores": {
                 "rf_attack_probability": float(rf_attack[i]),
@@ -377,6 +383,12 @@ def llm_stage(payload: dict[str, Any]) -> None:
 
     for alert in payload["alerts"]:
         ctx = alert["alert_context"]
+        # No explanation for a flow the system just called benign: it costs ~6 s of GPU
+        # time per row and produces an artefact nobody should act on.
+        if alert.get("suppressed"):
+            alert["llm_output"] = None
+            alert["llm_error"] = "suppressed: fused_prediction = 0, no alert raised"
+            continue
         t0 = time.perf_counter()
         try:
             alert["llm_output"] = llm_explain.explain_alert(
@@ -398,6 +410,10 @@ def dispatch_stage(payload: dict[str, Any], dry_run: bool) -> None:
     from src.notifications import alert_dispatcher
 
     for alert in payload["alerts"]:
+        if alert.get("suppressed"):
+            alert["dispatch"] = {"status": "suppressed",
+                                 "reason": "fused_prediction = 0, no alert raised"}
+            continue
         out = alert.get("llm_output")
         if not out:
             alert["dispatch"] = {"status": "skipped", "reason": alert.get("llm_error") or "no llm_output"}
@@ -454,6 +470,9 @@ def render_summary(payload: dict[str, Any]) -> str:
                   f"                  {out['explanation_th']}"]
             for i, step in enumerate(out["remediation"], 1):
                 L.append(f"                    {i}. {step}")
+        elif alert.get("suppressed"):
+            # Not a failure. Calling it one would train a reader to ignore real LLM errors.
+            L.append("  LLM             not called (flow suppressed)")
         elif alert.get("llm_error"):
             L.append(f"  LLM             FAILED: {alert['llm_error']}")
         else:
@@ -466,6 +485,10 @@ def render_summary(payload: dict[str, Any]) -> str:
                   f"                  and notify via {d['would_route_to']}.",
                   f"                  risk_score={rec['risk_score']}  model_used={rec['model_used']}  "
                   f"anomaly_type={rec['anomaly_type']}  mttd_ms={rec['mttd_ms']}"]
+        elif d and d["status"] == "suppressed":
+            L += ["  DISPATCH        SUPPRESSED -- the fusion rule classified this flow as not "
+                  "an attack, so no",
+                  "                  alert is raised and no explanation was generated."]
         elif d and d["status"] == "skipped":
             L.append(f"  DISPATCH        skipped ({d['reason']})")
         elif d:
@@ -570,6 +593,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(render_summary(payload))
         for alert in payload["alerts"]:
             if "priority_if_dispatched" in alert:
+                if alert.get("suppressed"):
+                    print(f"  row {alert['test_row_index']}: SUPPRESSED "
+                          f"(fused_prediction = 0, no alert would be raised)")
+                    continue
                 print(f"  row {alert['test_row_index']}: priority would be "
                       f"{alert['priority_if_dispatched']} (derive_priority, no LLM called)")
     return 0

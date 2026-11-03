@@ -107,11 +107,40 @@ def pred_cascade(d, p):
     return (score > p[1]).astype(int)
 
 
+def pred_cascade_ae_only(d, p):
+    """The deployed cascade with Isolation Forest REMOVED from the fallback.
+
+    This exists to answer "why three models" with a number instead of an argument. The
+    deployed rule uses IF only inside the fallback average, and the fallback fires on ~0.2%
+    of in-dataset rows, so IF's marginal contribution has never been isolated. Comparing
+    this against `fusion: confidence_weighted` measures exactly what the third model buys:
+    if the gap is ~0, the system needs two models, not three, and that is a reportable
+    finding rather than a failure.
+    """
+    conf = np.abs(d["rf"] - 0.5) * 2
+    score = np.where(conf >= p[0], d["rf"], d["ae"])
+    return (score > p[1]).astype(int)
+
+
+def pred_cascade_if_only(d, p):
+    """The mirror: the cascade with the Autoencoder removed instead.
+
+    Without this, a small gap in pred_cascade_ae_only could be read as "IF is useless"
+    when it might equally mean the two unsupervised members are interchangeable. Running
+    both halves distinguishes those two readings.
+    """
+    conf = np.abs(d["rf"] - 0.5) * 2
+    score = np.where(conf >= p[0], d["rf"], d["if_"])
+    return (score > p[1]).astype(int)
+
+
 CANDIDATES = {
     "RF solo":                     (pred_rf,      [GRID_1D]),
     "AE-v2 solo":                  (pred_ae,      [GRID_1D]),
     "IF-v2 solo":                  (pred_if,      [GRID_1D]),
     "fusion: confidence_weighted": (pred_cascade, [CONF_GRID, GRID_1D]),
+    "cascade, fallback = AE only (no IF)": (pred_cascade_ae_only, [CONF_GRID, GRID_1D]),
+    "cascade, fallback = IF only (no AE)": (pred_cascade_if_only, [CONF_GRID, GRID_1D]),
     "OR: max(RF, AE)":             (pred_maxor,   [GRID_1D]),
     "OR: RF or AE (2 thresholds)": (pred_or2,     [GRID_2D, GRID_2D]),
     "AND: RF and AE":              (pred_and2,    [GRID_2D, GRID_2D]),

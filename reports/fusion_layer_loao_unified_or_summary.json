@@ -4,8 +4,10 @@
   "pooled_rows": 4615461,
   "nested_pooled_f1": {
     "fusion: confidence_weighted": 0.9781557688357229,
+    "cascade, fallback = IF only (no AE)": 0.977901113000925,
     "OR: RF or AE (2 thresholds)": 0.974475776864385,
     "RF solo": 0.9736588837384803,
+    "cascade, fallback = AE only (no IF)": 0.9726594566304492,
     "OR: max(RF, AE)": 0.9723792609896554,
     "AND: RF and AE": 0.950354802416012,
     "AE-v2 solo": 0.8736291916190245,
@@ -13,8 +15,10 @@
   },
   "nested_pooled_recall": {
     "fusion: confidence_weighted": 0.9634841572534063,
+    "cascade, fallback = IF only (no AE)": 0.9638464922909692,
     "OR: RF or AE (2 thresholds)": 0.9608372292192621,
     "RF solo": 0.959263189348291,
+    "cascade, fallback = AE only (no IF)": 0.9576091534300658,
     "OR: max(RF, AE)": 0.9558633573399903,
     "AND: RF and AE": 0.9062493382679915,
     "AE-v2 solo": 0.8175901896612168,
@@ -22,8 +26,10 @@
   },
   "nested_pooled_fpr": {
     "fusion: confidence_weighted": 0.0006610284361546759,
+    "cascade, fallback = IF only (no AE)": 0.0007514723990798102,
     "OR: RF or AE (2 thresholds)": 0.0011330552400225275,
     "RF solo": 0.0011325779631733183,
+    "cascade, fallback = AE only (no IF)": 0.0011607372972766584,
     "OR: max(RF, AE)": 0.0010311566327163735,
     "AND: RF and AE": 9.450081614341215e-05,
     "AE-v2 solo": 0.00548916104275446,
