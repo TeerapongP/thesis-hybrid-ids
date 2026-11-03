@@ -1,0 +1,190 @@
+{"flow_id": "F000", "true_label": "BENIGN", "test_row_index": 22210, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 6.02}
+{"flow_id": "F001", "true_label": "DoS Slowhttptest", "test_row_index": 31103, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 1.79}
+{"flow_id": "F002", "true_label": "BENIGN", "test_row_index": 32327, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F003", "true_label": "BENIGN", "test_row_index": 34422, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F004", "true_label": "Infiltration", "test_row_index": 37153, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.41}
+{"flow_id": "F005", "true_label": "BENIGN", "test_row_index": 38701, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.4}
+{"flow_id": "F006", "true_label": "DDoS", "test_row_index": 39294, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F007", "true_label": "DoS Slowhttptest", "test_row_index": 40244, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F008", "true_label": "BENIGN", "test_row_index": 43521, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F009", "true_label": "Web Attack - Brute Force", "test_row_index": 44105, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.5}
+{"flow_id": "F010", "true_label": "BENIGN", "test_row_index": 45147, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F011", "true_label": "BENIGN", "test_row_index": 46607, "status": "ok", "verdict": {"is_attack": true, "attack_type": "DDoS", "reason": "Flow Duration สูงและ conn_count/uniq_dport_count สูง แสดงถึงการโจมตีแบบ DDoS"}, "wall_s": 0.8}
+{"flow_id": "F012", "true_label": "DoS GoldenEye", "test_row_index": 47452, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F013", "true_label": "BENIGN", "test_row_index": 47626, "status": "ok", "verdict": {"is_attack": true, "attack_type": "PortScan", "reason": "PortScan"}, "wall_s": 0.47}
+{"flow_id": "F014", "true_label": "DDoS", "test_row_index": 47921, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F015", "true_label": "BENIGN", "test_row_index": 49152, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F016", "true_label": "FTP-Patator", "test_row_index": 57301, "status": "ok", "verdict": {"is_attack": true, "attack_type": "PortScan", "reason": "PortScan"}, "wall_s": 0.47}
+{"flow_id": "F017", "true_label": "Bot", "test_row_index": 60887, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.47}
+{"flow_id": "F018", "true_label": "BENIGN", "test_row_index": 64626, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.48}
+{"flow_id": "F019", "true_label": "BENIGN", "test_row_index": 65539, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F020", "true_label": "BENIGN", "test_row_index": 70469, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.47}
+{"flow_id": "F021", "true_label": "DoS GoldenEye", "test_row_index": 72352, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.48}
+{"flow_id": "F022", "true_label": "BENIGN", "test_row_index": 77767, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F023", "true_label": "Bot", "test_row_index": 77808, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F024", "true_label": "FTP-Patator", "test_row_index": 78578, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.41}
+{"flow_id": "F025", "true_label": "Infiltration", "test_row_index": 80895, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.47}
+{"flow_id": "F026", "true_label": "BENIGN", "test_row_index": 81058, "status": "ok", "verdict": {"is_attack": true, "attack_type": "PortScan", "reason": "PortScan"}, "wall_s": 0.47}
+{"flow_id": "F027", "true_label": "BENIGN", "test_row_index": 83356, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F028", "true_label": "PortScan", "test_row_index": 89746, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F029", "true_label": "BENIGN", "test_row_index": 92122, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F030", "true_label": "BENIGN", "test_row_index": 95631, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.46}
+{"flow_id": "F031", "true_label": "BENIGN", "test_row_index": 98231, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.39}
+{"flow_id": "F032", "true_label": "FTP-Patator", "test_row_index": 98428, "status": "ok", "verdict": {"is_attack": true, "attack_type": "PortScan", "reason": "PortScan"}, "wall_s": 0.46}
+{"flow_id": "F033", "true_label": "BENIGN", "test_row_index": 101710, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F034", "true_label": "Web Attack - Sql Injection", "test_row_index": 109803, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F035", "true_label": "BENIGN", "test_row_index": 114415, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F036", "true_label": "BENIGN", "test_row_index": 114562, "status": "ok", "verdict": {"is_attack": true, "attack_type": null, "reason": "Flow Duration สูงและ conn_count/uniq_dport_count สูง"}, "wall_s": 0.53}
+{"flow_id": "F037", "true_label": "BENIGN", "test_row_index": 120793, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.41}
+{"flow_id": "F038", "true_label": "SSH-Patator", "test_row_index": 122159, "status": "ok", "verdict": {"is_attack": true, "attack_type": "BruteForce", "reason": "มีการใช้พอร์ต 22 (SSH) อย่างต่อเนื่องและไม่หยุดนิ่ง"}, "wall_s": 0.83}
+{"flow_id": "F039", "true_label": "Infiltration", "test_row_index": 130065, "status": "ok", "verdict": {"is_attack": true, "attack_type": "DoS", "reason": "Flow Duration สูงและ conn_count/uniq_dport_count สูง"}, "wall_s": 0.64}
+{"flow_id": "F040", "true_label": "DoS Hulk", "test_row_index": 133456, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.4}
+{"flow_id": "F041", "true_label": "Web Attack - Brute Force", "test_row_index": 135834, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "Flow Duration is high and SYN Flag Count is zero"}, "wall_s": 0.43}
+{"flow_id": "F042", "true_label": "DDoS", "test_row_index": 137571, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F043", "true_label": "DoS Slowhttptest", "test_row_index": 138813, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.45}
+{"flow_id": "F044", "true_label": "BENIGN", "test_row_index": 139454, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.48}
+{"flow_id": "F045", "true_label": "DoS slowloris", "test_row_index": 141644, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F046", "true_label": "BENIGN", "test_row_index": 145298, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F047", "true_label": "PortScan", "test_row_index": 156204, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F048", "true_label": "BENIGN", "test_row_index": 157348, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F049", "true_label": "Bot", "test_row_index": 158736, "status": "ok", "verdict": {"is_attack": true, "attack_type": "PortScan", "reason": "PortScan"}, "wall_s": 0.47}
+{"flow_id": "F050", "true_label": "SSH-Patator", "test_row_index": 160789, "status": "ok", "verdict": {"is_attack": true, "attack_type": "BruteForce", "reason": "การโจมตีแบบ BruteForce"}, "wall_s": 0.56}
+{"flow_id": "F051", "true_label": "DoS GoldenEye", "test_row_index": 160899, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F052", "true_label": "BENIGN", "test_row_index": 164092, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.5}
+{"flow_id": "F053", "true_label": "Bot", "test_row_index": 164700, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F054", "true_label": "BENIGN", "test_row_index": 166334, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.45}
+{"flow_id": "F055", "true_label": "Infiltration", "test_row_index": 166387, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F056", "true_label": "DoS slowloris", "test_row_index": 171819, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F057", "true_label": "FTP-Patator", "test_row_index": 176761, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F058", "true_label": "Web Attack - XSS", "test_row_index": 178494, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "Flow Duration is unusually high and SYN Flag Count is zero."}, "wall_s": 0.47}
+{"flow_id": "F059", "true_label": "BENIGN", "test_row_index": 178624, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F060", "true_label": "BENIGN", "test_row_index": 183380, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F061", "true_label": "DoS Hulk", "test_row_index": 183952, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F062", "true_label": "BENIGN", "test_row_index": 184780, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F063", "true_label": "BENIGN", "test_row_index": 186688, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.4}
+{"flow_id": "F064", "true_label": "BENIGN", "test_row_index": 186842, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.39}
+{"flow_id": "F065", "true_label": "BENIGN", "test_row_index": 195286, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F066", "true_label": "BENIGN", "test_row_index": 202797, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F067", "true_label": "Web Attack - XSS", "test_row_index": 206379, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F068", "true_label": "BENIGN", "test_row_index": 207089, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F069", "true_label": "Heartbleed", "test_row_index": 215249, "status": "ok", "verdict": {"is_attack": true, "attack_type": "DoS", "reason": "Flow Duration สูงและ SYN Flag Count เป็น 0"}, "wall_s": 0.62}
+{"flow_id": "F070", "true_label": "BENIGN", "test_row_index": 218291, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.47}
+{"flow_id": "F071", "true_label": "BENIGN", "test_row_index": 219435, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.41}
+{"flow_id": "F072", "true_label": "BENIGN", "test_row_index": 220403, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F073", "true_label": "BENIGN", "test_row_index": 221241, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "Flow IAT Mean is high and repeat ratio is above average for normal traffic"}, "wall_s": 0.52}
+{"flow_id": "F074", "true_label": "DoS slowloris", "test_row_index": 221928, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F075", "true_label": "BENIGN", "test_row_index": 223521, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F076", "true_label": "BENIGN", "test_row_index": 224682, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F077", "true_label": "DDoS", "test_row_index": 225522, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F078", "true_label": "DDoS", "test_row_index": 226912, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F079", "true_label": "BENIGN", "test_row_index": 227017, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F080", "true_label": "BENIGN", "test_row_index": 227059, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F081", "true_label": "Web Attack - Sql Injection", "test_row_index": 228119, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F082", "true_label": "DoS Hulk", "test_row_index": 230560, "status": "ok", "verdict": {"is_attack": true, "attack_type": null, "reason": "Flow Duration สูงและ conn_count/uniq_dport_count สูง แสดงถึงการโจมตีแบบ DDoS"}, "wall_s": 0.79}
+{"flow_id": "F083", "true_label": "BENIGN", "test_row_index": 233353, "status": "ok", "verdict": {"is_attack": true, "attack_type": null, "reason": "Flow Duration สูงและ conn_count/uniq_dport_count สูง"}, "wall_s": 0.57}
+{"flow_id": "F084", "true_label": "PortScan", "test_row_index": 234701, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.47}
+{"flow_id": "F085", "true_label": "BENIGN", "test_row_index": 235210, "status": "ok", "verdict": {"is_attack": true, "attack_type": null, "reason": "Flow Duration สูงและ conn_count/uniq_dport_count สูง"}, "wall_s": 0.58}
+{"flow_id": "F086", "true_label": "BENIGN", "test_row_index": 236651, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F087", "true_label": "BENIGN", "test_row_index": 239780, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F088", "true_label": "DoS Slowhttptest", "test_row_index": 247705, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.47}
+{"flow_id": "F089", "true_label": "SSH-Patator", "test_row_index": 247755, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.41}
+{"flow_id": "F090", "true_label": "DoS Hulk", "test_row_index": 249095, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F091", "true_label": "DoS Slowhttptest", "test_row_index": 249178, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F092", "true_label": "BENIGN", "test_row_index": 250922, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F093", "true_label": "BENIGN", "test_row_index": 252164, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.48}
+{"flow_id": "F094", "true_label": "Heartbleed", "test_row_index": 253320, "status": "ok", "verdict": {"is_attack": true, "attack_type": "PortScan", "reason": "Flow Duration สูงและ SYN Flag Count เป็น 0"}, "wall_s": 0.64}
+{"flow_id": "F095", "true_label": "FTP-Patator", "test_row_index": 257008, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F096", "true_label": "SSH-Patator", "test_row_index": 258523, "status": "ok", "verdict": {"is_attack": true, "attack_type": "BruteForce", "reason": "มีการใช้พอร์ต SSH (22) อย่างต่อเนื่องและไม่ปกติ"}, "wall_s": 0.8}
+{"flow_id": "F097", "true_label": "BENIGN", "test_row_index": 258690, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F098", "true_label": "Web Attack - XSS", "test_row_index": 262833, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F099", "true_label": "Bot", "test_row_index": 263472, "status": "ok", "verdict": {"is_attack": true, "attack_type": "PortScan", "reason": "มีการใช้พอร์ต 8080 จำนวนมากและแพ็กเก็ตที่ส่งกลับขนาดใหญ่"}, "wall_s": 0.86}
+{"flow_id": "F100", "true_label": "BENIGN", "test_row_index": 265329, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F101", "true_label": "Web Attack - Sql Injection", "test_row_index": 267599, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.41}
+{"flow_id": "F102", "true_label": "Bot", "test_row_index": 268707, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F103", "true_label": "BENIGN", "test_row_index": 274822, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F104", "true_label": "BENIGN", "test_row_index": 275400, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F105", "true_label": "PortScan", "test_row_index": 276868, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.39}
+{"flow_id": "F106", "true_label": "Web Attack - XSS", "test_row_index": 277689, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F107", "true_label": "BENIGN", "test_row_index": 279437, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F108", "true_label": "Infiltration", "test_row_index": 279514, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.48}
+{"flow_id": "F109", "true_label": "BENIGN", "test_row_index": 284469, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F110", "true_label": "Web Attack - Brute Force", "test_row_index": 289055, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F111", "true_label": "DoS slowloris", "test_row_index": 292401, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F112", "true_label": "DoS GoldenEye", "test_row_index": 293310, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F113", "true_label": "PortScan", "test_row_index": 293437, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "Flow Duration is short and SYN Flag Count is zero."}, "wall_s": 0.49}
+{"flow_id": "F114", "true_label": "DoS slowloris", "test_row_index": 297315, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F115", "true_label": "DoS slowloris", "test_row_index": 309313, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.41}
+{"flow_id": "F116", "true_label": "DoS GoldenEye", "test_row_index": 314240, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F117", "true_label": "DoS GoldenEye", "test_row_index": 314952, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F118", "true_label": "BENIGN", "test_row_index": 317352, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F119", "true_label": "BENIGN", "test_row_index": 318266, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F120", "true_label": "BENIGN", "test_row_index": 320870, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F121", "true_label": "BENIGN", "test_row_index": 324406, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F122", "true_label": "DoS GoldenEye", "test_row_index": 327614, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.5}
+{"flow_id": "F123", "true_label": "BENIGN", "test_row_index": 329774, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F124", "true_label": "DoS Slowhttptest", "test_row_index": 331831, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F125", "true_label": "BENIGN", "test_row_index": 337579, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F126", "true_label": "BENIGN", "test_row_index": 341563, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F127", "true_label": "BENIGN", "test_row_index": 343938, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F128", "true_label": "BENIGN", "test_row_index": 344180, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F129", "true_label": "FTP-Patator", "test_row_index": 344202, "status": "ok", "verdict": {"is_attack": true, "attack_type": "PortScan", "reason": "PortScan"}, "wall_s": 0.47}
+{"flow_id": "F130", "true_label": "BENIGN", "test_row_index": 345910, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F131", "true_label": "Web Attack - Brute Force", "test_row_index": 349628, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.45}
+{"flow_id": "F132", "true_label": "BENIGN", "test_row_index": 351326, "status": "ok", "verdict": {"is_attack": true, "attack_type": "DoS", "reason": "Flow Duration สูงมากและ conn_count/uniq_dport_count ต่ำ"}, "wall_s": 0.68}
+{"flow_id": "F133", "true_label": "FTP-Patator", "test_row_index": 352050, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.45}
+{"flow_id": "F134", "true_label": "BENIGN", "test_row_index": 352858, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F135", "true_label": "BENIGN", "test_row_index": 352944, "status": "ok", "verdict": {"is_attack": true, "attack_type": "DoS", "reason": "Flow Duration สูงและ conn_count/uniq_dport_count สูงในหน้าต่างเวลา 1 นาที"}, "wall_s": 0.81}
+{"flow_id": "F136", "true_label": "DoS Hulk", "test_row_index": 353313, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F137", "true_label": "BENIGN", "test_row_index": 361479, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F138", "true_label": "BENIGN", "test_row_index": 370727, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F139", "true_label": "Web Attack - Brute Force", "test_row_index": 370974, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F140", "true_label": "DDoS", "test_row_index": 372037, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F141", "true_label": "BENIGN", "test_row_index": 374662, "status": "ok", "verdict": {"is_attack": true, "attack_type": null, "reason": "Flow Duration สูงและ conn_count/uniq_dport_count สูง แสดงถึงการโจมตีแบบ DDoS"}, "wall_s": 0.74}
+{"flow_id": "F142", "true_label": "BENIGN", "test_row_index": 375359, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F143", "true_label": "BENIGN", "test_row_index": 382027, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F144", "true_label": "BENIGN", "test_row_index": 382949, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F145", "true_label": "BENIGN", "test_row_index": 383548, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F146", "true_label": "DoS Slowhttptest", "test_row_index": 386761, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F147", "true_label": "BENIGN", "test_row_index": 386961, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F148", "true_label": "BENIGN", "test_row_index": 389945, "status": "ok", "verdict": {"is_attack": true, "attack_type": null, "reason": "Flow Duration สูงและ conn_count/uniq_dport_count สูง"}, "wall_s": 0.54}
+{"flow_id": "F149", "true_label": "BENIGN", "test_row_index": 392221, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.46}
+{"flow_id": "F150", "true_label": "BENIGN", "test_row_index": 393816, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.51}
+{"flow_id": "F151", "true_label": "BENIGN", "test_row_index": 396072, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F152", "true_label": "DDoS", "test_row_index": 399514, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F153", "true_label": "SSH-Patator", "test_row_index": 399979, "status": "ok", "verdict": {"is_attack": true, "attack_type": null, "reason": "Flow Duration สูงและ conn_count/uniq_dport_count สูง แสดงถึงการโจมตีแบบ PortScan"}, "wall_s": 0.72}
+{"flow_id": "F154", "true_label": "BENIGN", "test_row_index": 400954, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F155", "true_label": "BENIGN", "test_row_index": 405534, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F156", "true_label": "Web Attack - Sql Injection", "test_row_index": 405577, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F157", "true_label": "PortScan", "test_row_index": 408661, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F158", "true_label": "BENIGN", "test_row_index": 414590, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F159", "true_label": "Infiltration", "test_row_index": 416925, "status": "ok", "verdict": {"is_attack": true, "attack_type": "PortScan", "reason": "PortScan"}, "wall_s": 0.46}
+{"flow_id": "F160", "true_label": "BENIGN", "test_row_index": 417038, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F161", "true_label": "BENIGN", "test_row_index": 419432, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F162", "true_label": "BENIGN", "test_row_index": 419640, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F163", "true_label": "SSH-Patator", "test_row_index": 420843, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F164", "true_label": "BENIGN", "test_row_index": 423124, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F165", "true_label": "BENIGN", "test_row_index": 424148, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F166", "true_label": "Infiltration", "test_row_index": 425923, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F167", "true_label": "PortScan", "test_row_index": 432444, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F168", "true_label": "BENIGN", "test_row_index": 432482, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F169", "true_label": "BENIGN", "test_row_index": 432611, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F170", "true_label": "Web Attack - XSS", "test_row_index": 439239, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F171", "true_label": "Web Attack - XSS", "test_row_index": 439991, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.42}
+{"flow_id": "F172", "true_label": "BENIGN", "test_row_index": 447498, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F173", "true_label": "BENIGN", "test_row_index": 450129, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F174", "true_label": "BENIGN", "test_row_index": 452707, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.49}
+{"flow_id": "F175", "true_label": "Bot", "test_row_index": 454513, "status": "ok", "verdict": {"is_attack": true, "attack_type": "PortScan", "reason": "PortScan"}, "wall_s": 0.49}
+{"flow_id": "F176", "true_label": "BENIGN", "test_row_index": 456458, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F177", "true_label": "DoS Hulk", "test_row_index": 457749, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.5}
+{"flow_id": "F178", "true_label": "BENIGN", "test_row_index": 464965, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.41}
+{"flow_id": "F179", "true_label": "BENIGN", "test_row_index": 467079, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F180", "true_label": "Web Attack - Brute Force", "test_row_index": 470793, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.5}
+{"flow_id": "F181", "true_label": "SSH-Patator", "test_row_index": 473160, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F182", "true_label": "BENIGN", "test_row_index": 474000, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F183", "true_label": "DoS Hulk", "test_row_index": 484393, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}
+{"flow_id": "F184", "true_label": "BENIGN", "test_row_index": 487707, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F185", "true_label": "BENIGN", "test_row_index": 489283, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F186", "true_label": "BENIGN", "test_row_index": 491727, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F187", "true_label": "DoS slowloris", "test_row_index": 492964, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F188", "true_label": "Web Attack - Brute Force", "test_row_index": 494753, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.44}
+{"flow_id": "F189", "true_label": "Web Attack - XSS", "test_row_index": 494882, "status": "ok", "verdict": {"is_attack": false, "attack_type": null, "reason": "การจราจรปกติ"}, "wall_s": 0.43}

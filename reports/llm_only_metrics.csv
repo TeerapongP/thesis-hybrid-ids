@@ -1,0 +1,24 @@
+"# LLM-only detection baseline. Balanced subsample: compare recall/FPR,"
+# NOT precision -- the other ablation arms use the natural-prevalence split.
+metric,value,num,den
+recall,0.166667,15,90
+fpr,0.100000,10,100
+errors,0,0,190
+mean_wall_s,0.5,,
+
+"# per attack category (descriptive only, n = 2-7 per row)"
+category,detected,n,recall
+Bot,3,7,0.4286
+DDoS,0,7,0.0000
+DoS GoldenEye,0,7,0.0000
+DoS Hulk,1,7,0.1429
+DoS Slowhttptest,0,7,0.0000
+DoS slowloris,0,7,0.0000
+FTP-Patator,3,7,0.4286
+Heartbleed,2,2,1.0000
+Infiltration,2,7,0.2857
+PortScan,0,7,0.0000
+SSH-Patator,4,7,0.5714
+Web Attack - Brute Force,0,7,0.0000
+Web Attack - Sql Injection,0,4,0.0000
+Web Attack - XSS,0,7,0.0000

@@ -1,0 +1,71 @@
+==========================================================================
+LLM-ONLY DETECTION BASELINE (4-way ablation arm)
+==========================================================================
+Command: uv run python -m src.evaluation.eval_llm_only_baseline
+
+==========================================================================
+1. WHAT THIS ARM IS
+==========================================================================
+The Thai LLM is given ONE network flow in physical units and asked to judge it.
+No ML output reaches the prompt: no RF predicted label, no fused score, no anomaly
+score. Including any of them would make this a measurement of the ensemble rather
+than of the LLM. The true label is withheld too.
+Fields shown to the model: 27 flow statistics in physical units
+(the 94 model features are MinMax-scaled and carry no meaning a language model can
+reason about).
+
+==========================================================================
+2. SAMPLE
+==========================================================================
+Scored: 190 flows (0 errors out of 190).
+Attack rows 90, benign rows 100.
+Deliberately balanced: estimating a false-positive rate needs benign rows, and
+running the full 504,193-row test split through an 8B model is not feasible.
+
+==========================================================================
+3. RESULT
+==========================================================================
+  Recall : 0.1667   (15 of 90 attacks detected)
+  FPR    : 0.1000   (10 of 100 benign flows flagged)
+  Mean latency: 0.5 s/flow
+
+PRECISION IS DELIBERATELY NOT REPORTED HERE. It depends on class prevalence, and
+this arm's sample is balanced while the SIEM and hybrid arms are measured on the
+natural-prevalence test split. A precision column would invite a comparison that is
+not valid. Recall and FPR do not depend on prevalence and are the figures to compare.
+
+==========================================================================
+4. PER ATTACK CATEGORY
+==========================================================================
+  category                      detected     n   recall
+  Bot                                  3     7    0.429
+  DDoS                                 0     7    0.000
+  DoS GoldenEye                        0     7    0.000
+  DoS Hulk                             1     7    0.143
+  DoS Slowhttptest                     0     7    0.000
+  DoS slowloris                        0     7    0.000
+  FTP-Patator                          3     7    0.429
+  Heartbleed                           2     2    1.000
+  Infiltration                         2     7    0.286
+  PortScan                             0     7    0.000
+  SSH-Patator                          4     7    0.571
+  Web Attack - Brute Force             0     7    0.000
+  Web Attack - Sql Injection           0     4    0.000
+  Web Attack - XSS                     0     7    0.000
+
+  Per-category counts are 2-7 flows, so these are descriptive only. A single
+  flow moves a category's recall by 0.14 or more.
+
+==========================================================================
+5. HOW TO USE THIS IN THE 4-WAY ABLATION
+==========================================================================
+The four arms do not all measure the same thing, and the table must say so:
+  rule-based SIEM : detection, natural prevalence, full test split
+  LLM-only        : detection, balanced subsample -- compare recall/FPR only
+  ML-only         : detection -- IDENTICAL to the hybrid, because the LLM layer
+                    writes explanations and does not touch the decision
+  hybrid          : detection, natural prevalence, full test split
+So ML-only and hybrid differ only in ANALYST OUTCOME, which is the A/B triage-time
+study (RQ4), not a detection metric. Presenting all four in one detection table
+would print the same row twice and imply a comparison that does not exist.
+
