@@ -12,15 +12,11 @@ SECTION 1: โหลดข้อมูล
   โหลด Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv        shape=(225745, 79)
 CICIDS-2017 รวมทั้งหมด shape = (2830743, 79)
 
->> UNSW-NB15
-  ไฟล์ features: NUSW-NB15_features.csv  columns=['No.', 'Name', 'Type ', 'Description']
-  จำนวนชื่อคอลัมน์ที่ดึงมาได้: 49
-  รายชื่อคอลัมน์: ['srcip', 'sport', 'dstip', 'dsport', 'proto', 'state', 'dur', 'sbytes', 'dbytes', 'sttl', 'dttl', 'sloss', 'dloss', 'service', 'Sload', 'Dload', 'Spkts', 'Dpkts', 'swin', 'dwin', 'stcpb', 'dtcpb', 'smeansz', 'dmeansz', 'trans_depth', 'res_bdy_len', 'Sjit', 'Djit', 'Stime', 'Ltime', 'Sintpkt', 'Dintpkt', 'tcprtt', 'synack', 'ackdat', 'is_sm_ips_ports', 'ct_state_ttl', 'ct_flw_http_mthd', 'is_ftp_login', 'ct_ftp_cmd', 'ct_srv_src', 'ct_srv_dst', 'ct_dst_ltm', 'ct_src_ ltm', 'ct_src_dport_ltm', 'ct_dst_sport_ltm', 'ct_dst_src_ltm', 'attack_cat', 'Label']
-  โหลด UNSW-NB15_1.csv           shape=(700001, 49)
-  โหลด UNSW-NB15_2.csv           shape=(700001, 49)
-  โหลด UNSW-NB15_3.csv           shape=(700001, 49)
-  โหลด UNSW-NB15_4.csv           shape=(440044, 49)
-UNSW-NB15 รวมทั้งหมด shape = (2540047, 49)
+>> CIC-UNSW-NB15 (แหล่งข้อมูลจริงของ unswnb15 slot: Data.csv + Label.csv, positional join)
+   โหลดผ่าน preprocess_pipeline.load_unsw() ตัวเดียวกับที่ pipeline ใช้ (import ไม่ reimplement)
+  โหลด Data.csv                  shape=(447915, 76)
+  โหลด Label.csv                 shape=(447915, 1)
+CIC-UNSW-NB15 รวมทั้งหมด shape = (447915, 78) (ยังไม่ dedup)
 ======================================================================
 SECTION 2: เช็คโครงสร้างข้อมูล
 ======================================================================
@@ -32,7 +28,7 @@ SECTION 2: เช็คโครงสร้างข้อมูล
  Total Fwd Packets                int64
  Total Backward Packets           int64
 Total Length of Fwd Packets       int64
- Total Length of Bwd Packets      int64
+ Total Length of Bwd Packets    float64
  Fwd Packet Length Max            int64
  Fwd Packet Length Min            int64
  Fwd Packet Length Mean         float64
@@ -45,18 +41,18 @@ Flow Bytes/s                    float64
  Flow Packets/s                 float64
  Flow IAT Mean                  float64
  Flow IAT Std                   float64
- Flow IAT Max                     int64
- Flow IAT Min                     int64
-Fwd IAT Total                     int64
+ Flow IAT Max                   float64
+ Flow IAT Min                   float64
+Fwd IAT Total                   float64
  Fwd IAT Mean                   float64
  Fwd IAT Std                    float64
- Fwd IAT Max                      int64
- Fwd IAT Min                      int64
-Bwd IAT Total                     int64
+ Fwd IAT Max                    float64
+ Fwd IAT Min                    float64
+Bwd IAT Total                   float64
  Bwd IAT Mean                   float64
  Bwd IAT Std                    float64
- Bwd IAT Max                      int64
- Bwd IAT Min                      int64
+ Bwd IAT Max                    float64
+ Bwd IAT Min                    float64
 Fwd PSH Flags                     int64
  Bwd PSH Flags                    int64
  Fwd URG Flags                    int64
@@ -99,12 +95,12 @@ Init_Win_bytes_forward            int64
  min_seg_size_forward             int64
 Active Mean                     float64
  Active Std                     float64
- Active Max                       int64
- Active Min                       int64
+ Active Max                     float64
+ Active Min                     float64
 Idle Mean                       float64
  Idle Std                       float64
- Idle Max                         int64
- Idle Min                         int64
+ Idle Max                       float64
+ Idle Min                       float64
  Label                           object
 --- CICIDS-2017: ตรวจสอบ whitespace นำหน้า/ตามหลังชื่อคอลัมน์ (repr) ---
   ' Destination Port'
@@ -189,58 +185,91 @@ Idle Mean                       float64
   พบคอลัมน์ที่มี whitespace เกิน 65 คอลัมน์ -> ทำการ .str.strip() ให้อัตโนมัติ
   ผลลัพธ์หลัง strip:
 ['Destination Port', 'Flow Duration', 'Total Fwd Packets', 'Total Backward Packets', 'Total Length of Fwd Packets', 'Total Length of Bwd Packets', 'Fwd Packet Length Max', 'Fwd Packet Length Min', 'Fwd Packet Length Mean', 'Fwd Packet Length Std', 'Bwd Packet Length Max', 'Bwd Packet Length Min', 'Bwd Packet Length Mean', 'Bwd Packet Length Std', 'Flow Bytes/s', 'Flow Packets/s', 'Flow IAT Mean', 'Flow IAT Std', 'Flow IAT Max', 'Flow IAT Min', 'Fwd IAT Total', 'Fwd IAT Mean', 'Fwd IAT Std', 'Fwd IAT Max', 'Fwd IAT Min', 'Bwd IAT Total', 'Bwd IAT Mean', 'Bwd IAT Std', 'Bwd IAT Max', 'Bwd IAT Min', 'Fwd PSH Flags', 'Bwd PSH Flags', 'Fwd URG Flags', 'Bwd URG Flags', 'Fwd Header Length', 'Bwd Header Length', 'Fwd Packets/s', 'Bwd Packets/s', 'Min Packet Length', 'Max Packet Length', 'Packet Length Mean', 'Packet Length Std', 'Packet Length Variance', 'FIN Flag Count', 'SYN Flag Count', 'RST Flag Count', 'PSH Flag Count', 'ACK Flag Count', 'URG Flag Count', 'CWE Flag Count', 'ECE Flag Count', 'Down/Up Ratio', 'Average Packet Size', 'Avg Fwd Segment Size', 'Avg Bwd Segment Size', 'Fwd Header Length.1', 'Fwd Avg Bytes/Bulk', 'Fwd Avg Packets/Bulk', 'Fwd Avg Bulk Rate', 'Bwd Avg Bytes/Bulk', 'Bwd Avg Packets/Bulk', 'Bwd Avg Bulk Rate', 'Subflow Fwd Packets', 'Subflow Fwd Bytes', 'Subflow Bwd Packets', 'Subflow Bwd Bytes', 'Init_Win_bytes_forward', 'Init_Win_bytes_backward', 'act_data_pkt_fwd', 'min_seg_size_forward', 'Active Mean', 'Active Std', 'Active Max', 'Active Min', 'Idle Mean', 'Idle Std', 'Idle Max', 'Idle Min', 'Label']
---- UNSW-NB15: columns ---
-['srcip', 'sport', 'dstip', 'dsport', 'proto', 'state', 'dur', 'sbytes', 'dbytes', 'sttl', 'dttl', 'sloss', 'dloss', 'service', 'Sload', 'Dload', 'Spkts', 'Dpkts', 'swin', 'dwin', 'stcpb', 'dtcpb', 'smeansz', 'dmeansz', 'trans_depth', 'res_bdy_len', 'Sjit', 'Djit', 'Stime', 'Ltime', 'Sintpkt', 'Dintpkt', 'tcprtt', 'synack', 'ackdat', 'is_sm_ips_ports', 'ct_state_ttl', 'ct_flw_http_mthd', 'is_ftp_login', 'ct_ftp_cmd', 'ct_srv_src', 'ct_srv_dst', 'ct_dst_ltm', 'ct_src_ ltm', 'ct_src_dport_ltm', 'ct_dst_sport_ltm', 'ct_dst_src_ltm', 'attack_cat', 'Label']
---- UNSW-NB15: dtypes ---
-srcip                object
-sport                object
-dstip                object
-dsport               object
-proto                object
-state                object
-dur                 float64
-sbytes                int64
-dbytes                int64
-sttl                  int64
-dttl                  int64
-sloss                 int64
-dloss                 int64
-service              object
-Sload               float64
-Dload               float64
-Spkts                 int64
-Dpkts                 int64
-swin                  int64
-dwin                  int64
-stcpb                 int64
-dtcpb                 int64
-smeansz               int64
-dmeansz               int64
-trans_depth           int64
-res_bdy_len           int64
-Sjit                float64
-Djit                float64
-Stime                 int64
-Ltime                 int64
-Sintpkt             float64
-Dintpkt             float64
-tcprtt              float64
-synack              float64
-ackdat              float64
-is_sm_ips_ports       int64
-ct_state_ttl          int64
-ct_flw_http_mthd    float64
-is_ftp_login        float64
-ct_ftp_cmd           object
-ct_srv_src            int64
-ct_srv_dst            int64
-ct_dst_ltm            int64
-ct_src_ ltm           int64
-ct_src_dport_ltm      int64
-ct_dst_sport_ltm      int64
-ct_dst_src_ltm        int64
-attack_cat           object
-Label                 int64
+--- CIC-UNSW-NB15: columns ---
+['Flow Duration', 'Total Fwd Packets', 'Total Backward Packets', 'Total Length of Fwd Packets', 'Total Length of Bwd Packets', 'Fwd Packet Length Max', 'Fwd Packet Length Min', 'Fwd Packet Length Mean', 'Fwd Packet Length Std', 'Bwd Packet Length Max', 'Bwd Packet Length Min', 'Bwd Packet Length Mean', 'Bwd Packet Length Std', 'Flow Bytes/s', 'Flow Packets/s', 'Flow IAT Mean', 'Flow IAT Std', 'Flow IAT Max', 'Flow IAT Min', 'Fwd IAT Total', 'Fwd IAT Mean', 'Fwd IAT Std', 'Fwd IAT Max', 'Fwd IAT Min', 'Bwd IAT Total', 'Bwd IAT Mean', 'Bwd IAT Std', 'Bwd IAT Max', 'Bwd IAT Min', 'Fwd PSH Flags', 'Bwd PSH Flags', 'Fwd URG Flags', 'Bwd URG Flags', 'Fwd Header Length', 'Bwd Header Length', 'Fwd Packets/s', 'Bwd Packets/s', 'Min Packet Length', 'Max Packet Length', 'Packet Length Mean', 'Packet Length Std', 'Packet Length Variance', 'FIN Flag Count', 'SYN Flag Count', 'RST Flag Count', 'PSH Flag Count', 'ACK Flag Count', 'URG Flag Count', 'CWE Flag Count', 'ECE Flag Count', 'Down/Up Ratio', 'Average Packet Size', 'Avg Fwd Segment Size', 'Avg Bwd Segment Size', 'Fwd Avg Bytes/Bulk', 'Fwd Avg Packets/Bulk', 'Fwd Avg Bulk Rate', 'Bwd Avg Bytes/Bulk', 'Bwd Avg Packets/Bulk', 'Bwd Avg Bulk Rate', 'Subflow Fwd Packets', 'Subflow Fwd Bytes', 'Subflow Bwd Packets', 'Subflow Bwd Bytes', 'Init_Win_bytes_forward', 'Init_Win_bytes_backward', 'act_data_pkt_fwd', 'min_seg_size_forward', 'Active Mean', 'Active Std', 'Active Max', 'Active Min', 'Idle Mean', 'Idle Std', 'Idle Max', 'Idle Min', 'attack_cat', 'Label']
+--- CIC-UNSW-NB15: dtypes ---
+Flow Duration                           int64
+Total Fwd Packets                       int64
+Total Backward Packets                  int64
+Total Length of Fwd Packets           float64
+Total Length of Bwd Packets           float64
+Fwd Packet Length Max                 float64
+Fwd Packet Length Min                 float64
+Fwd Packet Length Mean                float64
+Fwd Packet Length Std                 float64
+Bwd Packet Length Max                 float64
+Bwd Packet Length Min                 float64
+Bwd Packet Length Mean                float64
+Bwd Packet Length Std                 float64
+Flow Bytes/s                          float64
+Flow Packets/s                        float64
+Flow IAT Mean                         float64
+Flow IAT Std                          float64
+Flow IAT Max                          float64
+Flow IAT Min                          float64
+Fwd IAT Total                         float64
+Fwd IAT Mean                          float64
+Fwd IAT Std                           float64
+Fwd IAT Max                           float64
+Fwd IAT Min                           float64
+Bwd IAT Total                         float64
+Bwd IAT Mean                          float64
+Bwd IAT Std                           float64
+Bwd IAT Max                           float64
+Bwd IAT Min                           float64
+Fwd PSH Flags                           int64
+Bwd PSH Flags                           int64
+Fwd URG Flags                           int64
+Bwd URG Flags                           int64
+Fwd Header Length                       int64
+Bwd Header Length                       int64
+Fwd Packets/s                         float64
+Bwd Packets/s                         float64
+Min Packet Length                     float64
+Max Packet Length                     float64
+Packet Length Mean                    float64
+Packet Length Std                     float64
+Packet Length Variance                float64
+FIN Flag Count                          int64
+SYN Flag Count                          int64
+RST Flag Count                          int64
+PSH Flag Count                          int64
+ACK Flag Count                          int64
+URG Flag Count                          int64
+CWE Flag Count                          int64
+ECE Flag Count                          int64
+Down/Up Ratio                         float64
+Average Packet Size                   float64
+Avg Fwd Segment Size                  float64
+Avg Bwd Segment Size                  float64
+Fwd Avg Bytes/Bulk                      int64
+Fwd Avg Packets/Bulk                    int64
+Fwd Avg Bulk Rate                       int64
+Bwd Avg Bytes/Bulk                      int64
+Bwd Avg Packets/Bulk                    int64
+Bwd Avg Bulk Rate                       int64
+Subflow Fwd Packets                     int64
+Subflow Fwd Bytes                       int64
+Subflow Bwd Packets                     int64
+Subflow Bwd Bytes                       int64
+Init_Win_bytes_forward                  int64
+Init_Win_bytes_backward                 int64
+act_data_pkt_fwd                        int64
+min_seg_size_forward                    int64
+Active Mean                           float64
+Active Std                            float64
+Active Max                            float64
+Active Min                            float64
+Idle Mean                             float64
+Idle Std                              float64
+Idle Max                              float64
+Idle Min                              float64
+attack_cat                     string[python]
+Label                                   int64
+--- CIC-UNSW-NB15: จำนวนคอลัมน์ feature (ไม่รวม label ที่ derive เพิ่ม) ---
+  คอลัมน์ทั้งหมดหลังโหลด = 78 (feature 76 + derived ['Label', 'attack_cat'])
+  feature ที่เป็นตัวเลข = 76
+  feature ที่ไม่ใช่ตัวเลข = 0 
 ======================================================================
 SECTION 3: เช็คคุณภาพข้อมูล - CICIDS-2017
 ======================================================================
@@ -262,18 +291,19 @@ Flow Bytes/s      1509
   Init_Win_bytes_backward                       : 1441552 ค่าติดลบ
   min_seg_size_forward                          : 35 ค่าติดลบ
 ======================================================================
-SECTION 3: เช็คคุณภาพข้อมูล - UNSW-NB15
+SECTION 3: เช็คคุณภาพข้อมูล - CIC-UNSW-NB15
 ======================================================================
---- UNSW-NB15: จำนวน missing values (เฉพาะคอลัมน์ที่ NaN > 0) ---
-attack_cat          2218764
-is_ftp_login        1429879
-ct_flw_http_mthd    1348145
---- UNSW-NB15: จำนวน inf / -inf ในคอลัมน์ตัวเลข ---
+--- CIC-UNSW-NB15: จำนวน missing values (เฉพาะคอลัมน์ที่ NaN > 0) ---
+attack_cat    358332
+--- CIC-UNSW-NB15: จำนวน inf / -inf ในคอลัมน์ตัวเลข ---
   ไม่พบค่า inf/-inf ในคอลัมน์ตัวเลข
---- UNSW-NB15: จำนวนแถวซ้ำ (duplicate rows) ---
-  duplicate rows = 480632 (18.9222% ของทั้งหมด 2540047 แถว)
---- UNSW-NB15: ค่าติดลบในคอลัมน์ที่ไม่ควรติดลบ (duration/bytes/packet/count ฯลฯ) ---
-  ตรวจสอบ 19 คอลัมน์ที่เข้าเงื่อนไข ไม่พบค่าติดลบ
+--- CIC-UNSW-NB15: จำนวนแถวซ้ำ (duplicate rows) ---
+  duplicate rows = 141742 (31.6448% ของทั้งหมด 447915 แถว)
+--- CIC-UNSW-NB15: ค่าติดลบในคอลัมน์ที่ไม่ควรติดลบ (duration/bytes/packet/count ฯลฯ) ---
+  ตรวจสอบ 47 คอลัมน์ที่เข้าเงื่อนไข ไม่พบค่าติดลบ
+--- CIC-UNSW-NB15: เช็ค sentinel -1 ในคอลัมน์ Init-Win-Bytes ที่ rename แล้ว ---
+  Init_Win_bytes_forward       จำนวน -1 =        0  min = 0  max = 65418
+  Init_Win_bytes_backward      จำนวน -1 =        0  min = 0  max = 65518
 ======================================================================
 SECTION 4: Class Distribution
 ======================================================================
@@ -313,53 +343,54 @@ Infiltration                   0.0013
 Web Attack � Sql Injection     0.0007
 Heartbleed                     0.0004
 
---- UNSW-NB15: distribution ของคอลัมน์ Label (binary) ---
+--- CIC-UNSW-NB15: distribution ของรหัส label ดิบใน Label.csv (0-9) ---
+  0 = Benign           n=  358332  (80.0000%)
+  1 = Analysis         n=     385  ( 0.0860%)
+  2 = Backdoor         n=     452  ( 0.1009%)
+  3 = DoS              n=    4467  ( 0.9973%)
+  4 = Exploits         n=   30951  ( 6.9100%)
+  5 = Fuzzers          n=   29613  ( 6.6113%)
+  6 = Generic          n=    4632  ( 1.0341%)
+  7 = Reconnaissance   n=   16735  ( 3.7362%)
+  8 = Shellcode        n=    2102  ( 0.4693%)
+  9 = Worms            n=     246  ( 0.0549%)
+  รวม 447915 แถว, พบรหัสทั้งหมด 10 ค่า
+
+--- CIC-UNSW-NB15: distribution ของคอลัมน์ Label (binary, derive จากรหัสเดียวกัน) ---
 Label
-0    2218764
-1     321283
+0    358332
+1     89583
 
---- UNSW-NB15: สัดส่วน (%) Label ---
+--- CIC-UNSW-NB15: สัดส่วน (%) Label ---
 Label
-0    87.3513
-1    12.6487
+0    80.0
+1    20.0
 
---- UNSW-NB15: distribution ของคอลัมน์ attack_cat (multi-class) ---
+--- CIC-UNSW-NB15: distribution ของคอลัมน์ attack_cat (multi-class, NaN = Benign) ---
 attack_cat
-NaN                 2218764
-Generic              215481
-Exploits              44525
- Fuzzers              19195
-DoS                   16353
- Reconnaissance       12228
- Fuzzers               5051
-Analysis               2677
-Backdoor               1795
-Reconnaissance         1759
- Shellcode             1288
-Backdoors               534
-Shellcode               223
-Worms                   174
+<NA>              358332
+Exploits           30951
+Fuzzers            29613
+Reconnaissance     16735
+Generic             4632
+DoS                 4467
+Shellcode           2102
+Backdoor             452
+Analysis             385
+Worms                246
 
---- UNSW-NB15: สัดส่วน (%) attack_cat ---
+--- CIC-UNSW-NB15: สัดส่วน (%) attack_cat ---
 attack_cat
-NaN                 87.3513
-Generic              8.4833
-Exploits             1.7529
- Fuzzers             0.7557
-DoS                  0.6438
- Reconnaissance      0.4814
- Fuzzers             0.1989
-Analysis             0.1054
-Backdoor             0.0707
-Reconnaissance       0.0693
- Shellcode           0.0507
-Backdoors            0.0210
-Shellcode            0.0088
-Worms                0.0069
-
---- UNSW-NB15: ตรวจสอบ consistency ระหว่าง attack_cat กับ Label ---
-  แถวที่ attack_cat ระบุว่าเป็นการโจมตี แต่ Label != 1 : 0 แถว
-  แถวที่ attack_cat ว่าง/NaN (ควรเป็น normal) แต่ Label != 0 : 0 แถว
+<NA>                80.0
+Exploits            6.91
+Fuzzers           6.6113
+Reconnaissance    3.7362
+Generic           1.0341
+DoS               0.9973
+Shellcode         0.4693
+Backdoor          0.1009
+Analysis           0.086
+Worms             0.0549
 ======================================================================
 SECTION 5: Constant / Low-variance Columns
 ======================================================================
@@ -374,26 +405,28 @@ SECTION 5: Constant / Low-variance Columns
     'Bwd Avg Packets/Bulk' -> ค่าเดียว = np.int64(0)
     'Bwd Avg Bulk Rate' -> ค่าเดียว = np.int64(0)
 
---- UNSW-NB15: คอลัมน์ที่มีค่าเดียวกันทั้งหมด (nunique == 1) ---
-  ไม่พบคอลัมน์ที่มีค่าคงที่ตลอดทั้งชุดข้อมูล
+--- CIC-UNSW-NB15: คอลัมน์ที่มีค่าเดียวกันทั้งหมด (nunique == 1) ---
+  พบ 9 คอลัมน์ (ตัวเลือกให้พิจารณา drop ในขั้น preprocessing):
+    'Bwd PSH Flags' -> ค่าเดียว = np.int64(0)
+    'Fwd URG Flags' -> ค่าเดียว = np.int64(0)
+    'Bwd URG Flags' -> ค่าเดียว = np.int64(0)
+    'URG Flag Count' -> ค่าเดียว = np.int64(0)
+    'CWE Flag Count' -> ค่าเดียว = np.int64(0)
+    'ECE Flag Count' -> ค่าเดียว = np.int64(0)
+    'Fwd Avg Bytes/Bulk' -> ค่าเดียว = np.int64(0)
+    'Fwd Avg Packets/Bulk' -> ค่าเดียว = np.int64(0)
+    'Fwd Avg Bulk Rate' -> ค่าเดียว = np.int64(0)
 ======================================================================
 SECTION 6: Timestamp
 ======================================================================
 --- CICIDS-2017: ตรวจสอบคอลัมน์เกี่ยวกับเวลา ---
   ไม่พบคอลัมน์ Timestamp ในชุดไฟล์นี้ (ไฟล์ที่ใช้เป็นชุด MachineLearningCVE ซึ่งตัดคอลัมน์ Flow ID / Source IP / Source Port / Destination IP / Timestamp ออกจากการแจกจ่ายสาธารณะแล้ว เหลือเพียง 78 flow-based features + Label). หากต้องการ timestamp จริงสำหรับทำ simulated replay feed จะต้องใช้ไฟล์ต้นทาง GeneratedLabelledFlows (มี Timestamp column) แทน
 
---- UNSW-NB15: ตรวจสอบคอลัมน์เกี่ยวกับเวลา (Stime / Ltime) ---
-  คอลัมน์ 'Stime' (unix epoch seconds)
-    ตัวอย่างค่าดิบ: [1421927414, 1421927414, 1421927414, 1421927414, 1421927414]
-    min = 1421927377  max = 1424262068
-    ช่วงเวลาจริง: 2015-01-22 11:49:37 ถึง 2015-02-18 12:21:08
-  คอลัมน์ 'Ltime' (unix epoch seconds)
-    ตัวอย่างค่าดิบ: [1421927414, 1421927414, 1421927414, 1421927414, 1421927414]
-    min = 1421927414  max = 1424262069
-    ช่วงเวลาจริง: 2015-01-22 11:50:14 ถึง 2015-02-18 12:21:09
+--- CIC-UNSW-NB15: ตรวจสอบคอลัมน์เกี่ยวกับเวลา ---
+  ไม่พบคอลัมน์ Timestamp ในชุดนี้ — Data.csv มีแต่ CICFlowMeter features ล้วน ๆ (ตัด 7 identifier columns ออก: Flow ID / Src IP / Src Port / Dst IP / Dst Port / Protocol / Timestamp) หากต้องการ timestamp หรือ IP จริงต้องใช้ data/raw/cic-unsw-nb15/CICFlowMeter_out.csv ซึ่งเป็น population แบบไม่กรอง (3,540,241 แถว) ไม่ใช่คู่ Data.csv/Label.csv ที่ pipeline ใช้
 ======================================================================
 SECTION 7: สรุปผลลัพธ์
 ======================================================================
 CICIDS-2017 : 2830743 แถว, 79 คอลัมน์, duplicate rows = 308381, missing cells = 1358
-UNSW-NB15   : 2540047 แถว, 49 คอลัมน์, duplicate rows = 480632, missing cells = 4996788
+CIC-UNSW-NB15 : 447915 แถว, 78 คอลัมน์, duplicate rows = 141742, missing cells = 358332 (missing ส่วนใหญ่คือ attack_cat = NaN ของแถว Benign ตามการ derive)
 รายละเอียดทั้งหมดตามหัวข้อ 1-6 ด้านบน ถูกบันทึกไว้ใน eda_report.txt เรียบร้อยแล้ว

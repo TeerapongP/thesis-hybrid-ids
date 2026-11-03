@@ -1,20 +1,38 @@
+"""
+EDA sanity check สำหรับสองชุดข้อมูลที่ pipeline ใช้งานจริง:
 
+1. CICIDS-2017 — การแจกจ่ายแบบ MachineLearningCVE (8 ไฟล์ `*_ISCX.csv`,
+   78 flow features + Label, ไม่มี Timestamp/IP/Port)
+2. CIC-UNSW-NB15 — `data/raw/cic-unsw-nb15/Data.csv` + `Label.csv`
+   (positional join, 76 CICFlowMeter features, label เป็นรหัส 0-9)
+   ชุดนี้คือแหล่งข้อมูลของ "unswnb15 slot" ใน
+   `src/ingestion/preprocess_pipeline.py` ตั้งแต่การย้ายฐานข้อมูลปี 2026-07-02
+
+ของเดิมสคริปต์นี้อ่าน UNSW-NB15 รูปแบบดิบ 4 ไฟล์ (`UNSW-NB15_1..4.csv`, headerless,
+ต้องประกอบชื่อคอลัมน์จาก `NUSW-NB15_features.csv` ที่เป็น cp1252) ซึ่ง **ไม่ได้ป้อน
+อะไรใน pipeline อีกแล้ว** รายงาน UNSW ที่ออกมาจึงเป็นสถิติของไฟล์ที่ไม่มีใครใช้
+ตอนนี้สคริปต์เรียก `load_unsw()` ของ `preprocess_pipeline` โดยตรง (import ไม่ copy)
+เพื่อให้ EDA และ pipeline อ่านไฟล์เดียวกันเสมอและไม่มีโอกาส drift ออกจากกัน
+"""
 
 import os
 import sys
 import numpy as np
 import pandas as pd
 
-# คอนโซลของ Windows มักใช้ cp1252 เป็นค่า default ซึ่งพิมพ์ข้อความภาษาไทยไม่ได้
-# บังคับให้ stdout เป็น utf-8 เพื่อไม่ให้ print() ล้มกลางทาง
+from src.ingestion import preprocess_pipeline as pp
+from src.ingestion.preprocess_pipeline import (
+    CIC_UNSW_DATA_FILE,
+    CIC_UNSW_DIR,
+    CIC_UNSW_LABEL_CODE_MAP,
+    CIC_UNSW_LABEL_FILE,
+    INIT_WIN_BYTES_COLS,
+    load_unsw,
+)
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-# ----------------------------------------------------------------------------
-# CONFIG: แก้ path ตรงนี้ให้ตรงกับตำแหน่งไฟล์จริงบนเครื่อง — สคริปต์นี้อยู่ใน src/evaluation/ แต่ยังต้อง
-# รันจาก repo root เสมอ (เช่น `python -m src.evaluation.eda_sanity_check`) path ด้านล่างจึงอ้างอิงจาก
-# repo root ไม่ใช่จากตำแหน่งไฟล์ .py เอง
-# ----------------------------------------------------------------------------
 DATA_DIR = "./data/raw"
 
 CICIDS_FILES = [
@@ -28,34 +46,32 @@ CICIDS_FILES = [
     "Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv",
 ]
 
-UNSW_FILES = ["UNSW-NB15_1.csv", "UNSW-NB15_2.csv", "UNSW-NB15_3.csv", "UNSW-NB15_4.csv"]
-UNSW_FEATURES_FILE = "NUSW-NB15_features.csv"   # เป็น .csv (encoding cp1252 ไม่ใช่ utf-8)
-UNSW_GT_FILE = "NUSW-NB15_GT.csv"               # ไม่ได้ใช้ใน sanity check นี้ แต่เก็บ path ไว้อ้างอิง
+UNSW_DATASET_NAME = "CIC-UNSW-NB15"
 
 REPORT_PATH = "./reports/eda_report.txt"
 
-# ----------------------------------------------------------------------------
-# ตัวช่วยเก็บ output: print ออกจอ และเก็บบรรทัดไว้เขียนไฟล์ report พร้อมกัน
-# ----------------------------------------------------------------------------
 _REPORT_LINES = []
 
 
 def log(msg=""):
-    """print ข้อความ และเก็บไว้เขียนลง eda_report.txt ทีหลัง"""
     msg = str(msg)
     print(msg)
     _REPORT_LINES.append(msg)
 
 
+# `preprocess_pipeline.load_unsw()` เขียน log ผ่าน `log()` ของโมดูลตัวเอง ซึ่งจะไปลง
+# _REPORT_LINES ของ preprocess_report.txt แทน เปลี่ยน hook ให้ชี้มาที่ log() ตัวนี้
+# เพื่อให้บรรทัดโหลดไฟล์ปรากฏใน eda_report.txt (ไม่ใช่การ copy ตัวโหลดข้อมูลมาเขียนใหม่)
+pp.log = log
+
+
 def section(title):
-    """พิมพ์หัวข้อคั่นแต่ละ section ให้อ่านง่าย"""
     log("=" * 70)
     log(title)
     log("=" * 70)
 
 
 def safe_read_csv(path, **kwargs):
-    """wrap pd.read_csv ให้ error message ชัดเจนว่าไฟล์ไหนหาไม่เจอ"""
     if not os.path.isfile(path):
         raise FileNotFoundError(
             f"ไม่พบไฟล์: '{path}' กรุณาตรวจสอบว่าตั้งค่า DATA_DIR ถูกต้อง "
@@ -64,11 +80,7 @@ def safe_read_csv(path, **kwargs):
     return pd.read_csv(path, **kwargs)
 
 
-# ----------------------------------------------------------------------------
-# SECTION 1: โหลดข้อมูล
-# ----------------------------------------------------------------------------
 def load_cicids():
-    """โหลดไฟล์ CICIDS-2017 ทั้ง 8 ไฟล์ (มี header อยู่แล้ว) แล้ว concat เป็นก้อนเดียว"""
     frames = []
     for fname in CICIDS_FILES:
         path = os.path.join(DATA_DIR, fname)
@@ -79,41 +91,26 @@ def load_cicids():
     return combined
 
 
-def load_unsw():
-    """
-    โหลด UNSW-NB15:
-      1) เปิดไฟล์ features เพื่อดึงชื่อคอลัมน์ (คอลัมน์ 'Name' ในไฟล์ features)
-         ไฟล์นี้เข้ารหัสแบบ cp1252 (มีอักขระ smart-quote ที่ไม่ใช่ UTF-8)
-      2) ใช้ชื่อคอลัมน์ที่ได้ assign ให้กับข้อมูลดิบ 4 ไฟล์ (ไม่มี header ในตัวข้อมูล)
-      3) concat รวมเป็นก้อนเดียว
-    """
-    features_path = os.path.join(DATA_DIR, UNSW_FEATURES_FILE)
-    if not os.path.isfile(features_path):
-        raise FileNotFoundError(f"ไม่พบไฟล์ features: '{features_path}'")
-
-    features_df = pd.read_csv(features_path, encoding="cp1252")
-    log(f"  ไฟล์ features: {UNSW_FEATURES_FILE}  columns={features_df.columns.tolist()}")
-    col_names = features_df["Name"].str.strip().tolist()
-    log(f"  จำนวนชื่อคอลัมน์ที่ดึงมาได้: {len(col_names)}")
-    log(f"  รายชื่อคอลัมน์: {col_names}")
-
-    frames = []
-    for fname in UNSW_FILES:
-        path = os.path.join(DATA_DIR, fname)
-        # UNSW-NB15_1.csv มี BOM (utf-8-sig) ส่วนไฟล์อื่นเป็น ASCII ธรรมดา
-        # ใช้ utf-8-sig กับทุกไฟล์ได้อย่างปลอดภัย (ไม่กระทบไฟล์ที่ไม่มี BOM)
-        df = safe_read_csv(
-            path, header=None, names=col_names, low_memory=False, encoding="utf-8-sig"
-        )
-        log(f"  โหลด {fname:25s} shape={df.shape}")
-        frames.append(df)
-    combined = pd.concat(frames, ignore_index=True)
-    return combined
+#
+# โหมดโหลด UNSW ของสคริปต์นี้ถูกลบทิ้งทั้งก้อน แทนที่ด้วย `load_unsw()` ที่ import มาจาก
+# `preprocess_pipeline` ตรง ๆ — pipeline อ่าน Data.csv + Label.csv (positional join),
+# rename คอลัมน์ CICFlowMeter ที่ชื่อต่างกันผ่าน CIC_UNSW_COLUMN_RENAME และ derive
+# attack_cat + Label (binary) จากรหัส 0-9 ตาม CIC_UNSW_LABEL_CODE_MAP
+#
+# เช็คที่ถูกลบไปพร้อมกัน เพราะไม่มีอยู่ในรูปแบบข้อมูลใหม่:
+#   * การอ่าน NUSW-NB15_features.csv ด้วย cp1252 เพื่อประกอบชื่อคอลัมน์ — Data.csv
+#     มี header อยู่แล้ว ไม่ต้องประกอบชื่อ ไม่มีไฟล์ cp1252 ให้อ่าน
+#   * การอ่านทุกไฟล์เป็น utf-8-sig เพื่อกัน BOM ของ UNSW-NB15_1.csv — คงไว้ใน
+#     preprocess_pipeline.safe_read_csv อยู่แล้ว แต่ไม่ใช่ประเด็นของชุดใหม่
 
 
-# ----------------------------------------------------------------------------
-# SECTION 2: เช็คโครงสร้างข้อมูล
-# ----------------------------------------------------------------------------
+def read_unsw_label_codes():
+    """อ่านคอลัมน์รหัส 0-9 ดิบจาก Label.csv (ใช้รายงาน distribution ของรหัสเท่านั้น)."""
+    label_path = os.path.join(CIC_UNSW_DIR, CIC_UNSW_LABEL_FILE)
+    label_df = safe_read_csv(label_path, low_memory=False, encoding="utf-8-sig")
+    return label_df["Label"]
+
+
 def check_structure(df, name):
     log(f"--- {name}: columns ---")
     log(df.columns.tolist())
@@ -137,9 +134,6 @@ def check_structure(df, name):
     return df
 
 
-# ----------------------------------------------------------------------------
-# SECTION 3: เช็คคุณภาพข้อมูล (missing / inf / duplicate / negative)
-# ----------------------------------------------------------------------------
 NEGATIVE_CHECK_KEYWORDS = [
     "duration", "dur", "byte", "packet", "pkt", "length", "len",
     "count", "loss", "win", "ttl", "jit", "size", "meansz",
@@ -191,9 +185,6 @@ def check_negative_values(df, name):
         log(f"  ตรวจสอบ {len(candidate_cols)} คอลัมน์ที่เข้าเงื่อนไข ไม่พบค่าติดลบ")
 
 
-# ----------------------------------------------------------------------------
-# SECTION 4: Class distribution
-# ----------------------------------------------------------------------------
 def check_class_distribution_cicids(df):
     log("--- CICIDS-2017: distribution ของคอลัมน์ Label ---")
     log(df["Label"].value_counts().to_string())
@@ -202,35 +193,60 @@ def check_class_distribution_cicids(df):
     log(df["Label"].value_counts(normalize=True).mul(100).round(4).to_string())
 
 
-def check_class_distribution_unsw(df):
-    log("--- UNSW-NB15: distribution ของคอลัมน์ Label (binary) ---")
+def check_class_distribution_unsw(df, label_codes):
+    log(f"--- {UNSW_DATASET_NAME}: distribution ของรหัส label ดิบใน Label.csv (0-9) ---")
+    code_counts = label_codes.value_counts().sort_index()
+    total_codes = int(code_counts.sum())
+    for code, n in code_counts.items():
+        name = CIC_UNSW_LABEL_CODE_MAP.get(code, "<ไม่มีใน mapping>")
+        pct = 100 * n / total_codes if total_codes else 0.0
+        log(f"  {code} = {name:16s} n={n:>8d}  ({pct:7.4f}%)")
+    log(f"  รวม {total_codes} แถว, พบรหัสทั้งหมด {len(code_counts)} ค่า")
+    log("")
+    log(f"--- {UNSW_DATASET_NAME}: distribution ของคอลัมน์ Label (binary, derive จากรหัสเดียวกัน) ---")
     log(df["Label"].value_counts().to_string())
     log("")
-    log("--- UNSW-NB15: สัดส่วน (%) Label ---")
+    log(f"--- {UNSW_DATASET_NAME}: สัดส่วน (%) Label ---")
     log(df["Label"].value_counts(normalize=True).mul(100).round(4).to_string())
     log("")
-    log("--- UNSW-NB15: distribution ของคอลัมน์ attack_cat (multi-class) ---")
+    log(f"--- {UNSW_DATASET_NAME}: distribution ของคอลัมน์ attack_cat (multi-class, NaN = Benign) ---")
     log(df["attack_cat"].value_counts(dropna=False).to_string())
     log("")
-    log("--- UNSW-NB15: สัดส่วน (%) attack_cat ---")
+    log(f"--- {UNSW_DATASET_NAME}: สัดส่วน (%) attack_cat ---")
     log(df["attack_cat"].value_counts(normalize=True, dropna=False).mul(100).round(4).to_string())
 
-    log("")
-    log("--- UNSW-NB15: ตรวจสอบ consistency ระหว่าง attack_cat กับ Label ---")
-    # attack_cat มีค่า (ไม่ใช่ NaN/blank) แปลว่าเป็น traffic โจมตี -> ควรมี Label == 1
-    attack_cat_clean = df["attack_cat"].astype("string").str.strip()
-    is_attack_row = attack_cat_clean.notna() & (attack_cat_clean != "")
-    mismatch_should_be_1 = df.loc[is_attack_row & (df["Label"] != 1)]
-    mismatch_should_be_0 = df.loc[~is_attack_row & (df["Label"] != 0)]
-    log(f"  แถวที่ attack_cat ระบุว่าเป็นการโจมตี แต่ Label != 1 : {len(mismatch_should_be_1)} แถว")
-    log(f"  แถวที่ attack_cat ว่าง/NaN (ควรเป็น normal) แต่ Label != 0 : {len(mismatch_should_be_0)} แถว")
-    if len(mismatch_should_be_1) > 0:
-        log(f"  ตัวอย่าง attack_cat ที่ mismatch: {mismatch_should_be_1['attack_cat'].unique()[:10].tolist()}")
+    # ลบเช็ค consistency ระหว่าง attack_cat กับ Label ออก: ในรูปแบบ UNSW-NB15 ดิบเดิม
+    # สองคอลัมน์นี้มาจากสองแหล่งอิสระ จึงต้อง cross-check ว่าตรงกัน แต่ใน CIC-UNSW-NB15
+    # ทั้งคู่ derive จากรหัส Label.csv ตัวเดียวกันใน load_unsw() จึงตรงกันโดยโครงสร้าง
+    # (by construction) การเช็คซ้ำที่นี่ไม่ได้วัดคุณภาพข้อมูลต้นทางอะไรเลย — จะวัดก็แค่
+    # บั๊กของโค้ดเราเอง ซึ่ง preprocess_pipeline.clean_unsw() assert ไว้ให้แล้ว
 
 
-# ----------------------------------------------------------------------------
-# SECTION 5: Constant / low-variance columns
-# ----------------------------------------------------------------------------
+def check_init_win_sentinel_unsw(df):
+    """CICIDS-2017 ใช้ -1 เป็น sentinel 'not measured' ใน Init_Win_bytes_* — ยืนยันว่า
+    คอลัมน์ที่ rename มาแล้วของ CIC-UNSW-NB15 ไม่มี sentinel นี้ (จึงไม่ต้องจัดการพิเศษ)."""
+    log(f"--- {UNSW_DATASET_NAME}: เช็ค sentinel -1 ในคอลัมน์ Init-Win-Bytes ที่ rename แล้ว ---")
+    for c in INIT_WIN_BYTES_COLS:
+        if c not in df.columns:
+            log(f"  [WARNING] ไม่พบคอลัมน์ {c!r} หลัง rename — ตรวจ CIC_UNSW_COLUMN_RENAME")
+            continue
+        n_sentinel = int((df[c] == -1).sum())
+        log(f"  {c:28s} จำนวน -1 = {n_sentinel:>8d}  min = {df[c].min()}  max = {df[c].max()}")
+
+
+def check_feature_column_count_unsw(df):
+    log(f"--- {UNSW_DATASET_NAME}: จำนวนคอลัมน์ feature (ไม่รวม label ที่ derive เพิ่ม) ---")
+    derived_cols = ["Label", "attack_cat"]
+    feature_cols = [c for c in df.columns if c not in derived_cols]
+    numeric_feature_cols = (
+        df[feature_cols].select_dtypes(include=[np.number]).columns.tolist()
+    )
+    non_numeric = [c for c in feature_cols if c not in numeric_feature_cols]
+    log(f"  คอลัมน์ทั้งหมดหลังโหลด = {df.shape[1]} (feature {len(feature_cols)} + derived {derived_cols})")
+    log(f"  feature ที่เป็นตัวเลข = {len(numeric_feature_cols)}")
+    log(f"  feature ที่ไม่ใช่ตัวเลข = {len(non_numeric)} {non_numeric if non_numeric else ''}")
+
+
 def check_constant_columns(df, name):
     log(f"--- {name}: คอลัมน์ที่มีค่าเดียวกันทั้งหมด (nunique == 1) ---")
     nunique = df.nunique(dropna=False)
@@ -243,9 +259,6 @@ def check_constant_columns(df, name):
         log("  ไม่พบคอลัมน์ที่มีค่าคงที่ตลอดทั้งชุดข้อมูล")
 
 
-# ----------------------------------------------------------------------------
-# SECTION 6: Timestamp
-# ----------------------------------------------------------------------------
 def check_timestamp_cicids(df):
     log("--- CICIDS-2017: ตรวจสอบคอลัมน์เกี่ยวกับเวลา ---")
     time_cols = [c for c in df.columns if ("time" in c.lower() or "stamp" in c.lower())]
@@ -265,22 +278,27 @@ def check_timestamp_cicids(df):
 
 
 def check_timestamp_unsw(df):
-    log("--- UNSW-NB15: ตรวจสอบคอลัมน์เกี่ยวกับเวลา (Stime / Ltime) ---")
-    for c in ["Stime", "Ltime"]:
-        if c not in df.columns:
-            log(f"  ไม่พบคอลัมน์ {c!r} ในข้อมูล")
-            continue
-        log(f"  คอลัมน์ {c!r} (unix epoch seconds)")
-        log(f"    ตัวอย่างค่าดิบ: {df[c].head(5).tolist()}")
-        log(f"    min = {df[c].min()}  max = {df[c].max()}")
-        parsed_min = pd.to_datetime(df[c].min(), unit="s")
-        parsed_max = pd.to_datetime(df[c].max(), unit="s")
-        log(f"    ช่วงเวลาจริง: {parsed_min} ถึง {parsed_max}")
+    # เช็ค Stime/Ltime (unix epoch) ของรูปแบบ UNSW-NB15 ดิบเดิมถูกลบออก: CIC-UNSW-NB15
+    # Data.csv ไม่มีสองคอลัมน์นั้น และไม่มีคอลัมน์เวลาใด ๆ เลย การปล่อยให้เช็คเดิมรันต่อ
+    # จะได้แค่ "ไม่พบคอลัมน์" สองบรรทัดโดยไม่อธิบายว่าทำไม จึงแทนด้วยการเช็คแบบ generic
+    # เหมือนฝั่ง CICIDS-2017 พร้อมระบุว่าถ้าต้องการเวลา/IP จริงต้องไปใช้ไฟล์ไหน
+    log(f"--- {UNSW_DATASET_NAME}: ตรวจสอบคอลัมน์เกี่ยวกับเวลา ---")
+    time_cols = [c for c in df.columns if ("time" in c.lower() or "stamp" in c.lower())]
+    if not time_cols:
+        log(
+            "  ไม่พบคอลัมน์ Timestamp ในชุดนี้ — Data.csv มีแต่ CICFlowMeter features "
+            "ล้วน ๆ (ตัด 7 identifier columns ออก: Flow ID / Src IP / Src Port / "
+            "Dst IP / Dst Port / Protocol / Timestamp) "
+            "หากต้องการ timestamp หรือ IP จริงต้องใช้ "
+            "data/raw/cic-unsw-nb15/CICFlowMeter_out.csv ซึ่งเป็น population "
+            "แบบไม่กรอง (3,540,241 แถว) ไม่ใช่คู่ Data.csv/Label.csv ที่ pipeline ใช้"
+        )
+    else:
+        for c in time_cols:
+            log(f"  พบคอลัมน์ที่เกี่ยวกับเวลา: {c!r}")
+            log(f"  ตัวอย่างค่า: {df[c].head(5).tolist()}")
 
 
-# ----------------------------------------------------------------------------
-# MAIN
-# ----------------------------------------------------------------------------
 def main():
     section("SECTION 1: โหลดข้อมูล")
     log(">> CICIDS-2017")
@@ -291,17 +309,22 @@ def main():
         sys.exit(1)
     log(f"CICIDS-2017 รวมทั้งหมด shape = {cicids_df.shape}")
     log("")
-    log(">> UNSW-NB15")
+    log(f">> {UNSW_DATASET_NAME} (แหล่งข้อมูลจริงของ unswnb15 slot: "
+        f"{CIC_UNSW_DATA_FILE} + {CIC_UNSW_LABEL_FILE}, positional join)")
+    log(f"   โหลดผ่าน preprocess_pipeline.load_unsw() ตัวเดียวกับที่ pipeline ใช้ "
+        f"(import ไม่ reimplement)")
     try:
         unsw_df = load_unsw()
-    except FileNotFoundError as e:
+        unsw_label_codes = read_unsw_label_codes()
+    except (FileNotFoundError, ValueError) as e:
         log(f"[ERROR] {e}")
         sys.exit(1)
-    log(f"UNSW-NB15 รวมทั้งหมด shape = {unsw_df.shape}")
+    log(f"{UNSW_DATASET_NAME} รวมทั้งหมด shape = {unsw_df.shape} (ยังไม่ dedup)")
 
     section("SECTION 2: เช็คโครงสร้างข้อมูล")
     cicids_df = check_structure(cicids_df, "CICIDS-2017")
-    unsw_df = check_structure(unsw_df, "UNSW-NB15")
+    unsw_df = check_structure(unsw_df, UNSW_DATASET_NAME)
+    check_feature_column_count_unsw(unsw_df)
 
     section("SECTION 3: เช็คคุณภาพข้อมูล - CICIDS-2017")
     check_missing(cicids_df, "CICIDS-2017")
@@ -309,21 +332,22 @@ def main():
     check_duplicates(cicids_df, "CICIDS-2017")
     check_negative_values(cicids_df, "CICIDS-2017")
 
-    section("SECTION 3: เช็คคุณภาพข้อมูล - UNSW-NB15")
-    check_missing(unsw_df, "UNSW-NB15")
-    check_inf(unsw_df, "UNSW-NB15")
-    check_duplicates(unsw_df, "UNSW-NB15")
-    check_negative_values(unsw_df, "UNSW-NB15")
+    section(f"SECTION 3: เช็คคุณภาพข้อมูล - {UNSW_DATASET_NAME}")
+    check_missing(unsw_df, UNSW_DATASET_NAME)
+    check_inf(unsw_df, UNSW_DATASET_NAME)
+    check_duplicates(unsw_df, UNSW_DATASET_NAME)
+    check_negative_values(unsw_df, UNSW_DATASET_NAME)
+    check_init_win_sentinel_unsw(unsw_df)
 
     section("SECTION 4: Class Distribution")
     check_class_distribution_cicids(cicids_df)
     log("")
-    check_class_distribution_unsw(unsw_df)
+    check_class_distribution_unsw(unsw_df, unsw_label_codes)
 
     section("SECTION 5: Constant / Low-variance Columns")
     check_constant_columns(cicids_df, "CICIDS-2017")
     log("")
-    check_constant_columns(unsw_df, "UNSW-NB15")
+    check_constant_columns(unsw_df, UNSW_DATASET_NAME)
 
     section("SECTION 6: Timestamp")
     check_timestamp_cicids(cicids_df)
@@ -334,9 +358,10 @@ def main():
     log(f"CICIDS-2017 : {cicids_df.shape[0]} แถว, {cicids_df.shape[1]} คอลัมน์, "
         f"duplicate rows = {cicids_df.duplicated().sum()}, "
         f"missing cells = {int(cicids_df.isna().sum().sum())}")
-    log(f"UNSW-NB15   : {unsw_df.shape[0]} แถว, {unsw_df.shape[1]} คอลัมน์, "
+    log(f"{UNSW_DATASET_NAME} : {unsw_df.shape[0]} แถว, {unsw_df.shape[1]} คอลัมน์, "
         f"duplicate rows = {unsw_df.duplicated().sum()}, "
-        f"missing cells = {int(unsw_df.isna().sum().sum())}")
+        f"missing cells = {int(unsw_df.isna().sum().sum())} "
+        f"(missing ส่วนใหญ่คือ attack_cat = NaN ของแถว Benign ตามการ derive)")
     log("รายละเอียดทั้งหมดตามหัวข้อ 1-6 ด้านบน ถูกบันทึกไว้ใน eda_report.txt เรียบร้อยแล้ว")
 
     os.makedirs(os.path.dirname(REPORT_PATH), exist_ok=True)
