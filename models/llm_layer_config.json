@@ -77,10 +77,10 @@
   },
   "quality_verified": false,
   "quality_issues": [
-    "UNRESOLVED, highest priority: 60/100 explanations echo a rendered few-shot example (>=0.80 difflib similarity) and 51/100 are verbatim. Mean similarity 0.8102, max 1.0000.",
-    "Concrete downstream harm of that echoing, counted: 12/100 explanations are self-contradictory about confidence, e.g. 'ความมั่นใจต่ำ (1.00)' -- the example's 'low confidence' wording reused while the real value 1.00 is substituted in. An analyst reading that is actively misled, so this is a factual defect and not a style complaint.",
-    "Candidate fixes NOT yet tried, deliberately: dropping to a single example, removing examples entirely (the JSON schema is enforced by with_structured_output, so format compliance does not depend on them), or making the examples describe reasoning shape without full sentences. Each needs a fresh 100-alert run to evaluate; tuning against this same run would be fitting to the data being reported.",
-    "Thai-language qualitative review by a human reader is still not done. M2 measures mechanical faithfulness (entities present and correct, techniques grounded); whether the Thai prose is actually useful to an analyst is a judgement no script here makes."
+    "Template echoing is NOT solved and is probably not solvable by prompt tuning at this model size: 60/100 explanations are >=0.80 similar to a rendered example, and only 48/100 are distinct. Reducing the examples makes it worse, not better (variant C: 100/100 echo, 33/100 distinct).",
+    "The reported faithfulness metrics cannot distinguish 'templated but correct' from 'templated and wrong about the behaviour'. See few_shot_count_experiment.",
+    "entity_complete regressed to 94/100 with the confidence fix: 6 alerts omit a required entity. Omission was previously eliminated at 100/100.",
+    "Thai-language qualitative review by a human reader is still not done, and variant C shows why no script here can substitute for it."
   ],
   "remediation_limit": "1-5 unique items: JSON schema maxItems plus a dedupe-and-truncate validator on LlmDraft",
   "repeat_penalty": 1.15,
@@ -121,20 +121,23 @@
     "pipeline": "the real deployed path per alert: the three *_unified models on one 94-feature population, fuse_with_metadata (confidence_weighted cascade), RagRetriever.retrieve(top_k=3) queried with the RF predicted label, then llm_explain.explain_alert.",
     "results": {
       "produced_output": "100/100",
-      "entity_pass_strict": "98/100",
-      "entity_complete": "100/100",
-      "entity_corruption_free": "98/100",
-      "hallucination_lower_bound": "0.0191 (8/419 claims)",
+      "entity_pass_strict": "94/100",
+      "entity_complete": "94/100",
+      "entity_corruption_free": "100/100",
+      "hallucination_lower_bound": "0.0294 (13/442 claims)",
       "hallucination_among_decidable": "0.0198 (8/404)",
       "undecidable_share": "0.0358 (15/419)",
       "waf_nonweb_context": "0/100",
       "example_echo_alerts_ge_0.80": "60/100",
       "example_echo_verbatim_ge_0.999": "51/100",
-      "example_echo_ratio_mean": 0.8102,
-      "example_echo_ratio_max": 1.0,
-      "gen_speed": "~60-67 tok/s on the RTX 3070, ~5.8 s/alert, no corrective retries needed"
+      "example_echo_ratio_mean": 0.7683,
+      "example_echo_ratio_max": 0.9619,
+      "gen_speed": "~60-67 tok/s on the RTX 3070, ~5.8 s/alert, no corrective retries needed",
+      "confidence_contradiction": "0/100 (was 12/100)",
+      "distinct_explanations": "48/100"
     },
-    "supersedes": "the earlier 100-alert run, which scored random_forest.pkl (80 features) plus the behavioral_v2 IF/AE (92 features) reconciled by a row-hash join, and recorded model_used as 'autoencoder_v2' -- a value fusion_layer no longer emits. Those figures described a pipeline that is not deployed and must not be cited. Preserved as reports/llm_faithfulness_*.before_fewshot_fix.*"
+    "supersedes": "the earlier 100-alert run, which scored random_forest.pkl (80 features) plus the behavioral_v2 IF/AE (92 features) reconciled by a row-hash join, and recorded model_used as 'autoencoder_v2' -- a value fusion_layer no longer emits. Those figures described a pipeline that is not deployed and must not be cited. Preserved as reports/llm_faithfulness_*.before_fewshot_fix.*",
+    "configuration": "two rendered few-shot examples, `confidence` removed from FACTS (variant B)"
   },
   "few_shot_leak_control": {
     "problem_history": [
@@ -145,5 +148,50 @@
     "guard_retained": "llm_explain._assert_no_foreign_entities still rejects any IPv4, hostname-shaped token or Txxxx id absent from FACTS, with one corrective retry then ValueError. It fails loudly on purpose: an explanation naming the wrong host sends an analyst to the wrong machine.",
     "effect_measured": "entity_pass 28/100 -> 98/100; entity omission eliminated (entity_complete 100/100).",
     "cost_measured": "the risk it traded into is template echoing, and it is large: 60/100 explanations are >=0.80 similar to a rendered example and 51/100 are verbatim copies. This is measured by the example_echo metric rather than assumed away."
+  },
+  "confidence_field_removed": {
+    "problem": "`confidence` is the fusion rule's own |P(attack) - 0.5| * 2 -- certainty in EITHER direction, high both when the model is sure it IS an attack and sure it is NOT. The explanation layer read it as certainty-of-attack and wrote 'ความมั่นใจต่ำ (0.99)' on benign rows: correct number, backwards reading.",
+    "scale": "12/100 alerts, and it PASSED the mechanical claim check because the number is right",
+    "found_by": "running src/pipeline.py end to end -- the seam is between fusion and the explanation layer, so neither component's own tests could see it",
+    "fix": "removed from FACTS entirely rather than renamed, because a renamed ambiguous quantity is still ambiguous and fused_score already carries risk in one direction. The prompt now forbids quoting a numeric confidence at all and asks for severity to be conveyed through priority. Note the file's own comment already said this value was 'not used because it is RF certainty in either direction' while the code passed it in twice.",
+    "effect": "12/100 -> 0/100, and no explanation mentions model confidence at all",
+    "cost": "entity_complete 100/100 -> 94/100 and hallucination 1.91% -> 2.94%. Reported rather than omitted: the fix is a trade, not a free win."
+  },
+  "few_shot_count_experiment": {
+    "question": "does reducing the few-shot examples from two to one reduce template echoing?",
+    "answer": "no -- it makes it total, and the faithfulness metrics reward that",
+    "measured": {
+      "A (2 examples, confidence shown)": {
+        "entity_pass": 0.98,
+        "entity_complete": 1.0,
+        "hallucination": 0.0191,
+        "confidence_contradiction": 0.12,
+        "echo_ge_0.80": 0.6,
+        "distinct_explanations": "52/100"
+      },
+      "B (2 examples, confidence removed) -- DEPLOYED": {
+        "entity_pass": 0.94,
+        "entity_complete": 0.94,
+        "hallucination": 0.0294,
+        "confidence_contradiction": 0.0,
+        "echo_ge_0.80": 0.6,
+        "distinct_explanations": "48/100"
+      },
+      "C (1 example, confidence removed)": {
+        "entity_pass": 1.0,
+        "entity_complete": 1.0,
+        "hallucination": 0.0,
+        "confidence_contradiction": 0.0,
+        "echo_ge_0.80": 1.0,
+        "distinct_explanations": "33/100"
+      }
+    },
+    "why_C_was_rejected_despite_perfect_scores": "With one template to match, the model fills it in and does nothing else. All 100 explanations describe the flow as 'ส่งคำขอผิดรูปแบบจำนวนมาก' (sending many malformed requests) -- including all 10 BENIGN flows, where it is false. Two examples: the phrase appears on 52/100 and on ZERO benign flows.",
+    "what_this_exposes_about_M2": "A BLIND SPOT, and it is the most important result of this experiment. M2 checks that named entities match the alert and that technique ids are grounded. It cannot check whether the described BEHAVIOUR matches the attack type, so prose that is entity-perfect and semantically wrong scores 1.0000 on every axis. Selecting a configuration by maximising M2 would have chosen the degenerate one. This is why the human Thai-language review is not optional.",
+    "evidence": [
+      "reports/llm_faithfulness_*.baselineA_2examples_with_confidence.*",
+      "reports/llm_faithfulness_*.variantB_conf_fixed.*",
+      "reports/llm_faithfulness_*.variantC_1example.*"
+    ]
   }
 }

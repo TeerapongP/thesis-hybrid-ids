@@ -48,14 +48,14 @@ FEW_SHOT_TEMPLATES = [
         "input": {
             "source_ip": "{{SRC_IP}}", "dst_ip": "{{DST_IP}}", "dst_port": "{{DST_PORT}}",
             "affected_asset": "{{ASSET}}", "rf_predicted_label": "{{LABEL}}",
-            "confidence": "{{CONFIDENCE}}", "technique_id": "{{TECHNIQUE_ID}}",
+            "technique_id": "{{TECHNIQUE_ID}}",
             "mitre_tactic": "{{TACTIC}}", "priority": "HIGH",
         },
         "output": {
             "explanation_th": (
                 "เครื่อง {{SRC_IP}} ส่งคำขอผิดรูปแบบจำนวนมากไปยังบริการของ {{ASSET}} "
                 "ที่พอร์ต {{DST_PORT}} ลักษณะตรงกับเทคนิค {{TECHNIQUE_ID}} "
-                "โมเดลมีความมั่นใจ {{CONFIDENCE}}"
+                "จัดเป็นเหตุการณ์ระดับ {{PRIORITY}}"
             ),
             "remediation": [
                 "ตรวจสอบ log ของ {{ASSET}} ในช่วงเวลาที่เกิดเหตุ",
@@ -68,14 +68,14 @@ FEW_SHOT_TEMPLATES = [
         "input": {
             "source_ip": "{{SRC_IP}}", "dst_ip": "{{DST_IP}}", "dst_port": "{{DST_PORT}}",
             "affected_asset": "{{ASSET}}", "rf_predicted_label": "BENIGN",
-            "confidence": "{{CONFIDENCE}}", "technique_id": None, "mitre_tactic": None,
+            "technique_id": None, "mitre_tactic": None,
             "priority": "LOW",
         },
         "output": {
             "explanation_th": (
                 "พบปริมาณการเชื่อมต่อจาก {{SRC_IP}} ไปยัง {{ASSET}} ที่พอร์ต {{DST_PORT}} สูงกว่าปกติ "
                 "แต่หลักฐานจาก RAG ไม่สอดคล้องกันพอที่จะระบุเทคนิค MITRE ได้ "
-                "และความมั่นใจต่ำ ({{CONFIDENCE}})"
+                "จึงจัดเป็นเหตุการณ์ระดับ {{PRIORITY}}"
             ),
             "remediation": [
                 "เฝ้าดูพฤติกรรมของ {{SRC_IP}} ต่อในรอบถัดไป",
@@ -85,7 +85,7 @@ FEW_SHOT_TEMPLATES = [
     },
 ]
 
-_SHOT_FIELDS = ("SRC_IP", "DST_IP", "DST_PORT", "ASSET", "LABEL", "CONFIDENCE",
+_SHOT_FIELDS = ("SRC_IP", "DST_IP", "DST_PORT", "ASSET", "LABEL", "PRIORITY",
                 "TECHNIQUE_ID", "TACTIC")
 
 
@@ -97,14 +97,13 @@ def _shot_substitutions(facts: dict[str, Any]) -> dict[str, str]:
     description rather than an empty string, so a copied example never reads as truncated.
     """
     ctx = facts.get("alert_context") or {}
-    conf = facts.get("confidence")
     return {
         "SRC_IP": str(ctx.get("source_ip") or "ไม่ทราบต้นทาง"),
         "DST_IP": str(ctx.get("dst_ip") or "ไม่ทราบปลายทาง"),
         "DST_PORT": str(ctx.get("dst_port") if ctx.get("dst_port") is not None else "ไม่ทราบพอร์ต"),
         "ASSET": str(ctx.get("affected_asset") or ctx.get("dst_ip") or "ไม่ทราบระบบปลายทาง"),
         "LABEL": str(ctx.get("rf_predicted_label") or "ไม่ระบุ"),
-        "CONFIDENCE": (f"{conf:.2f}" if isinstance(conf, (int, float)) else "ไม่ทราบ"),
+        "PRIORITY": str(facts.get("priority") or "ไม่ระบุ"),
         "TECHNIQUE_ID": str(facts.get("technique_id") or "ไม่ระบุเทคนิค"),
         "TACTIC": str(facts.get("mitre_tactic") or "ไม่ระบุยุทธวิธี"),
     }
@@ -234,11 +233,17 @@ def build_prompt(
     confidence: float,
 ) -> str:
     technique_id, tactic = _technique_context(rag_hits)
+    # `confidence` is |P(attack) - 0.5| * 2 -- certainty in EITHER direction, high both when
+    # the model is sure it IS an attack and sure it is NOT. Shown to the LLM it reads as
+    # certainty-of-attack and produced "ความมั่นใจต่ำ (0.99)" on benign rows in 12/100 alerts.
+    # It is removed rather than renamed, because a renamed ambiguous number is still
+    # ambiguous, and fused_score already carries risk in one direction. It is stripped from
+    # the nested alert_context too, which carried a second copy.
+    shown_context = {k: v for k, v in alert_context.items() if k != "confidence"}
     facts = {
-        "alert_context": alert_context,
+        "alert_context": shown_context,
         "fused_score": fused_score,
         "fused_prediction": fused_prediction,
-        "confidence": confidence,
         "priority": derive_priority(fused_score, fused_prediction),
         "technique_id": technique_id,
         "mitre_tactic": tactic,
@@ -246,13 +251,30 @@ def build_prompt(
     }
     return (
         "คุณเป็นนักวิเคราะห์ SOC ตอบเป็น JSON เท่านั้น ห้ามแต่ง IP, port, hostname, technique_id, "
-        "mitre_tactic, priority หรือ confidence และต้องคัดลอกค่าจาก FACTS ตรงตัว "
+        "mitre_tactic หรือ priority และต้องคัดลอกค่าจาก FACTS ตรงตัว "
+        "ห้ามกล่าวถึงระดับความมั่นใจของโมเดลเป็นตัวเลข ให้สื่อความรุนแรงผ่าน priority แทน "
         "ความรุนแรงของคำอธิบายและ remediation ต้องสอดคล้องกับ priority ใน FACTS หาก technique_id เป็น null "
         "ให้คง null อธิบายว่าหลักฐาน RAG ไม่พอ และห้ามเอ่ยถึงรหัสเทคนิคใดๆ ในคำอธิบาย "
         "EXAMPLES แสดงรูปแบบคำตอบโดยใช้ค่าจริงของเหตุการณ์นี้แล้ว ให้เลียนรูปแบบ "
         "แต่เขียนเนื้อหาที่ตรงกับ FACTS ของเหตุการณ์นี้เอง ห้ามคัดลอกประโยคทั้งประโยค "
         f"remediation ต้องเป็นรายการข้อความภาษาไทย 1-{MAX_REMEDIATION} ข้อ ไม่ซ้ำกัน\n"
         f"SCHEMA={json.dumps(OUTPUT_FIELDS, ensure_ascii=False)}\n"
+        # TWO examples, deliberately, after measuring one against two.
+        #
+        # One example scores BETTER on every faithfulness metric -- entity_pass 1.000,
+        # entity_complete 1.000, hallucination 0.0000 -- and is the wrong choice. With a
+        # single template to pattern-match, the model fills it in and nothing else: only
+        # 33/100 explanations are distinct, and all 100 describe the flow as "ส่งคำขอ
+        # ผิดรูปแบบจำนวนมาก" (sending many malformed requests), including all 10 BENIGN
+        # flows, where it is simply false.
+        #
+        # Every metric scored that as perfect, because the entities are all correct and the
+        # technique ids are all grounded. M2 checks whether the named entities match the
+        # alert; it cannot check whether the described BEHAVIOUR matches the attack type.
+        # Optimising against it would have selected the degenerate configuration.
+        #
+        # Two examples: 48/100 distinct, the phrase appears on 52/100 and on ZERO benign
+        # flows. Measured in reports/llm_faithfulness_*.variant{B,C}* .
         f"EXAMPLES={json.dumps(render_few_shots(facts), ensure_ascii=False)}\n"
         f"FACTS={json.dumps(facts, ensure_ascii=False, default=str)}"
     )

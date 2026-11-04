@@ -1,0 +1,75 @@
+# aggregate rates (each row recomputable from llm_faithfulness_raw.jsonl; see report section 8)
+metric,numerator,denominator,rate,ci95_lo,ci95_hi,basis
+entity_pass,98,100,0.980000,0.929987,0.994498,measured: no omitted and no foreign/altered entity (strict)
+entity_corruption_free,98,100,0.980000,0.929987,0.994498,"measured: no foreign/altered IP, port, technique id, hostname; no Thai digits"
+entity_complete,100,100,1.000000,0.963005,1.000000,measured: every context IP/port/hostname/technique id appears verbatim
+abstained,50,100,0.500000,0.403830,0.596170,measured: technique_id null (fewer than 2 of top-3 RAG hits agree)
+result_technique_in_hits,50,50,1.000000,0.928650,1.000000,measured (by construction near-certain: technique_id is code-derived from hits)
+result_tactic_matches_kb,50,50,1.000000,0.928650,1.000000,measured (by construction near-certain: tactic is code-derived from KB)
+prose_ungrounded_alerts,0,100,0.000000,0.000000,0.036995,measured: alert prose names a technique id absent from retrieved hits
+prose_technique_mention_alerts,52,100,0.520000,0.423164,0.615356,measured: alert prose names any technique id
+consensus_matches_label_mapping,42,50,0.840000,0.714855,0.916627,"measured, informational: RAG consensus technique equals MITRE mapping of true label (retrieval accuracy, not hallucination)"
+alerts_with_bad_claim,8,100,0.080000,0.041093,0.149983,approximated: alert has >=1 unsupported/contradicted claim by mechanical rules
+defect_waf_portscan_pred,0,7,0.000000,0.000000,0.354339,"measured: WAF in remediation, alerts RF-predicted PortScan"
+defect_waf_portscan_true,0,7,0.000000,0.000000,0.354339,"measured: WAF in remediation, alerts truly PortScan"
+defect_waf_portscan_true_smb,0,0,nan,nan,nan,"measured: WAF in remediation, truly PortScan with dst_port 139/445"
+example_echo_alerts,60,100,0.600000,0.502001,0.690600,measured: explanation is >= 0.8 similar to a rendered few-shot example (difflib ratio)
+waf_nonweb_all,0,100,0.000000,0.000000,0.036995,measured: WAF in remediation when dst_port is not a web port and label not Web Attack
+defect_insufficient_null_all,24,50,0.480000,0.347969,0.614885,approximated (keyword regex): abstained alerts whose explanation states RAG evidence insufficient
+defect_insufficient_ssh_true,4,7,0.571429,0.250454,0.841783,approximated (keyword regex): truly SSH-Patator alerts stating evidence insufficient
+defect_insufficient_ssh_null,4,7,0.571429,0.250454,0.841783,approximated (keyword regex): truly SSH-Patator alerts that abstained and state insufficiency
+ssh_true_technique_null,7,7,1.000000,0.645661,1.000000,measured: truly SSH-Patator alerts where the technique abstained
+example_echo_ratio_max,,,1.000000,,,measured scalar: highest single-alert difflib similarity to a rendered example
+example_echo_ratio_mean,,,0.810200,,,measured scalar: mean difflib similarity to a rendered example
+hallucination_lower_bound,8,419,0.019093,0.009706,0.037219,"approximated: (unsupported+contradicted)/all claims; undecidable claims counted as not hallucinated, so this is a LOWER bound"
+hallucination_among_decidable,8,404,0.019802,0.010067,0.038583,approximated: (unsupported+contradicted)/(supported+unsupported+contradicted)
+undecidable_share,15,419,0.035800,0.021813,0.058221,unmeasured share: claims with no mechanically checkable atom; need human raters
+
+# entity presence by type (measured)
+entity_type,present,required,rate
+ip,200,200,1.000000
+port,100,100,1.000000
+technique_id,50,50,1.000000
+
+# claim verdict counts (approximated; claim split heuristic documented in report section 4)
+source,supported,unsupported,contradicted,undecidable
+explanation,116,4,4,14
+remediation,280,0,0,1
+
+# claim reason counts (rule that fired; one claim may fire several)
+reason,count
+attack_type,5
+technique_named_despite_abstention,4
+ungrounded_term,1
+
+# per true category (alerts sampled from the CICIDS-2017 behavioral test split)
+category,n_sampled,n_ok,entity_pass,entity_corruption_free,abstained,prose_ungrounded_alerts,claims,claims_unsupported,claims_contradicted,claims_undecidable
+BENIGN,10,10,10,10,10,0,48,0,0,8
+Bot,7,7,5,5,7,0,33,3,4,1
+DDoS,7,7,7,7,0,0,28,0,0,0
+DoS GoldenEye,7,7,7,7,0,0,28,0,0,0
+DoS Hulk,7,7,7,7,0,0,28,0,0,0
+DoS Slowhttptest,7,7,7,7,0,0,28,0,0,0
+DoS slowloris,7,7,7,7,0,0,28,0,0,0
+FTP-Patator,7,7,7,7,7,0,28,0,0,0
+Heartbleed,2,2,2,2,2,0,12,0,0,1
+Infiltration,7,7,7,7,7,0,28,1,0,4
+PortScan,7,7,7,7,0,0,28,0,0,0
+SSH-Patator,7,7,7,7,7,0,29,0,0,0
+Web Attack - Brute Force,7,7,7,7,0,0,28,0,0,0
+Web Attack - Sql Injection,4,4,4,4,4,0,16,0,0,0
+Web Attack - XSS,7,7,7,7,6,0,29,0,0,1
+
+# throughput (measured from Ollama eval_count/eval_duration; first call may include model load)
+metric,value
+n_with_metrics,100
+gen_tokens_total,16776
+gen_seconds_total,261.8317
+gen_tok_s_pooled,64.0717
+gen_tok_s_median,65.2010
+gen_tok_s_min,57.2963
+gen_tok_s_max,70.4079
+prompt_tokens_mean,2228.6700
+wall_s_total_llm,565.8584
+wall_s_mean,5.6586
+wall_s_first,4.6772

@@ -44,17 +44,21 @@ For rows RF predicts BENIGN the query is a generic anomaly sentence. The true la
 Required entities: source IP, destination IP, destination port, hostname (none in this data), and the RAG-consensus
 technique_id when one exists. 'Pass' needs every required entity verbatim in explanation_th + remediation AND no
 foreign or altered IP, port ('พอร์ต N'/'port N'/'ip:N'), technique id or hostname, AND no Thai-numeral digits.
-Strict pass:            98/100 = 98.0% (95% Wilson CI 93.0-99.4%)
-Complete (no omission): 100/100 = 100.0% (95% Wilson CI 96.3-100.0%)
-Corruption-free (no foreign/altered entity, no Thai digits): 98/100 = 98.0% (95% Wilson CI 93.0-99.4%)
+Strict pass:            94/100 = 94.0% (95% Wilson CI 87.5-97.2%)
+Complete (no omission): 94/100 = 94.0% (95% Wilson CI 87.5-97.2%)
+Corruption-free (no foreign/altered entity, no Thai digits): 100/100 = 100.0% (95% Wilson CI 96.3-100.0%)
 Presence by entity type:
-  ip            200/200 = 100.0% (95% Wilson CI 98.1-100.0%)
-  port          100/100 = 100.0% (95% Wilson CI 96.3-100.0%)
+  ip            188/200 = 94.0% (95% Wilson CI 89.8-96.5%)
+  port          95/100 = 95.0% (95% Wilson CI 88.8-97.8%)
   technique_id  50/50 = 100.0% (95% Wilson CI 92.9-100.0%)
-Foreign entity mentions by type (count of mentions): {'technique_id': 4}; alerts with Thai digits: 0.
+Foreign entity mentions by type (count of mentions): {}; alerts with Thai digits: 0.
 Violating alerts (omitted = required but absent; foreign = present but not in the alert context):
-  A010 [Bot] omitted=[] foreign=['technique_id:T1046', 'technique_id:T1499.002'] thai_digits=False
-  A011 [Bot] omitted=[] foreign=['technique_id:T1046', 'technique_id:T1499.002'] thai_digits=False
+  A053 [FTP-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:21'] foreign=[] thai_digits=False
+  A054 [FTP-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:21'] foreign=[] thai_digits=False
+  A055 [FTP-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:21'] foreign=[] thai_digits=False
+  A057 [FTP-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:21'] foreign=[] thai_digits=False
+  A058 [FTP-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50', 'port:21'] foreign=[] thai_digits=False
+  A081 [SSH-Patator] omitted=['ip:172.16.0.1', 'ip:192.168.10.50'] foreign=[] thai_digits=False
 
 ======================================================================
 3. TECHNIQUE GROUNDING (measured)
@@ -65,7 +69,7 @@ regression guard, not a model measurement. The model-dependent question is wheth
 Abstained (technique_id null):                 50/100 = 50.0% (95% Wilson CI 40.4-59.6%)
 Result technique_id present in retrieved hits: 50/50 = 100.0% (95% Wilson CI 92.9-100.0%)  (guard)
 Result mitre_tactic equals KB lowercase tactic: 50/50 = 100.0% (95% Wilson CI 92.9-100.0%)  (guard)
-Alerts whose prose names any technique id:     52/100 = 52.0% (95% Wilson CI 42.3-61.5%)
+Alerts whose prose names any technique id:     50/100 = 50.0% (95% Wilson CI 40.4-59.6%)
 Alerts whose prose names an id NOT retrieved:   0/100 = 0.0% (95% Wilson CI 0.0-3.7%)   <- technique hallucination rate
 Informational, not hallucination: RAG consensus technique equals MITRE mapping of the true label: 42/50 = 84.0% (95% Wilson CI 71.5-91.7%)
 
@@ -80,13 +84,13 @@ attack type conflicts with the alert (explanation), or a different retrieved tec
 an IP, port, technique, hostname or Latin-script service/product term found nowhere in the alert or retrieved chunk text
 (alias and port-to-service tables in the source; 'SMB' is grounded by dst_port 445/139). supported: it has >=1 checkable
 atom and all are grounded. undecidable: no checkable atom (most Thai prose and generic advice).
-Claims total: 419; verdicts: {'supported': 396, 'undecidable': 15, 'unsupported': 4, 'contradicted': 4}
-Hallucination LOWER bound (unsupported+contradicted)/all claims: 8/419 = 1.9% (95% Wilson CI 1.0-3.7%)
-Among mechanically decidable claims only:                       8/404 = 2.0% (95% Wilson CI 1.0-3.9%)
-Undecidable share (not judged either way):                       15/419 = 3.6% (95% Wilson CI 2.2-5.8%)
-Alerts with at least one unsupported/contradicted claim:         8/100 = 8.0% (95% Wilson CI 4.1-15.0%)
-By source: {'explanation': {'supported': 116, 'undecidable': 14, 'unsupported': 4, 'contradicted': 4}, 'remediation': {'supported': 280, 'undecidable': 1}}
-Rules that fired (claims may fire several): {'technique_named_despite_abstention': 4, 'attack_type': 5, 'ungrounded_term': 1}
+Claims total: 442; verdicts: {'supported': 377, 'undecidable': 52, 'contradicted': 10, 'unsupported': 3}
+Hallucination LOWER bound (unsupported+contradicted)/all claims: 13/442 = 2.9% (95% Wilson CI 1.7-5.0%)
+Among mechanically decidable claims only:                       13/390 = 3.3% (95% Wilson CI 2.0-5.6%)
+Undecidable share (not judged either way):                       52/442 = 11.8% (95% Wilson CI 9.1-15.1%)
+Alerts with at least one unsupported/contradicted claim:         11/100 = 11.0% (95% Wilson CI 6.3-18.6%)
+By source: {'explanation': {'supported': 116, 'undecidable': 33, 'contradicted': 10, 'unsupported': 1}, 'remediation': {'supported': 261, 'undecidable': 19, 'unsupported': 2}}
+Rules that fired (claims may fire several): {'attack_type': 15, 'ungrounded_term': 1, 'priority': 1}
 Reading: a claim marked supported means its checkable atoms are grounded, not that the sentence is true. No LLM judge was
 used. Typhoon grading Typhoon would not be independent, and no second model was available that would not need its own
 validation.
@@ -96,7 +100,7 @@ validation.
 ======================================================================
 Defect C (new, not in quality_issues): few-shot entity copying, which quality_issues_fixed says was fixed.
   Alerts echoing a rendered few-shot example (difflib ratio >= 0.8): 60/100 = 60.0% (95% Wilson CI 50.2-69.1%)
-    highest similarity seen: 1.0   mean: 0.8102
+    highest similarity seen: 0.9619   mean: 0.7683
     The examples now carry this alert's own values, so a copied entity is the CORRECT
     entity and the old few-shot-leak check cannot fire. Echoing the example's sentence
     is the risk that replaced it, which is what this measures.
@@ -107,23 +111,23 @@ Defect A: PortScan remediation suggesting a WAF block.
   Any alert with WAF while dst_port is non-web and label not Web Attack: 0/100 = 0.0% (95% Wilson CI 0.0-3.7%)
 Defect B: explanation does not state the RAG evidence is insufficient (keyword regex, approximated).
   Truly SSH-Patator alerts where technique abstained:      7/7 = 100.0% (95% Wilson CI 64.6-100.0%)
-  Truly SSH-Patator alerts stating insufficiency:          4/7 = 57.1% (95% Wilson CI 25.0-84.2%)
-  ... among SSH-Patator alerts that abstained:             4/7 = 57.1% (95% Wilson CI 25.0-84.2%)
-  All abstained alerts (any category) stating insufficiency: 24/50 = 48.0% (95% Wilson CI 34.8-61.5%)
+  Truly SSH-Patator alerts stating insufficiency:          0/7 = 0.0% (95% Wilson CI 0.0-35.4%)
+  ... among SSH-Patator alerts that abstained:             0/7 = 0.0% (95% Wilson CI 0.0-35.4%)
+  All abstained alerts (any category) stating insufficiency: 19/50 = 38.0% (95% Wilson CI 25.9-51.8%)
 The prompt only asks for the insufficiency statement when technique_id is null, so the abstained denominators are the fair ones.
 
 ======================================================================
 6. THROUGHPUT (measured)
 ======================================================================
 Alerts with Ollama timing metadata: 100.
-Generation: 16776 tokens in 261.8s of decode = 64.1 tok/s pooled (per-alert median 65.2, min 57.3, max 70.4).
-Mean prompt tokens: 2229. Mean wall time per alert: 5.66s; first alert 4.68s (may include model load).
-Total LLM wall time: 566s. Whole run including alert build and retrieval: 568s.
+Generation: 16517 tokens in 254.2s of decode = 65.0 tok/s pooled (per-alert median 66.0, min 50.8, max 71.3).
+Mean prompt tokens: 2226. Mean wall time per alert: 6.56s; first alert 7.91s (may include model load).
+Total LLM wall time: 656s.
 
 ======================================================================
 7. WHAT IS NOT MEASURED
 ======================================================================
-- Whether undecidable claims (15 of 419) are true. These are the Thai prose statements and generic remediation
+- Whether undecidable claims (52 of 442) are true. These are the Thai prose statements and generic remediation
   advice with no checkable entity. Judging them needs human raters (SOC analysts) against the retrieved chunks.
 - Whether 'supported' claims are true as sentences; only their entities and terms are grounded.
 - Semantic contradictions with no lexical trigger, for example a remediation that is wrong for the attack but uses only
