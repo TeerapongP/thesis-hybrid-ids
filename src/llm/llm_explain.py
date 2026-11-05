@@ -52,15 +52,30 @@ FEW_SHOT_TEMPLATES = [
             "mitre_tactic": "{{TACTIC}}", "priority": "HIGH",
         },
         "output": {
+            # The behaviour clause is deliberately class-neutral. It used to read "ส่งคำขอ
+            # ผิดรูปแบบจำนวนมาก" -- many malformed requests -- which describes a flood. But
+            # {{LABEL}} renders this alert's OWN predicted class into the example input, so
+            # the prompt asserted that malformed-request flooding is the right explanation
+            # for whatever class this alert is. On a PortScan the model copied it and
+            # produced a confidently wrong sentence (seen on the first full-pipeline run:
+            # label PortScan, technique T1046, explanation "malformed requests").
+            #
+            # Copying itself could not be stopped: three prompt variants were measured and
+            # echo stayed at 60/100 (reports/llm_example_echo_experiment.*). So the fix is
+            # to make the sentence that gets copied TRUE for any class rather than false for
+            # most of them. This trades a correctness failure for a vagueness one, which is
+            # the better of the two, and it is a limitation to report rather than a cure.
+            # The same applies to the remediation lines: patching is specific to an
+            # exploited service, so step 3 now asks for an assessment instead.
             "explanation_th": (
-                "เครื่อง {{SRC_IP}} ส่งคำขอผิดรูปแบบจำนวนมากไปยังบริการของ {{ASSET}} "
+                "เครื่อง {{SRC_IP}} มีพฤติกรรมการเชื่อมต่อที่ผิดปกติไปยังบริการของ {{ASSET}} "
                 "ที่พอร์ต {{DST_PORT}} ลักษณะตรงกับเทคนิค {{TECHNIQUE_ID}} "
                 "จัดเป็นเหตุการณ์ระดับ {{PRIORITY}}"
             ),
             "remediation": [
                 "ตรวจสอบ log ของ {{ASSET}} ในช่วงเวลาที่เกิดเหตุ",
                 "ปิดกั้น {{SRC_IP}} ชั่วคราวที่อุปกรณ์ควบคุมการเข้าถึงที่เหมาะกับพอร์ต {{DST_PORT}}",
-                "ตรวจสอบและติดตั้งแพตช์ของบริการบนพอร์ต {{DST_PORT}}",
+                "ประเมินความเสี่ยงของบริการบนพอร์ต {{DST_PORT}} และแก้ไขตามผลการประเมิน",
             ],
         },
     },
@@ -72,8 +87,13 @@ FEW_SHOT_TEMPLATES = [
             "priority": "LOW",
         },
         "output": {
+            # Same reason as shot 1: this clause used to assert the connection volume was
+            # above normal, which a copied sentence would state as fact about a flow nobody
+            # measured that way. What this shot must actually demonstrate is the null-
+            # technique case -- name the entities, say the evidence was insufficient, keep
+            # technique_id null -- so the volume claim is dropped and only that remains.
             "explanation_th": (
-                "พบปริมาณการเชื่อมต่อจาก {{SRC_IP}} ไปยัง {{ASSET}} ที่พอร์ต {{DST_PORT}} สูงกว่าปกติ "
+                "พบการเชื่อมต่อจาก {{SRC_IP}} ไปยัง {{ASSET}} ที่พอร์ต {{DST_PORT}} "
                 "แต่หลักฐานจาก RAG ไม่สอดคล้องกันพอที่จะระบุเทคนิค MITRE ได้ "
                 "จึงจัดเป็นเหตุการณ์ระดับ {{PRIORITY}}"
             ),
