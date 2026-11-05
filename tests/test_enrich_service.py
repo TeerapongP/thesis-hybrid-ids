@@ -254,6 +254,30 @@ class BoundaryTests(unittest.TestCase):
         ev = {"src_ip": "10.0.0.1", "dst_ip": HIT, "source_ip": HIT, "dst": "not-an-ip", "src": 5}
         self.assertEqual(enrich.extract_observables(ev), [HIT])
 
+    def test_every_source_field_spelling_has_a_destination_counterpart(self):
+        """IP_FIELDS was asymmetric: dest_ip and `Destination Address` were absent while
+        destination_ip and `Destination address` were present, so a live event whose
+        destination was spelled either way had that address silently never looked up.
+        Lookup is keyed on the exact field name, so the asymmetry alone is the bug.
+        """
+        for field in ("dst_ip", "dest_ip", "destination_ip", "dst",
+                      "Destination Address", "Destination address", "Destination IP"):
+            with self.subTest(field=field):
+                self.assertIn(field, enrich.IP_FIELDS)
+                self.assertEqual(enrich.extract_observables({field: HIT}), [HIT])
+
+    def test_walk_query_passes_fromid_as_a_list(self):
+        """Live OpenCTI 5.12.17 types stixCoreRelationships(fromId:) as [String].
+
+        Declaring $id as String! is accepted by no server and rejected at validation with
+        GRAPHQL_VALIDATION_FAILED, which enrich.py reports as an OpenCTI failure -- so
+        every graph walk returned no context while the service looked healthy. This is
+        asserted against the query text because a unit test has no live platform; the
+        shape itself was confirmed by running it against the real instance.
+        """
+        self.assertIn("$id: [String]", enrich._WALK_QUERY)
+        self.assertNotIn("$id: String", enrich._WALK_QUERY)
+
     def test_config_fails_fast_naming_missing_keys_without_values(self):
         with tempfile.TemporaryDirectory() as d:
             with self.assertRaises(RuntimeError) as ctx:

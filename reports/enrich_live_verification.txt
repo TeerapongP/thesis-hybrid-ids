@@ -1,0 +1,97 @@
+OpenCTI enrichment service -- live verification
+===============================================
+Date            2026-11-05
+Service         src/services/enrich.py
+OpenCTI         5.12.17 (reported by `about { version }`) at http://localhost:8082
+Kafka           grafana-kafka-broker-1 (KRaft) at 127.0.0.1:9092
+Topics          pa5220.raw -> pa5220.enriched, 3 partitions each
+
+WHY THIS RUN EXISTED
+--------------------
+Before it, 27 unit tests passed against stubs and nothing had touched a real broker or a
+real platform. CLAUDE.md recorded the GraphQL query shapes as written from knowledge of
+OpenCTI 5.12.x and never executed, with the note that a wrong query degrades to "no
+match" rather than to a visible error. That prediction was correct, and the failure mode
+was exactly the dangerous one: a service that looks healthy while returning nothing.
+
+
+TWO DEFECTS FOUND, BOTH SILENT
+------------------------------
+1. GRAPH WALK NEVER RAN.  _WALK_QUERY declared `$id: String!`, but 5.12.17 types
+   stixCoreRelationships(fromId:) as [String]. Every walk was rejected before execution:
+
+     "Variable \"$id\" of type \"String!\" used in position expecting type \"[String]\"."
+     extensions.code = GRAPHQL_VALIDATION_FAILED
+
+   enrich.py treats an OpenCTI failure as "publish anyway, with enrichment.error", which
+   is the right call for a pipeline, so the whole graph-context feature was dead and
+   nothing in the service's own output said so. Fixed to `$id: [String]!`, after which the
+   same indicator returned 2 relationship edges. Verified both a scalar and a list are
+   accepted, so the call site did not have to change.
+
+2. DESTINATION ADDRESSES WERE SKIPPED.  IP_FIELDS listed `source_ip`, `src_ip`, `src`,
+   `Source Address`, `Source IP` on the source side, but on the destination side it had
+   `destination_ip` and `Destination address` while missing `dest_ip` and the capitalized
+   `Destination Address`. Matching is on the exact field name, so an event spelled either
+   way had its destination never looked up. Found because a live event with
+   dest_ip = 8.8.8.8 came back with observables_checked = [].
+
+
+WHAT THE LIVE RUN CONFIRMED
+---------------------------
+Positive match, end to end:
+
+  in   {"src_ip": "99.83.190.102", "dest_ip": "8.8.8.8", ...}
+  out  "matched": true
+       "indicators": [{"id": "68cb10cc-...", "name": "99.83.190.102",
+                       "confidence": 75, "valid_until": "2026-12-18T09:50:35.000Z"}]
+       "source": "opencti"
+
+  - raw fields preserved on every record; enrichment is additive, never a mutation
+  - an event with no routable address still carries enrichment with matched: false, so a
+    consumer never has to distinguish "no enrichment ran" from "ran and found nothing"
+  - the LRU cache works live: a repeated address returns "source": "cache"
+  - after the fix, both `dest_ip` and `Destination Address` resolve the indicator
+  - graph walk returns real context: indicator -> `indicates` -> Malware "Mirai", and
+    parse_related correctly drops the `based-on` edge whose target is an observable rather
+    than one of WALK_TARGET_TYPES
+
+
+A NEGATIVE RESULT THAT IS CORRECT BEHAVIOUR
+-------------------------------------------
+An event with src_ip = 1.1.1.1 reported matched: false even though OpenCTI holds an
+indicator whose name contains that address. The indicator's pattern is
+
+  [url:value = 'https://1.1.1.1/cdn-cgi/trace']
+
+OpenCTI's full-text search is fuzzy and returned it; pattern_matches_observable re-verifies
+every hit against ipv4/ipv6 pattern values only, so a URL that merely contains the address
+is rejected. The same check rejects 1.1.1.11 for an observable of 1.1.1.1. This is the
+re-verification layer doing its job, not a miss.
+
+
+A LIMIT OF THIS INSTANCE WORTH RECORDING
+----------------------------------------
+Of 55,219 indicators ingested, a sample of ~3,000 held exactly 2 with an ipv4-addr
+pattern. The distribution was file 1,190 / url 1,071 / domain-name 514 / hostname 185 /
+email-addr 12 / cryptocurrency-wallet 3 / ipv4-addr 2. The connectors feeding this
+platform (AlienVault OTX, URLhaus, abuse.ch SSL, VirusTotal) publish mostly hashes, URLs
+and domains.
+
+This matters for the thesis rather than for the code: IP-based enrichment of flow records
+has very little to match against in this corpus, so a low match rate in any larger run is
+a property of the available threat intel, not evidence that enrichment is broken. The
+pipeline's features are flow statistics, so enrichment adds context to an alert rather
+than detection signal -- but the honest version of that claim is that on this corpus it
+will usually add nothing at all.
+
+
+METHOD NOTE
+-----------
+An early reading suggested the `Destination Address` fix had not worked. It had: several
+orphaned consumer processes from earlier attempts were still running older code on the
+same topic, each publishing its own enriched copy, and the first copy read happened to be
+a stale one. Counting occurrences per event_id showed up to 6 copies of a single input.
+The fix is confirmed by the records written by the current process, and the stale
+processes were stopped. Anyone repeating this should confirm only one consumer is running,
+or key on the newest record per event_id rather than the first.

@@ -61,7 +61,12 @@ logger = logging.getLogger("enrich")
 # stage, so accept the common spellings. Extend here, not in the logic.
 IP_FIELDS: tuple[str, ...] = (
     "src_ip", "source_ip", "src", "Source Address", "Source IP",
-    "dst_ip", "destination_ip", "dst", "Destination address", "Destination IP",
+    # `dest_ip` and the capitalized `Destination Address` were missing while their source-side
+    # counterparts were present, so a destination address spelled either way was silently
+    # never looked up -- found by a live run whose dest_ip went unchecked. Lookup is keyed on
+    # the exact field name, so each spelling has to be listed; the asymmetry is the bug.
+    "dst_ip", "dest_ip", "destination_ip", "dst",
+    "Destination Address", "Destination address", "Destination IP",
 )
 
 GRAPH_WALK_LIMIT = 25
@@ -348,7 +353,7 @@ query Indicators($search: String, $first: Int) {
 }"""
 
 _WALK_QUERY = """
-query Walk($id: String!, $first: Int) {
+query Walk($id: [String]!, $first: Int) {
   stixCoreRelationships(fromId: $id, first: $first) {
     edges { node {
       relationship_type
