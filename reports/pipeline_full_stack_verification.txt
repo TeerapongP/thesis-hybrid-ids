@@ -1,0 +1,83 @@
+Seven-layer pipeline -- full-stack live verification
+====================================================
+Date      2026-11-05
+Command   python -m src.pipeline --label "DoS Hulk" --dispatch
+Row       44383 (unified test split), true Label = DoS Hulk
+
+WHY THIS RUN EXISTED
+--------------------
+--dry-run is the default and everything up to this point had used it. The real --dispatch
+path had never executed once, so neither had the composition of the seven layers with the
+output layer actually sending.
+
+WHAT RAN, AND WHAT IT PRODUCED
+------------------------------
+  scoring        1 row fused in 0.026s (26.5 ms/row, Anaconda subprocess)
+  RF             P(attack) = 1.0000, predicted DoS Hulk
+  IF             raw 0.4868 -> normalized 0.4081
+  AE             mse 0.022210 -> normalized 0.2298
+  FUSION         fused_score 1.0000, decided_by random_forest, margin +0.9700
+  SHAP           risk_score 100, branch random_forest
+  RAG            T1498 (0.9813), T1499.002 detection (0.7969), T1499.002 description (0.6942)
+  LLM            Typhoon2 8B on Ollama, technique T1499.002, tactic impact
+  DISPATCH       rabbitmq=ok  influxdb=ok  elasticsearch=ok  notification=sent
+                 alert_id bfff10e2-6b8e-446b-a930-1169b3841f47, priority HIGH
+  LINE           Messaging API accepted the broadcast, HTTP 200
+
+Every layer ran against a real service. Nothing was stubbed.
+
+THREE DEFECTS THE RUN FOUND
+---------------------------
+1. THE SUMMARY CRASHED AFTER SENDING.  render_summary subscripted d["status"], but a real
+   dispatch_alert receipt has no top-level "status" -- it carries alert_id and priority plus
+   one status per sink. Only the dry-run shapes this module builds itself have that key, so
+   the default path could never hit it. Every --dispatch run therefore raised KeyError
+   *after* the alert had been published and the LINE message sent: the work succeeded and
+   the operator saw a traceback. Fixed to .get(); a test now asserts the real receipt shape
+   renders, using the exact receipt from this run.
+
+2. RABBITMQ'S `soc` VHOST IS CREATED BY NOTHING IN THE REPO.  A first dispatch failed with
+   (530) NOT_ALLOWED - vhost soc not found while InfluxDB and Elasticsearch succeeded. The
+   official rabbitmq image has no declarative vhost setting, so Compose cannot do it. The
+   earlier "RabbitMQ is live-verified" claim was true only against a volume that already
+   had the vhost; a rebuild loses the entire event bus. The two rabbitmqctl commands are now
+   in CLAUDE.md's bring-up section.
+
+3. THE LLM DESCRIBED A PORTSCAN AS A FLOOD.  Covered separately in
+   reports/llm_faithfulness_report.txt and the commit that fixed it. The prompt, not the
+   model, was wrong: render_few_shots substitutes the live alert's own predicted label into
+   the example's input while the example's behaviour clause was hardcoded to a flood.
+
+A DEMO TRAP, DOCUMENTED RATHER THAN FIXED
+-----------------------------------------
+write_influx_point uses the alert's own `timestamp` as the point time. For a flow replayed
+from CICIDS-2017 that is 2017-07-05, so this alert reports influxdb=ok truthfully and the
+point is genuinely stored -- at 2017-07-05 10:47:00, where the Grafana dashboard's recent
+windows cannot see it. Verified: a -30d query returns nothing for it, a 2017 range returns
+it with risk_score=100.
+
+Set Grafana's time range to the capture window when demonstrating on replayed data. This is
+deliberately not changed to wall-clock, which would assert that 2017 traffic happened today
+-- a worse misrepresentation than an empty panel. MTTD is unaffected either way: it is the
+ingested_at -> detected_at difference, which is preserved regardless of the absolute time.
+
+ALSO CORRECTED
+--------------
+assemble_alert_context's docstring called score_latency_s the "MEASURED per-row scoring
+latency". It is the run's mean: all rows score in one vectorised pass, so no per-row figure
+exists, and every alert in a run reports the same mttd_ms. Correct for a batch, wrong to
+read as a per-flow measurement. Only the docstring changed; computing it per row would mean
+abandoning vectorised scoring to measure the thing less accurately.
+
+STATE OF THE OUTPUT LAYER AFTER THIS RUN
+----------------------------------------
+  RabbitMQ        live-verified (vhost now provisioned, exchange soc.alerts, alert.HIGH)
+  InfluxDB        live-verified (see the timestamp caveat above)
+  Elasticsearch   live-verified (soc-alerts-2026.11.05, 15 docs total)
+  LINE            live-verified (broadcast, HTTP 200)
+  Gmail           not configured -- GMAIL_* are empty by the author's decision; reports
+                  dry-run and logs why. src/notifications/gmail_oauth_setup.py mints the
+                  refresh token when they choose to.
+
+tests/verify_dashboard_queries.py reports PASS: the Grafana and Kibana queries, taken
+verbatim from the provisioned dashboards, return records dispatch_alert actually wrote.

@@ -233,6 +233,32 @@ class TestSummaryRendering(unittest.TestCase):
         self.assertIn("DRY RUN -- nothing sent", text)
         self.assertIn("alert.HIGH", text)
 
+    def test_renders_a_real_dispatch_receipt(self):
+        """A real dispatch_alert receipt has no top-level "status".
+
+        It carries alert_id and priority plus one status per sink. render_summary
+        subscripted d["status"], so every --dispatch run raised KeyError *after* the alert
+        had already been published and the LINE message sent -- the one shape the dry-run
+        default never produces, so nothing caught it until the first live run. The receipt
+        below is the exact shape dispatch_alert returned on that run.
+        """
+        payload = {**self.PAYLOAD, "alerts": [dict(self.PAYLOAD["alerts"][0])]}
+        payload["alerts"][0]["llm_output"] = {
+            "priority": "HIGH", "explanation_th": "ทดสอบ", "technique_id": "T1046",
+            "mitre_tactic": "discovery", "remediation": ["บล็อก IP"],
+        }
+        payload["alerts"][0]["dispatch"] = {
+            "alert_id": "bfff10e2-6b8e-446b-a930-1169b3841f47", "priority": "HIGH",
+            "risk_score": 100, "model_used": "random_forest",
+            "rabbitmq": {"status": "ok", "exchange": "soc.alerts", "routing_key": "alert.HIGH"},
+            "influxdb": {"status": "ok"}, "elasticsearch": {"status": "ok"},
+            "notification": {"status": "sent", "delivery_mode": "broadcast", "http_status": 200},
+        }
+        text = pipeline.render_summary(payload)
+        self.assertIn("bfff10e2-6b8e-446b-a930-1169b3841f47", text)
+        self.assertIn("notification=sent", text)
+        self.assertNotIn("DRY RUN", text)
+
 
 class TestCliDefaults(unittest.TestCase):
     def test_dry_run_is_the_default_and_dispatch_is_opt_in(self):

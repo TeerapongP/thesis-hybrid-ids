@@ -483,18 +483,22 @@ def render_summary(payload: dict[str, Any]) -> str:
         else:
             L.append("  LLM             skipped (--no-llm)")
         d = alert.get("dispatch")
-        if d and d["status"] == "dry_run":
+        # .get, not ["status"]: a real dispatch_alert receipt has no top-level "status" --
+        # it carries alert_id/priority plus one status per sink -- so subscripting raised
+        # KeyError and crashed the summary on every --dispatch run, after the alert had
+        # already been sent. Only the dry-run shapes this module builds itself have it.
+        if d and d.get("status") == "dry_run":
             rec = d["record"]
             L += [f"  DISPATCH        DRY RUN -- nothing sent. Would publish {d['routing_key']} "
                   f"to RabbitMQ, write InfluxDB + Elasticsearch,",
                   f"                  and notify via {d['would_route_to']}.",
                   f"                  risk_score={rec['risk_score']}  model_used={rec['model_used']}  "
                   f"anomaly_type={rec['anomaly_type']}  mttd_ms={rec['mttd_ms']}"]
-        elif d and d["status"] == "suppressed":
+        elif d and d.get("status") == "suppressed":
             L += ["  DISPATCH        SUPPRESSED -- the fusion rule classified this flow as not "
                   "an attack, so no",
                   "                  alert is raised and no explanation was generated."]
-        elif d and d["status"] == "skipped":
+        elif d and d.get("status") == "skipped":
             L.append(f"  DISPATCH        skipped ({d['reason']})")
         elif d:
             L.append(f"  DISPATCH        alert_id={d.get('alert_id')}  priority={d.get('priority')}  "

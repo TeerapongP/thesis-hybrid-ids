@@ -409,6 +409,8 @@ docker exec opencti-opencti-rabbitmq-1 rabbitmqctl add_vhost soc
 docker exec opencti-opencti-rabbitmq-1 rabbitmqctl set_permissions -p soc opencti ".*" ".*" ".*"
 ```
 
+**A demo trap worth knowing before any live demonstration.** `write_influx_point` uses the alert record's own `timestamp` as the point time, and for a flow replayed out of CICIDS-2017 that is **2017-07-05**. So a dispatched alert reports `influxdb=ok` truthfully and the point is genuinely stored — nine years in the past, where the Grafana dashboard's recent-window panels will never show it (confirmed 2026-11-05: `alert_id=bfff10e2…` HIGH risk_score=100 sits at `2017-07-05 10:47:00`, invisible to a `-30d` query). **Set Grafana's time range to the 2017 capture window when demonstrating on replayed data.** This is deliberately not "fixed" by writing at wall-clock: that would assert 2017 traffic happened today, which is a worse misrepresentation than an empty panel, and MTTD is unaffected either way since it is the `ingested_at`→`detected_at` difference, which is preserved.
+
 This is why "RabbitMQ is live-verified" was true and still not reproducible: the verification ran against a volume that already had the vhost, and nothing in the repo recreated it. Re-run `uv run python tests/verify_dashboard_queries.py` after a dispatch to confirm the whole output layer; note it queries InfluxDB over `-30d`, so with no recent write it reports FAIL purely from an empty window rather than from a broken path — dispatch one alert first, then re-run.
 
 Each stack's `.env` file holds real credentials/tokens; never print or commit their contents. The Compose commands above name each stack's env file explicitly.
