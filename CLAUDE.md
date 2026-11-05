@@ -398,6 +398,15 @@ docker compose --env-file opencti/.env -f opencti/docker-compose.yml up -d
 docker compose --env-file observability/.env -f observability/docker-compose.yml up -d
 docker compose --env-file notification/.env -f grafana/docker-compose.yml up -d
 ```
+**The `soc` RabbitMQ vhost is not created by any of this and must be added by hand** (found 2026-11-05: a freshly started broker had only `/`, and `dispatch_alert` failed with `(530) NOT_ALLOWED - vhost soc not found` while InfluxDB and Elasticsearch succeeded). The official `rabbitmq` image has no declarative vhost setting, so Compose cannot do it; it needs `rabbitmqctl` or a mounted `definitions.json`. The broker user is the one embedded in `RABBITMQ_URL` (currently `opencti`, since the stack reuses the OpenCTI broker):
+
+```bash
+docker exec opencti-opencti-rabbitmq-1 rabbitmqctl add_vhost soc
+docker exec opencti-opencti-rabbitmq-1 rabbitmqctl set_permissions -p soc opencti ".*" ".*" ".*"
+```
+
+This is why "RabbitMQ is live-verified" was true and still not reproducible: the verification ran against a volume that already had the vhost, and nothing in the repo recreated it. Re-run `uv run python tests/verify_dashboard_queries.py` after a dispatch to confirm the whole output layer; note it queries InfluxDB over `-30d`, so with no recent write it reports FAIL purely from an empty window rather than from a broken path — dispatch one alert first, then re-run.
+
 Each stack's `.env` file holds real credentials/tokens; never print or commit their contents. The Compose commands above name each stack's env file explicitly.
 
 `observability/.env.example` lists the three required InfluxDB initialization keys. Add them with unique values to the ignored `observability/.env`; Compose exits if any are missing. `opencti/.env.example` lists the platform bootstrap token, the worker token, and one token variable per connector. OpenCTI 5.12.17 documents the worker token as requiring an administrator account with bypass capability, so provision a dedicated worker service identity with that required privilege and set `OPENCTI_WORKER_ADMIN_TOKEN`; do not reuse the platform bootstrap token. Create a separate least-privilege Connector-role account/token for each connector and set its matching `OPENCTI_*_CONNECTOR_TOKEN` variable. Only the platform receives `OPENCTI_ADMIN_TOKEN`. Compose fails closed until these credentials are provisioned in the ignored `opencti/.env`.
@@ -410,7 +419,7 @@ Historical runtime verification on 2026-07-18 used the then-current local creden
 
 ## Working with the datasets
 
-**Note on `eda_sanity_check.py` vs. `preprocess_pipeline.py` currently disagreeing about the UNSW source**: `eda_sanity_check.py` was not touched during the CIC-UNSW-NB15 migration and still loads/reports on the *old* raw UNSW-NB15 4-file format (`UNSW-NB15_1..4.csv`, still present in `data/raw/` but no longer used by `preprocess_pipeline.py`). Its UNSW-related findings below no longer describe what actually feeds the `unswnb15` pipeline slot — treat them as historical/archived, relevant only if `eda_sanity_check.py` is updated or the old format is ever revived.
+**`eda_sanity_check.py` and `preprocess_pipeline.py` now agree about the UNSW source.** They disagreed for a long time — the sanity check still loaded the old raw 4-file format (`UNSW-NB15_1..4.csv`) after `preprocess_pipeline.py` had migrated to CIC-UNSW-NB15, so the EDA report described files the pipeline no longer read. It now loads `data/raw/cic-unsw-nb15/Data.csv` + `Label.csv` by the same positional join, and reports the raw 0–9 code distribution. **Two checks were deliberately dropped rather than ported**, because they describe the old format and no longer apply: reading `NUSW-NB15_features.csv` as `cp1252` to assemble column names (`Data.csv` has its own header), and the `attack_cat`/`Label` cross-consistency reconciliation (both are now derived from the same `Label.csv` code, so they agree by construction and the script only asserts it). The `utf-8-sig` BOM guard is kept. One genuine gap is reported rather than skipped: `Data.csv` carries **no timestamp column at all**, so the timestamp check cannot run on this dataset — `CICFlowMeter_out.csv` is where those live. The UNSW entries in the "Known quirks" list below that refer to the 4-file format are marked archived and are history, not current behaviour.
 
 Known quirks (already handled in `eda_sanity_check.py`, keep these in mind for any new preprocessing script):
 - CICIDS-2017 column names have stray leading/trailing whitespace — must `.str.strip()` them.

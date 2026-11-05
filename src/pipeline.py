@@ -184,10 +184,15 @@ def build_alert_context(
 ) -> dict[str, Any]:
     """The alert context every downstream layer consumes.
 
-    `ingested_at` is the flow's own capture time and `detected_at` is that plus the MEASURED
-    per-row scoring latency, which is what src/evaluation/mttd_eval.py does. Transport,
-    enrichment, RAG and LLM time are excluded deliberately: none is live-verified end to end
-    and all of it happens after the detection decision.
+    `ingested_at` is the flow's own capture time and `detected_at` is that plus the measured
+    scoring latency, which is what src/evaluation/mttd_eval.py does. Transport, enrichment,
+    RAG and LLM time are excluded deliberately: none is live-verified end to end and all of
+    it happens after the detection decision.
+
+    `score_latency_s` is the run's mean, not this row's own time: all rows are scored in one
+    vectorised pass, so no per-row figure exists to measure. Every alert in a run therefore
+    reports the same mttd_ms, which is correct for a batch and should not be read as a
+    per-flow measurement.
     """
     ts = _iso(ident_row["Timestamp"])
     detected = _iso(_add_seconds(ident_row["Timestamp"], score_latency_s))
