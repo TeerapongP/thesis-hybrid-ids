@@ -1,0 +1,221 @@
+==========================================================================
+split robustness: random vs group-aware stratified CV
+==========================================================================
+  rows 2,520,961  groups 128,929  network features 92  device cuda  smoke False
+  schemes ['random', 'grouped']  folds [0, 1, 2, 3, 4]  checkpoints E:\thesis\reports\split_robustness_checkpoints
+  fusion confidence_threshold 0.95  fused_decision_threshold 0.03
+==========================================================================
+random fold 0
+==========================================================================
+  rows train 1,512,576  val 504,192  test 504,193
+  group overlap % test-train 96.37  test-val 93.54  train-val 93.55
+  rf    precision 0.9996  recall 0.9996  f1 0.9996  auc_roc 1.0000  fpr 0.0001
+  if    precision 0.5452  recall 0.5754  f1 0.5599  auc_roc 0.8714  fpr 0.0975
+  ae    precision 0.9441  recall 0.8397  f1 0.8888  auc_roc 0.9849  fpr 0.0101
+  fused precision 0.9956  recall 0.9976  f1 0.9966  auc_roc 1.0000  fpr 0.0009
+  fold finished in 257.3s
+==========================================================================
+random fold 1
+==========================================================================
+  rows train 1,512,576  val 504,193  test 504,192
+  group overlap % test-train 96.31  test-val 93.42  train-val 93.52
+  rf    precision 0.9995  recall 0.9996  f1 0.9996  auc_roc 1.0000  fpr 0.0001
+  if    precision 0.5270  recall 0.5868  f1 0.5553  auc_roc 0.8625  fpr 0.1070
+  ae    precision 0.9440  recall 0.8429  f1 0.8906  auc_roc 0.9820  fpr 0.0102
+  fused precision 0.9957  recall 0.9973  f1 0.9965  auc_roc 1.0000  fpr 0.0009
+  fold finished in 259.5s
+==========================================================================
+random fold 2
+==========================================================================
+  rows train 1,512,576  val 504,193  test 504,192
+  group overlap % test-train 96.40  test-val 93.52  train-val 93.48
+  rf    precision 0.9994  recall 0.9995  f1 0.9995  auc_roc 1.0000  fpr 0.0001
+  if    precision 0.5508  recall 0.5882  f1 0.5689  auc_roc 0.8763  fpr 0.0975
+  ae    precision 0.9418  recall 0.8359  f1 0.8857  auc_roc 0.9838  fpr 0.0105
+  fused precision 0.9960  recall 0.9975  f1 0.9968  auc_roc 1.0000  fpr 0.0008
+  fold finished in 245.6s
+==========================================================================
+random fold 3
+==========================================================================
+  rows train 1,512,576  val 504,193  test 504,192
+  group overlap % test-train 96.35  test-val 93.53  train-val 93.49
+  rf    precision 0.9996  recall 0.9996  f1 0.9996  auc_roc 1.0000  fpr 0.0001
+  if    precision 0.5236  recall 0.5943  f1 0.5567  auc_roc 0.8621  fpr 0.1099
+  ae    precision 0.9466  recall 0.8485  f1 0.8949  auc_roc 0.9832  fpr 0.0097
+  fused precision 0.9960  recall 0.9975  f1 0.9967  auc_roc 1.0000  fpr 0.0008
+  fold finished in 245.6s
+==========================================================================
+random fold 4
+==========================================================================
+  rows train 1,512,576  val 504,193  test 504,192
+  group overlap % test-train 96.39  test-val 93.48  train-val 93.47
+  rf    precision 0.9994  recall 0.9997  f1 0.9996  auc_roc 1.0000  fpr 0.0001
+  if    precision 0.5229  recall 0.5944  f1 0.5564  auc_roc 0.8664  fpr 0.1102
+  ae    precision 0.9430  recall 0.8440  f1 0.8908  auc_roc 0.9821  fpr 0.0104
+  fused precision 0.9963  recall 0.9974  f1 0.9968  auc_roc 1.0000  fpr 0.0008
+  fold finished in 253.1s
+==========================================================================
+grouped fold 0
+==========================================================================
+  rows train 1,571,851  val 514,860  test 434,250
+  group overlap % test-train 0.00  test-val 0.00  train-val 0.00
+  rf    precision 0.9995  recall 0.9040  f1 0.9493  auc_roc 1.0000  fpr 0.0001
+  if    precision 0.4439  recall 0.4852  f1 0.4636  auc_roc 0.8420  fpr 0.0849
+  ae    precision 0.9035  recall 0.7796  f1 0.8370  auc_roc 0.9745  fpr 0.0116
+  fused precision 0.9823  recall 0.9874  f1 0.9848  auc_roc 0.9997  fpr 0.0025
+  fold finished in 258.7s
+==========================================================================
+grouped fold 1
+==========================================================================
+  rows train 1,532,146  val 483,695  test 505,120
+  group overlap % test-train 0.00  test-val 0.00  train-val 0.00
+  classes absent from train but present in test (n_test): {'DoS GoldenEye': 6164}
+  rf    precision 0.9997  recall 0.9412  f1 0.9696  auc_roc 1.0000  fpr 0.0001
+  if    precision 0.6532  recall 0.7733  f1 0.7082  auc_roc 0.9155  fpr 0.0914
+  ae    precision 0.9552  recall 0.9107  f1 0.9325  auc_roc 0.9884  fpr 0.0095
+  fused precision 0.9929  recall 0.9965  f1 0.9947  auc_roc 0.9999  fpr 0.0016
+  fold finished in 227.6s
+==========================================================================
+grouped fold 2
+==========================================================================
+  rows train 1,574,827  val 434,032  test 512,102
+  group overlap % test-train 0.00  test-val 0.00  train-val 0.00
+  rf    precision 0.9994  recall 0.9929  f1 0.9962  auc_roc 1.0000  fpr 0.0002
+  if    precision 0.6560  recall 0.6176  f1 0.6362  auc_roc 0.9051  fpr 0.0909
+  ae    precision 0.9640  recall 0.9393  f1 0.9515  auc_roc 0.9890  fpr 0.0098
+  fused precision 0.9736  recall 0.9923  f1 0.9829  auc_roc 0.9997  fpr 0.0075
+  fold finished in 237.2s
+==========================================================================
+grouped fold 3
+==========================================================================
+  rows train 1,492,346  val 448,976  test 579,639
+  group overlap % test-train 0.00  test-val 0.00  train-val 0.00
+  rf    precision 0.9994  recall 0.9994  f1 0.9994  auc_roc 1.0000  fpr 0.0001
+  if    precision 0.4690  recall 0.3792  f1 0.4193  auc_roc 0.7988  fpr 0.1003
+  ae    precision 0.9405  recall 0.7881  f1 0.8576  auc_roc 0.9818  fpr 0.0116
+  fused precision 0.9153  recall 0.9958  f1 0.9539  auc_roc 0.9996  fpr 0.0215
+  fold finished in 231.1s
+==========================================================================
+grouped fold 4
+==========================================================================
+  rows train 1,495,439  val 535,672  test 489,850
+  group overlap % test-train 0.00  test-val 0.00  train-val 0.00
+  classes absent from train but present in test (n_test): {'Web Attack - Sql Injection': 21}
+  rf    precision 0.9703  recall 0.5665  f1 0.7154  auc_roc 0.9981  fpr 0.0024
+  if    precision 0.4023  recall 0.7851  f1 0.5320  auc_roc 0.8508  fpr 0.1584
+  ae    precision 0.7668  recall 0.6464  f1 0.7015  auc_roc 0.9623  fpr 0.0267
+  fused precision 0.9407  recall 0.9785  f1 0.9593  auc_roc 0.9959  fpr 0.0084
+  fold finished in 236.1s
+==========================================================================
+per-scheme results
+==========================================================================
+grouped: folds [0, 1, 2, 3, 4]  pooled rows 2,520,961  test-train 0.00%  test-val 0.00%  train-val 0.00%  rows of classes absent from train 6,185
+  rf    precision 0.9937+-0.0131 (pooled 0.9969)  recall 0.8808+-0.1800 (pooled 0.9136)  f1 0.9260+-0.1195 (pooled 0.9535)  auc_roc 0.9996+-0.0009 (pooled 0.9998)  fpr 0.0006+-0.0010 (pooled 0.0006)
+  if    precision 0.5249+-0.1208 (pooled 0.5336)  recall 0.6081+-0.1776 (pooled 0.5963)  f1 0.5519+-0.1197 (pooled 0.5632)  auc_roc 0.8624+-0.0481 (pooled 0.8630)  fpr 0.1052+-0.0303 (pooled 0.1059)
+  ae    precision 0.9060+-0.0812 (pooled 0.9238)  recall 0.8128+-0.1172 (pooled 0.8339)  f1 0.8560+-0.0990 (pooled 0.8766)  auc_roc 0.9792+-0.0111 (pooled 0.9763)  fpr 0.0139+-0.0072 (pooled 0.0140)
+  fused precision 0.9610+-0.0321 (pooled 0.9584)  recall 0.9901+-0.0074 (pooled 0.9916)  f1 0.9751+-0.0176 (pooled 0.9747)  auc_roc 0.9990+-0.0017 (pooled 0.9993)  fpr 0.0083+-0.0080 (pooled 0.0088)
+random: folds [0, 1, 2, 3, 4]  pooled rows 2,520,961  test-train 96.36%  test-val 93.50%  train-val 93.50%  rows of classes absent from train 0
+  rf    precision 0.9995+-0.0001 (pooled 0.9995)  recall 0.9996+-0.0001 (pooled 0.9996)  f1 0.9996+-0.0001 (pooled 0.9996)  auc_roc 1.0000+-0.0000 (pooled 1.0000)  fpr 0.0001+-0.0000 (pooled 0.0001)
+  if    precision 0.5339+-0.0131 (pooled 0.5336)  recall 0.5878+-0.0078 (pooled 0.5878)  f1 0.5594+-0.0056 (pooled 0.5594)  auc_roc 0.8677+-0.0061 (pooled 0.8675)  fpr 0.1044+-0.0064 (pooled 0.1044)
+  ae    precision 0.9439+-0.0018 (pooled 0.9439)  recall 0.8422+-0.0047 (pooled 0.8422)  f1 0.8902+-0.0033 (pooled 0.8902)  auc_roc 0.9832+-0.0012 (pooled 0.9829)  fpr 0.0102+-0.0003 (pooled 0.0102)
+  fused precision 0.9959+-0.0003 (pooled 0.9959)  recall 0.9974+-0.0001 (pooled 0.9974)  f1 0.9967+-0.0001 (pooled 0.9967)  auc_roc 1.0000+-0.0000 (pooled 1.0000)  fpr 0.0008+-0.0001 (pooled 0.0008)
+==========================================================================
+random vs grouped, pooled over the identical row set
+==========================================================================
+model    metric  random  grouped   delta  random_seen  grouped_seen  delta_seen
+   rf precision  0.9995   0.9969 -0.0026       0.9995        0.9969     -0.0026
+   rf    recall  0.9996   0.9136 -0.0860       0.9996        0.9244     -0.0752
+   rf        f1  0.9996   0.9535 -0.0461       0.9995        0.9593     -0.0403
+   rf   auc_roc  1.0000   0.9998 -0.0002       1.0000        0.9998     -0.0002
+   rf       fpr  0.0001   0.0006  0.0005       0.0001        0.0006      0.0005
+   if precision  0.5336   0.5336  0.0000       0.5308        0.5308      0.0001
+   if    recall  0.5878   0.5963  0.0085       0.5898        0.5985      0.0086
+   if        f1  0.5594   0.5632  0.0038       0.5587        0.5626      0.0039
+   if   auc_roc  0.8675   0.8630 -0.0045       0.8675        0.8628     -0.0047
+   if       fpr  0.1044   0.1059  0.0015       0.1044        0.1059      0.0015
+   ae precision  0.9439   0.9238 -0.0201       0.9436        0.9234     -0.0202
+   ae    recall  0.8422   0.8339 -0.0083       0.8494        0.8409     -0.0084
+   ae        f1  0.8902   0.8766 -0.0136       0.8940        0.8802     -0.0138
+   ae   auc_roc  0.9829   0.9763 -0.0067       0.9831        0.9764     -0.0068
+   ae       fpr  0.0102   0.0140  0.0038       0.0102        0.0140      0.0038
+fused precision  0.9959   0.9584 -0.0376       0.9959        0.9578     -0.0381
+fused    recall  0.9974   0.9916 -0.0058       0.9974        0.9917     -0.0058
+fused        f1  0.9967   0.9747 -0.0220       0.9966        0.9744     -0.0222
+fused   auc_roc  1.0000   0.9993 -0.0007       1.0000        0.9993     -0.0006
+fused       fpr  0.0008   0.0088  0.0079       0.0008        0.0088      0.0079
+
+  _seen columns drop the same row set from both schemes: every row whose class had 0
+  train rows in that row's fold under ANY scheme of this run. The leakage effect is
+  read from delta_seen, not delta.
+  common excluded rows 6,185  by class {'DoS GoldenEye': 6164, 'Web Attack - Sql Injection': 21}
+  seen population rows  random 2,514,776  grouped 2,514,776
+
+  classes absent from train in a fold (held-out categories, not leakage):
+    grouped fold 1: DoS GoldenEye (n_test 6164)
+    grouped fold 4: Web Attack - Sql Injection (n_test 21)
+
+  per-class pooled recall; seen = rows outside the common exclusion set (rows whose class had no train rows in that fold under any scheme)
+                     label model  n_random  n_grouped  n_excluded_common_grouped  recall_random  recall_grouped  recall_seen_random  recall_seen_grouped  delta_seen
+                       Bot    ae      1948       1948                          0         0.0190          0.0210              0.0190               0.0210      0.0021
+                       Bot fused      1948       1948                          0         0.7449          0.7213              0.7449               0.7213     -0.0236
+                       Bot    if      1948       1948                          0         0.0231          0.0231              0.0231               0.0231      0.0000
+                       Bot    rf      1948       1948                          0         0.9682          0.9559              0.9682               0.9559     -0.0123
+                      DDoS    ae    128014     128014                          0         0.9650          0.9525              0.9650               0.9525     -0.0125
+                      DDoS fused    128014     128014                          0         0.9999          0.9965              0.9999               0.9965     -0.0033
+                      DDoS    if    128014     128014                          0         0.6135          0.6273              0.6135               0.6273      0.0137
+                      DDoS    rf    128014     128014                          0         0.9999          0.9721              0.9999               0.9721     -0.0278
+             DoS GoldenEye    ae     10286      10286                       6164         0.3254          0.3138              0.2790               0.2455     -0.0335
+             DoS GoldenEye fused     10286      10286                       6164         0.9993          0.9927              0.9993               0.9971     -0.0022
+             DoS GoldenEye    if     10286      10286                       6164         0.4125          0.3943              0.3503               0.3100     -0.0403
+             DoS GoldenEye    rf     10286      10286                       6164         0.9998          0.2013              0.9998               0.2283     -0.7715
+                  DoS Hulk    ae    172846     172846                          0         0.9506          0.9343              0.9506               0.9343     -0.0162
+                  DoS Hulk fused    172846     172846                          0         0.9995          0.9974              0.9995               0.9974     -0.0022
+                  DoS Hulk    if    172846     172846                          0         0.9209          0.9333              0.9209               0.9333      0.0124
+                  DoS Hulk    rf    172846     172846                          0         1.0000          0.8741              1.0000               0.8741     -0.1258
+          DoS Slowhttptest    ae      5228       5228                          0         0.5822          0.6232              0.5822               0.6232      0.0409
+          DoS Slowhttptest fused      5228       5228                          0         0.9966          0.9862              0.9966               0.9862     -0.0103
+          DoS Slowhttptest    if      5228       5228                          0         0.5964          0.6213              0.5964               0.6213      0.0249
+          DoS Slowhttptest    rf      5228       5228                          0         0.9979          0.6655              0.9979               0.6655     -0.3324
+             DoS slowloris    ae      5385       5385                          0         0.5842          0.5668              0.5842               0.5668     -0.0175
+             DoS slowloris fused      5385       5385                          0         0.9948          0.9122              0.9948               0.9122     -0.0826
+             DoS slowloris    if      5385       5385                          0         0.5829          0.5857              0.5829               0.5857      0.0028
+             DoS slowloris    rf      5385       5385                          0         0.9970          0.8812              0.9970               0.8812     -0.1159
+               FTP-Patator    ae      5931       5931                          0         0.0005          0.0005              0.0005               0.0005      0.0000
+               FTP-Patator fused      5931       5931                          0         0.9988          0.9938              0.9988               0.9938     -0.0051
+               FTP-Patator    if      5931       5931                          0         0.0003          0.0002              0.0003               0.0002     -0.0002
+               FTP-Patator    rf      5931       5931                          0         0.9997          0.9963              0.9997               0.9963     -0.0034
+                Heartbleed    ae        11         11                          0         1.0000          1.0000              1.0000               1.0000      0.0000
+                Heartbleed fused        11         11                          0         1.0000          1.0000              1.0000               1.0000      0.0000
+                Heartbleed    if        11         11                          0         1.0000          1.0000              1.0000               1.0000      0.0000
+                Heartbleed    rf        11         11                          0         0.9091          0.9091              0.9091               0.9091      0.0000
+              Infiltration    ae        36         36                          0         0.5833          0.4722              0.5833               0.4722     -0.1111
+              Infiltration fused        36         36                          0         0.9167          0.8333              0.9167               0.8333     -0.0833
+              Infiltration    if        36         36                          0         0.8611          0.8611              0.8611               0.8611      0.0000
+              Infiltration    rf        36         36                          0         0.6111          0.4722              0.6111               0.4722     -0.1389
+                  PortScan    ae     90694      90694                          0         0.6737          0.6835              0.6737               0.6835      0.0097
+                  PortScan fused     90694      90694                          0         0.9964          0.9896              0.9964               0.9896     -0.0068
+                  PortScan    if     90694      90694                          0         0.0207          0.0178              0.0207               0.0178     -0.0028
+                  PortScan    rf     90694      90694                          0         0.9997          0.9944              0.9997               0.9944     -0.0053
+               SSH-Patator    ae      3219       3219                          0         0.0009          0.0009              0.0009               0.0009      0.0000
+               SSH-Patator fused      3219       3219                          0         0.9894          0.9487              0.9894               0.9487     -0.0407
+               SSH-Patator    if      3219       3219                          0         0.0003          0.0000              0.0003               0.0000     -0.0003
+               SSH-Patator    rf      3219       3219                          0         0.9981          0.9556              0.9981               0.9556     -0.0426
+  Web Attack - Brute Force    ae      1470       1470                          0         0.0000          0.0000              0.0000               0.0000      0.0000
+  Web Attack - Brute Force fused      1470       1470                          0         0.9714          0.8374              0.9714               0.8374     -0.1340
+  Web Attack - Brute Force    if      1470       1470                          0         0.0497          0.0497              0.0497               0.0497      0.0000
+  Web Attack - Brute Force    rf      1470       1470                          0         0.9959          0.9776              0.9959               0.9776     -0.0184
+Web Attack - Sql Injection    ae        21         21                         21         0.0000          0.0000                 NaN                  NaN         NaN
+Web Attack - Sql Injection fused        21         21                         21         0.6667          0.5238                 NaN                  NaN         NaN
+Web Attack - Sql Injection    if        21         21                         21         0.0000          0.0000                 NaN                  NaN         NaN
+Web Attack - Sql Injection    rf        21         21                         21         0.8095          0.4762                 NaN                  NaN         NaN
+          Web Attack - XSS    ae       652        652                          0         0.0000          0.0000              0.0000               0.0000      0.0000
+          Web Attack - XSS fused       652        652                          0         0.9586          0.8206              0.9586               0.8206     -0.1380
+          Web Attack - XSS    if       652        652                          0         0.0245          0.0261              0.0245               0.0261      0.0015
+          Web Attack - XSS    rf       652        652                          0         0.9939          0.9847              0.9939               0.9847     -0.0092
+
+  Reading the table: delta is grouped minus random with identical training code. A gap
+  is attributable to temporal-autocorrelation leakage only where the class had train rows
+  in the grouped fold, so read delta_seen. Grouped CV can leave a class with no train
+  rows (a class confined to one group is held out whole), which is a zero-day effect and
+  not leakage, and those rows are excluded from the _seen columns and listed above.
+  Pooled AUC concatenates scores normalized per fold with that fold's train constants.
