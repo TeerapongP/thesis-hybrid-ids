@@ -147,6 +147,54 @@ class FixedContractTests(unittest.TestCase):
         self.assertEqual(post.call_args.args[0], notify_line.LINE_PUSH_URL)
         self.assertEqual(post.call_args.kwargs["json"]["to"], config["line_to_id"])
 
+    def test_line_broadcast_mode_needs_no_recipient(self):
+        """Broadcast must reach the API with LINE_TO_ID empty, and carry no `to` field.
+
+        This is the whole point of the mode: the destination id cannot be fetched from
+        the API, so requiring one would leave the channel permanently in dry-run.
+        """
+        response = Mock(status_code=200)
+        config = {
+            "line_channel_access_token": "AbCdEfGhIjKlMnOpQrStUvWxYz123456",
+            "line_to_id": "",
+            "line_delivery_mode": "broadcast",
+            "line_grafana_base_url": "http://localhost:3001",
+        }
+        with patch.object(notify_line.requests, "post", return_value=response) as post:
+            result = notify_line.send_line_alert({"priority": "HIGH"}, config)
+
+        self.assertEqual(result["status"], "sent")
+        self.assertEqual(result["delivery_mode"], "broadcast")
+        self.assertEqual(post.call_args.args[0], notify_line.LINE_BROADCAST_URL)
+        self.assertNotIn("to", post.call_args.kwargs["json"])
+
+    def test_unknown_line_mode_falls_back_to_push_not_broadcast(self):
+        """A typo must not widen the blast radius to every friend of the channel."""
+        for mode in ("broadcst", "BROADCAST ", "", None):
+            with self.subTest(mode=mode):
+                resolved, url = notify_line.resolve_delivery({"line_delivery_mode": mode})
+                if mode == "BROADCAST ":
+                    # Case and surrounding whitespace are normalized, not rejected.
+                    self.assertEqual((resolved, url), ("broadcast", notify_line.LINE_BROADCAST_URL))
+                else:
+                    self.assertEqual((resolved, url), ("push", notify_line.LINE_PUSH_URL))
+
+    def test_line_dry_run_distinguishes_missing_token_from_missing_recipient(self):
+        """send_line_alert collapses causes into one dry-run; the reason must still differ.
+
+        Without this, a revoked token and an unset recipient produce the same receipt and
+        the output layer cannot be diagnosed from its own logs.
+        """
+        base = {"line_grafana_base_url": "http://localhost:3001", "line_delivery_mode": "push"}
+        no_token = notify_line.send_line_alert({}, {**base, "line_to_id": "U" + "1" * 32})
+        no_dest = notify_line.send_line_alert(
+            {}, {**base, "line_channel_access_token": "AbCdEfGhIjKlMnOpQrStUvWxYz123456",
+                 "line_to_id": ""})
+
+        self.assertEqual([no_token["status"], no_dest["status"]], ["dry_run", "dry_run"])
+        self.assertIn("token", no_token["reason"])
+        self.assertIn("recipient", no_dest["reason"])
+
     def test_mttd_uses_ingest_and_detection_timestamps(self):
         self.assertEqual(
             alert_dispatcher._elapsed_ms("2026-09-24T10:00:00+07:00", "2026-09-24T10:00:02+07:00"),

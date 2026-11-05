@@ -75,6 +75,11 @@ def load_env_config(env_path: Path = NOTIFICATION_ENV_PATH) -> dict[str, Any]:
         "elastic_alert_index_pattern": raw["ELASTIC_ALERT_INDEX"],
         "line_channel_access_token": raw["LINE_CHANNEL_ACCESS_TOKEN"],
         "line_to_id": raw["LINE_TO_ID"],
+        # Read with a default rather than listed in REQUIRED_ENV_KEYS: an existing
+        # notification/.env written before this key existed must keep loading, and the
+        # default is the narrower of the two modes. notify_line.resolve_delivery() owns
+        # validating the value.
+        "line_delivery_mode": raw.get("LINE_DELIVERY_MODE") or "push",
         "line_grafana_base_url": raw["LINE_GRAFANA_BASE_URL"],
         "gmail_client_id": raw["GMAIL_CLIENT_ID"],
         "gmail_client_secret": raw["GMAIL_CLIENT_SECRET"],

@@ -29,6 +29,7 @@ import urllib.error
 import urllib.request
 
 from .config_utils import looks_real
+from .notify_line import resolve_delivery
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 ENV_PATH = ROOT / "notification" / ".env"
@@ -102,14 +103,28 @@ def main() -> int:
         if status2 == 200 and value is not None:
             print(f"ok    used       {used.get('totalUsage')} of {value} this month")
 
+    mode, url = resolve_delivery({"line_delivery_mode": env.get("LINE_DELIVERY_MODE")})
+    print(f"ok    mode       {mode} -> {url}")
+    if mode == "broadcast":
+        print("note  broadcast  reaches every friend of this channel; no routing, and LINE "
+              "allows 60 requests/hour per channel")
+        if problems:
+            print()
+            print("\n".join(f"  - {p}" for p in problems))
+            return 1
+        print("\nPASS  channel is usable; send_line_alert will broadcast to all friends.")
+        return _maybe_send_test(args, env, token, recipient, mode)
+
     if not looks_real(recipient, min_len=8):
         problems.append(
-            "LINE_TO_ID is empty. It is the push destination and cannot be derived from the "
-            "token: /v2/bot/followers/ids needs a verified or premium Official Account and "
-            "returns HTTP 403 otherwise, and a group or room id only arrives on a webhook "
-            "event, which this project does not run. Copy \"Your user ID\" from the LINE "
-            "Developers console's Basic settings tab (33 characters, starts with U), and add "
-            "the bot as a friend from that account first -- a push to a non-friend is rejected."
+            "LINE_TO_ID is empty while LINE_DELIVERY_MODE is push. It is the push "
+            "destination and cannot be derived from the token: /v2/bot/followers/ids needs a "
+            "verified or premium Official Account and returns HTTP 403 otherwise, and a group "
+            "or room id only arrives on a webhook event, which this project does not run. "
+            "Either copy \"Your user ID\" from the LINE Developers console's Basic settings "
+            "tab (33 characters, starts with U) and add the bot as a friend from that account "
+            "-- a push to a non-friend is rejected -- or set LINE_DELIVERY_MODE=broadcast, "
+            "which needs no recipient."
         )
         print("FAIL  recipient  LINE_TO_ID not configured")
     elif recipient == bot_id:
@@ -124,18 +139,35 @@ def main() -> int:
         return 1
 
     print("\nPASS  channel is usable; send_line_alert will attempt a real push.")
+    return _maybe_send_test(args, env, token, recipient, mode)
 
-    if args.send_test:
-        from .notify_line import send_line_alert
-        record = {"priority": "HIGH", "source_ip": "198.51.100.23",
-                  "mitre_tactic": "Credential Access",
-                  "explanation_th": "ข้อความทดสอบจาก line_preflight ไม่ใช่การแจ้งเตือนจริง"}
-        config = {"line_channel_access_token": token, "line_to_id": recipient,
-                  "line_grafana_base_url": env.get("LINE_GRAFANA_BASE_URL", "http://localhost:3000")}
-        result = send_line_alert(record, config)
-        print(f"\nsend-test: {json.dumps({k: v for k, v in result.items() if k != 'would_send_message'}, ensure_ascii=False)}")
-        return 0 if result.get("status") == "sent" else 1
-    return 0
+
+def _maybe_send_test(args, env: dict[str, str], token: str, recipient: str, mode: str) -> int:
+    if not args.send_test:
+        return 0
+
+    from .notify_line import send_line_alert
+
+    # Quota is read either side of the send, because the reference does not state whether
+    # a broadcast is billed per call or per recipient. Reporting the delta measures it
+    # instead of leaving the channel's real monthly capacity a guess.
+    _, before = api_get("/v2/bot/message/quota/consumption", token)
+    record = {"priority": "HIGH", "source_ip": "198.51.100.23",
+              "mitre_tactic": "Credential Access",
+              "explanation_th": "ข้อความทดสอบจาก line_preflight ไม่ใช่การแจ้งเตือนจริง"}
+    config = {"line_channel_access_token": token, "line_to_id": recipient,
+              "line_delivery_mode": mode,
+              "line_grafana_base_url": env.get("LINE_GRAFANA_BASE_URL", "http://localhost:3000")}
+    result = send_line_alert(record, config)
+    shown = {k: v for k, v in result.items() if k != "would_send_message"}
+    print(f"\nsend-test: {json.dumps(shown, ensure_ascii=False)}")
+
+    _, after = api_get("/v2/bot/message/quota/consumption", token)
+    used_before, used_after = before.get("totalUsage"), after.get("totalUsage")
+    if isinstance(used_before, int) and isinstance(used_after, int):
+        print(f"quota      {used_before} -> {used_after} "
+              f"(this {mode} cost {used_after - used_before} of the monthly allowance)")
+    return 0 if result.get("status") == "sent" else 1
 
 
 if __name__ == "__main__":

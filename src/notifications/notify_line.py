@@ -1,17 +1,3 @@
-"""
-notify_line.py
-===============
-LINE sender for HIGH-priority alerts -- per `diagrams/thesis_dataflow_v2.drawio`'s
-"Line Notify / Line Bot" node: *"HIGH priority -> ส่งทันที · ข้อความ: priority · src_ip ·
-mitre_tactic · explanation_th (สรุป 2 บรรทัด) + link Grafana"*.
-
-Backend: LINE Messaging API push. LINE Notify was retired in 2025, so a channel access token
-and explicit user/group/room recipient id (`LINE_TO_ID`) are both required.
-
-Real-vs-dry-run rule: both `LINE_CHANNEL_ACCESS_TOKEN` and `LINE_TO_ID` must look configured;
-otherwise the module returns a dry-run result without making an external call. Secret values are
-never logged.
-"""
 
 from __future__ import annotations
 
@@ -25,14 +11,22 @@ from .config_utils import looks_real
 logger = logging.getLogger("alert_dispatcher.notify_line")
 
 LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push"
+# Broadcast reaches every account that has added the bot as a friend, so it needs no
+# recipient id. That suits a lab SOC channel, where analysts subscribe by adding the bot
+# and nobody maintains a roster of user ids -- and LINE_TO_ID cannot be obtained
+# programmatically anyway (/v2/bot/followers/ids needs a verified or premium Official
+# Account). Two costs come with it, both real rather than theoretical:
+#   * 60 requests per hour per channel, against 2,000/s for push. A burst of HIGH alerts
+#     above one per minute will be rate-limited, so broadcast is not a drop-in for a
+#     production alerting path.
+#   * No routing. Every friend of the channel receives every alert; HIGH-to-on-call is
+#     not expressible.
+LINE_BROADCAST_URL = "https://api.line.me/v2/bot/message/broadcast"
+
+DELIVERY_MODES = ("push", "broadcast")
 
 
 def summarize_two_lines(explanation_th: str, max_chars: int = 150) -> str:
-    """Truncate `explanation_th` to a ~2-line (~150 char) summary at a word/clause boundary --
-    never mid-word. Thai text in this repo's examples has no period-delimited "sentences" (it
-    uses em-dashes / commas as clause breaks instead -- see the few-shot examples in
-    HANDOFF_LLM_LAYER.md), so this prefers cutting at the last em-dash or, failing that, the
-    last whitespace before `max_chars`, rather than assuming '.'-delimited sentences exist."""
     text = (explanation_th or "").strip()
     if len(text) <= max_chars:
         return text
@@ -47,9 +41,6 @@ def summarize_two_lines(explanation_th: str, max_chars: int = 150) -> str:
 
 
 def build_line_message(record: dict[str, Any], config: dict[str, Any]) -> str:
-    """Per the diagram's exact field list: priority, src_ip, mitre_tactic, a 2-line
-    explanation_th summary, plus a Grafana deep link (soc-main dashboard uid, per
-    grafana/dashboards/soc-overview.json)."""
     summary = summarize_two_lines(record.get("explanation_th", ""))
     grafana_link = f"{config['line_grafana_base_url'].rstrip('/')}/d/soc-main"
     return (
@@ -61,36 +52,72 @@ def build_line_message(record: dict[str, Any], config: dict[str, Any]) -> str:
     )
 
 
+def resolve_delivery(config: dict[str, Any]) -> tuple[str, str | None]:
+    """Pick the endpoint, and say why, without reading the config twice at the call site.
+
+    An unrecognised mode falls back to push rather than to broadcast. Broadcast is the
+    wider blast radius of the two, so a typo in LINE_DELIVERY_MODE must not be what
+    decides to message every friend of the channel.
+    """
+    mode = (config.get("line_delivery_mode") or "push").strip().lower()
+    if mode not in DELIVERY_MODES:
+        logger.warning("[notify_line] unknown LINE_DELIVERY_MODE %r -- falling back to push", mode)
+        mode = "push"
+    return mode, (LINE_BROADCAST_URL if mode == "broadcast" else LINE_PUSH_URL)
+
+
 def send_line_alert(record: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
-    """Send (or dry-run-log) a HIGH-priority LINE Messaging API message for one assembled alert
-    `record` (see src/notifications/alert_dispatcher.py's assemble_alert_record). Never raises -- any
-    failure (network, non-200, missing credential) is returned in the status dict so the
-    caller (alert_dispatcher.dispatch_alert) can log-and-continue without crashing."""
     token = config.get("line_channel_access_token")
     recipient = config.get("line_to_id")
     message = build_line_message(record, config)
+    mode, url = resolve_delivery(config)
 
-    if not looks_real(token, min_len=20) or not looks_real(recipient, min_len=8):
+    if not looks_real(token, min_len=20):
         logger.info(
-            "[notify_line] dry-run: LINE_CHANNEL_ACCESS_TOKEN/LINE_TO_ID are not both configured -- "
+            "[notify_line] dry-run: LINE_CHANNEL_ACCESS_TOKEN is not configured -- "
             "would-be message logged, no HTTP call made"
         )
-        return {"status": "dry_run", "reason": "LINE credentials/recipient not configured", "would_send_message": message}
+        return {"status": "dry_run", "reason": "LINE channel access token not configured",
+                "delivery_mode": mode, "would_send_message": message}
+
+    # Only push needs a destination. Keeping this check inside the push branch is what
+    # lets broadcast mode work with LINE_TO_ID left empty.
+    if mode == "push" and not looks_real(recipient, min_len=8):
+        logger.info(
+            "[notify_line] dry-run: LINE_TO_ID is not configured and LINE_DELIVERY_MODE is "
+            "push -- would-be message logged, no HTTP call made"
+        )
+        return {"status": "dry_run", "reason": "LINE recipient not configured",
+                "delivery_mode": mode, "would_send_message": message}
+
+    payload: dict[str, Any] = {"messages": [{"type": "text", "text": message}]}
+    if mode == "push":
+        payload["to"] = recipient
 
     try:
         resp = requests.post(
-            LINE_PUSH_URL,
+            url,
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-            json={"to": recipient, "messages": [{"type": "text", "text": message}]},
+            json=payload,
             timeout=10,
         )
     except requests.RequestException as exc:
         logger.warning("[notify_line] Messaging API request failed: %s", type(exc).__name__)
-        return {"status": "error", "error": f"{type(exc).__name__}: {exc}"}
+        return {"status": "error", "delivery_mode": mode, "error": f"{type(exc).__name__}: {exc}"}
 
     if resp.status_code in (200, 202):
-        logger.info("[notify_line] Messaging API accepted the message (HTTP %s)", resp.status_code)
-        return {"status": "sent", "http_status": resp.status_code}
+        logger.info("[notify_line] Messaging API accepted the %s (HTTP %s)", mode, resp.status_code)
+        return {"status": "sent", "delivery_mode": mode, "http_status": resp.status_code}
+
+    if resp.status_code == 429:
+        # Distinguishable on purpose: broadcast allows only 60 requests per hour per
+        # channel, so a burst of HIGH alerts hits this while the credentials are fine.
+        logger.warning("[notify_line] Messaging API returned 429 -- rate limit or monthly "
+                       "quota exhausted (broadcast allows 60 requests/hour)")
+        return {"status": "error", "delivery_mode": mode, "http_status": 429,
+                "reason": "rate limit or monthly message quota",
+                "response_body": resp.text[:300]}
 
     logger.warning("[notify_line] Messaging API returned HTTP %s (not sent)", resp.status_code)
-    return {"status": "error", "http_status": resp.status_code, "response_body": resp.text[:300]}
+    return {"status": "error", "delivery_mode": mode, "http_status": resp.status_code,
+            "response_body": resp.text[:300]}
