@@ -62,11 +62,21 @@ def api_get(path: str, token: str) -> tuple[int | None, dict]:
         return None, {"transport_error": f"{type(exc).__name__}: {exc}"}
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """Separate from main() so a test can assert the real CLI's defaults.
+
+    main() reaches the network on its first call, so a test that exercised it would need
+    the live channel. A test that rebuilt an equivalent parser instead would assert its own
+    copy and pass while the real default flipped.
+    """
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--send-test", action="store_true",
-                    help="push one real test message to LINE_TO_ID (visible to a person, uses quota)")
-    args = ap.parse_args()
+                    help="push one real message to the channel (visible to a person, uses quota)")
+    return ap
+
+
+def main() -> int:
+    args = build_parser().parse_args()
 
     env = read_env(ENV_PATH)
     token = env.get("LINE_CHANNEL_ACCESS_TOKEN", "")
