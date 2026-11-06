@@ -5,17 +5,26 @@ services:
     networks:
       - soc_shared
     ports:
-      - "8086:8086"
+      - "127.0.0.1:8086:8086"
     volumes:
       - influxdb-data:/var/lib/influxdb2
       - influxdb-config:/etc/influxdb2
     environment:
       DOCKER_INFLUXDB_INIT_MODE: setup
-      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUX_INIT_USERNAME:-admin}
-      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUX_INIT_PASSWORD:-Asdopoo123!}
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUX_INIT_USERNAME:?Set INFLUX_INIT_USERNAME in observability/.env}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUX_INIT_PASSWORD:?Set INFLUX_INIT_PASSWORD in observability/.env}
       DOCKER_INFLUXDB_INIT_ORG: ${INFLUX_INIT_ORG:-soc}
       DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUX_INIT_BUCKET:-alerts}
-      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_INIT_ADMIN_TOKEN:-soc-influx-dev-token-change-me}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_INIT_ADMIN_TOKEN:?Set INFLUX_INIT_ADMIN_TOKEN in observability/.env}
+      # Infinite, and deliberately so. The architecture diagram asked for 90 days, which
+      # would be actively destructive here: alert_dispatcher stamps each point with the
+      # flow's own capture time, so a replayed CICIDS-2017 alert lands in 2017 and a 90-day
+      # retention deletes it on the next compaction. Verified on the live bucket -- the one
+      # replayed point sits 3,411 days in the past. Either the retention goes or the
+      # flow-time stamping goes, and the stamping is the truthful half.
+      # Note this only applies on first init; an existing volume keeps whatever it has
+      # (`influx bucket update`), the same reproducibility trap as the RabbitMQ soc vhost.
+      DOCKER_INFLUXDB_INIT_RETENTION: ${INFLUX_INIT_RETENTION:-0}
     deploy:
       resources:
         limits:
@@ -34,10 +43,11 @@ services:
     restart: unless-stopped
     networks:
       - soc_shared
+      - soc_elastic
     ports:
-      - "5601:5601"
+      - "127.0.0.1:5601:5601"
     environment:
-      ELASTICSEARCH_HOSTS: '["http://host.docker.internal:9200"]'
+      ELASTICSEARCH_HOSTS: '["http://opencti-elasticsearch:9200"]'
       ELASTICSEARCH_USERNAME: kibana_system
       ELASTICSEARCH_PASSWORD: ${KIBANA_SYSTEM_PASSWORD}
       XPACK_SECURITY_ENABLED: "true"
@@ -62,13 +72,14 @@ services:
     restart: unless-stopped
     networks:
       - soc_shared
+      - soc_elastic
     volumes:
       - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
     environment:
       LS_JAVA_OPTS: "-Xms512m -Xmx512m"
       XPACK_MONITORING_ENABLED: "false"
       KAFKA_BOOTSTRAP: kafka-broker:29092
-      ES_HOST: http://host.docker.internal:9200
+      ES_HOST: http://opencti-elasticsearch:9200
       ES_USER: elastic
       ES_PASSWORD: ${ELASTIC_PASSWORD}
     deploy:
@@ -80,6 +91,10 @@ services:
 
 networks:
   soc_shared:
+    external: true
+
+  soc_elastic:
+    name: soc_elastic
     external: true
 
 volumes:

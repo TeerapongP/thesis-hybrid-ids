@@ -174,8 +174,17 @@ def write_influx_point(record: dict[str, Any], config: dict[str, Any]) -> dict[s
         .tag("priority", str(record.get("priority") or "unknown"))
         .tag("anomaly_type", str(record.get("anomaly_type") or "unknown"))
         .tag("mitre_tactic", str(record.get("mitre_tactic") or "unknown"))
+        # model_used is a tag, not a field: Grafana groups by it to split the dashboard by
+        # deciding branch, and only tags are indexed for grouping. It was absent entirely,
+        # so no panel could show that RF decides 99.785% of rows and the fallback the rest.
+        .tag("model_used", str(record.get("model_used") or "unknown"))
         .field("risk_score", float(record.get("risk_score") or 0))
         .field("response_ms", float(record.get("response_ms") or 0.0))
+        # mttd_ms was already computed on every record and then dropped here, which is why
+        # the MTTD timeline panel the architecture called for could not be built. None is
+        # written as a real absence rather than 0.0: a missing ingested_at would otherwise
+        # read as "detected instantly" and pull the series toward zero.
+        .field("mttd_ms", float(record["mttd_ms"]) if record.get("mttd_ms") is not None else None)
         .time(point_time)
     )
 

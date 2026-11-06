@@ -119,3 +119,69 @@ class PreflightTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class InfluxPointTests(unittest.TestCase):
+    """The point the dispatcher writes is the dashboard's only data source.
+
+    Two values the architecture asked Grafana to chart -- MTTD over time, and the split by
+    deciding branch -- were computed on every alert record and then dropped here, so the
+    panels could not be built from anything. These assert the point carries them.
+    """
+
+    RECORD = {
+        "alert_id": "a-1", "priority": "HIGH", "risk_score": 91, "response_ms": 2400.0,
+        "source_ip": "198.51.100.9", "dst_port": 445, "anomaly_type": "PortScan",
+        "mitre_tactic": "discovery", "model_used": "if_ae_fallback", "mttd_ms": 27.0,
+        "timestamp": "2017-07-05T10:47:00+00:00",
+    }
+    CONFIG = {"influx_url": "http://localhost:8086", "influx_token": "x",
+              "influx_org": "soc", "influx_bucket": "alerts"}
+
+    def _line(self, record):
+        """Build the Point exactly as write_influx_point does, without the network call."""
+        from influxdb_client import Point
+        from datetime import datetime
+        ts = record.get("timestamp")
+        point = (
+            Point("soc_alert")
+            .tag("alert_id", str(record.get("alert_id") or "unknown"))
+            .tag("source_ip", str(record.get("source_ip") or "unknown"))
+            .tag("dst_port", str(record.get("dst_port") if record.get("dst_port") is not None else "unknown"))
+            .tag("priority", str(record.get("priority") or "unknown"))
+            .tag("anomaly_type", str(record.get("anomaly_type") or "unknown"))
+            .tag("mitre_tactic", str(record.get("mitre_tactic") or "unknown"))
+            .tag("model_used", str(record.get("model_used") or "unknown"))
+            .field("risk_score", float(record.get("risk_score") or 0))
+            .field("response_ms", float(record.get("response_ms") or 0.0))
+            .field("mttd_ms", float(record["mttd_ms"]) if record.get("mttd_ms") is not None else None)
+            .time(datetime.fromisoformat(ts))
+        )
+        return point.to_line_protocol()
+
+    def test_model_used_is_a_tag_so_grafana_can_group_by_it(self):
+        line = self._line(self.RECORD)
+        self.assertIn("model_used=if_ae_fallback", line.split(" ")[0],
+                      "model_used must be in the tag set, not the field set, or no panel "
+                      f"can group by branch: {line}")
+
+    def test_mttd_is_written_as_a_field(self):
+        self.assertIn("mttd_ms=27", self._line(self.RECORD))
+
+    def test_absent_mttd_is_omitted_rather_than_written_as_zero(self):
+        """A record with no ingested_at has unknown MTTD, not an MTTD of zero.
+
+        Writing 0.0 would read as "detected instantly" and drag the panel's mean toward
+        zero, which is exactly the degenerate reading the MTTD evaluation already had to
+        correct for once.
+        """
+        line = self._line({**self.RECORD, "mttd_ms": None})
+        self.assertNotIn("mttd_ms", line)
+        self.assertIn("risk_score=91", line)
+
+    def test_source_matches_this_contract(self):
+        """Pin the assertions above to the real function, not just to this copy of it."""
+        src = (Path(__file__).resolve().parents[1]
+               / "src" / "notifications" / "alert_dispatcher.py").read_text(encoding="utf-8")
+        self.assertIn('.tag("model_used"', src)
+        self.assertIn('.field("mttd_ms"', src)
