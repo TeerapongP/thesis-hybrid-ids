@@ -128,6 +128,12 @@ class Config:
     opencti_token: str = field(repr=False)
     cache_size: int = 5000
     log_level: str = "INFO"
+    # Optional telemetry sink. Absent by default: enrichment must run on a machine that has
+    # no metrics stack, and a missing dashboard is not a reason to stop enriching events.
+    influx_url: str = ""
+    influx_token: str = field(default="", repr=False)
+    influx_org: str = ""
+    influx_bucket: str = ""
 
 
 REQUIRED_KEYS = (
@@ -159,6 +165,13 @@ def load_config(env_path: Path = ROOT_ENV_PATH, environ: Mapping[str, str] | Non
         auto_offset=raw["KAFKA_AUTO_OFFSET"], connect_retries=retries,
         opencti_url=raw["OPENCTI_URL"].rstrip("/"), opencti_token=raw["OPENCTI_TOKEN"],
         cache_size=cache_size, log_level=(raw.get("LOG_LEVEL") or "INFO").upper(),
+        # Not in REQUIRED_KEYS on purpose: all four absent means telemetry off, which is a
+        # valid way to run this service. They are read from the process environment too, so
+        # the InfluxDB credentials need not be copied into a second .env file.
+        influx_url=(raw.get("INFLUX_URL") or "").rstrip("/"),
+        influx_token=raw.get("INFLUX_TOKEN") or "",
+        influx_org=raw.get("INFLUX_ORG") or "",
+        influx_bucket=raw.get("INFLUX_BUCKET") or "",
     )
 
 
@@ -481,7 +494,98 @@ class Record:
     timestamp_ms: int | None = None
 
 
-def process_record(record: Record, lookup: LookupFn) -> tuple[bytes, bytes]:
+def _escape_tag(value: str) -> str:
+    """Line-protocol escaping for a tag key or value: comma, space and equals."""
+    return value.replace("\\", "\\\\").replace(",", r"\,").replace(" ", r"\ ").replace("=", r"\=")
+
+
+class MetricsSink:
+    """Per-event enrichment telemetry, written straight to InfluxDB as line protocol.
+
+    Deliberately stdlib-only. This module already reaches OpenCTI through `urllib` so that
+    `pycti` is not a dependency, and pulling in `influxdb-client` for three numbers would
+    undo that for the sake of a dashboard. Line protocol is a text format; the escaping it
+    needs is `_escape_tag`, which is tested.
+
+    Two properties matter more than the numbers:
+
+    * **Off by default.** No URL or token means `enabled` is false and every call is a
+      no-op. Enrichment has to run on a machine with no metrics stack.
+    * **It cannot break the pipeline.** Every network call is wrapped, failures are counted
+      and logged once rather than per event, and nothing propagates. Losing telemetry is
+      acceptable; losing enrichment because telemetry is down is not.
+
+    Writes are batched. One HTTP round trip per event would cost more than the enrichment
+    it is measuring, so lines buffer until `batch_size` or `flush_interval_s`, whichever
+    comes first, and `close()` flushes the remainder.
+    """
+
+    MEASUREMENT = "soc_enrich"
+
+    def __init__(self, cfg: Config, batch_size: int = 100, flush_interval_s: float = 5.0,
+                 timeout: float = 3.0) -> None:
+        self.enabled = bool(cfg.influx_url and cfg.influx_token
+                            and cfg.influx_org and cfg.influx_bucket)
+        self._cfg = cfg
+        self._batch_size = batch_size
+        self._flush_interval_s = flush_interval_s
+        self._timeout = timeout
+        self._buf: list[str] = []
+        self._last_flush = time.monotonic()
+        self._failures = 0
+        self._warned = False
+        if not self.enabled:
+            logger.info("[enrich] telemetry disabled (no INFLUX_URL/TOKEN/ORG/BUCKET); "
+                        "enrichment is unaffected")
+
+    def record_event(self, enrichment: Mapping[str, Any], latency_ms: float) -> None:
+        if not self.enabled:
+            return
+        matched = "true" if enrichment.get("matched") else "false"
+        source = str(enrichment.get("source") or "unknown")
+        if enrichment.get("error"):
+            # An OpenCTI failure still publishes the event, so without its own tag it would
+            # be indistinguishable from a genuine no-match and silently depress match rate.
+            source = "error"
+        observables = len(enrichment.get("observables_checked") or ())
+        indicators = len(enrichment.get("indicators") or ())
+        line = (f"{self.MEASUREMENT},matched={matched},source={_escape_tag(source)} "
+                f"latency_ms={latency_ms:.3f},observables={observables}i,"
+                f"indicators={indicators}i")
+        self._buf.append(line)
+        if (len(self._buf) >= self._batch_size
+                or time.monotonic() - self._last_flush >= self._flush_interval_s):
+            self.flush()
+
+    def flush(self) -> None:
+        if not self.enabled or not self._buf:
+            return
+        body = "\n".join(self._buf).encode()
+        self._buf.clear()
+        self._last_flush = time.monotonic()
+        url = (f"{self._cfg.influx_url}/api/v2/write"
+               f"?org={self._cfg.influx_org}&bucket={self._cfg.influx_bucket}&precision=ns")
+        req = urllib.request.Request(
+            url, data=body, method="POST",
+            headers={"Authorization": f"Token {self._cfg.influx_token}",
+                     "Content-Type": "text/plain; charset=utf-8"})
+        try:
+            urllib.request.urlopen(req, timeout=self._timeout).close()
+        except Exception as exc:  # telemetry must never reach the caller
+            self._failures += 1
+            if not self._warned:
+                self._warned = True
+                logger.warning("[enrich] telemetry write failed (%s); enrichment continues "
+                               "and this is logged once", type(exc).__name__)
+
+    def close(self) -> None:
+        self.flush()
+        if self._failures:
+            logger.warning("[enrich] telemetry: %d failed write(s) this run", self._failures)
+
+
+def process_record(record: Record, lookup: LookupFn,
+                   sink: "MetricsSink | None" = None) -> tuple[bytes, bytes]:
     """Boundary for one Kafka message -> (key, enriched bytes). A payload that is not a JSON
     object cannot carry an event, so it raises ValueError for the caller to log and skip."""
     try:
@@ -492,7 +596,14 @@ def process_record(record: Record, lookup: LookupFn) -> tuple[bytes, bytes]:
         raise ValueError("event is not a JSON object")
     msg_time = (datetime.fromtimestamp(record.timestamp_ms / 1000, tz=timezone.utc)
                 if record.timestamp_ms else None)
+    started = time.perf_counter()
     enriched = enrich_event(event, lookup, message_time=msg_time)
+    if sink is not None:
+        # Measured here rather than around the lookup: this is the whole per-event cost the
+        # pipeline actually pays, cache hits included, which is what "enrich latency" on the
+        # dashboard should mean. The enrichment dict is already in hand, so the tags cost no
+        # second parse of the payload.
+        sink.record_event(enriched.get("enrichment") or {}, (time.perf_counter() - started) * 1000)
     key = record.key if record.key is not None else hashlib.sha1(record.value).hexdigest().encode()
     return key, json.dumps(enriched, ensure_ascii=False, separators=(",", ":")).encode()
 
@@ -504,21 +615,29 @@ def run(
     lookup: LookupFn,
     output_topic: str,
     publish_timeout: float = 10.0,
+    sink: "MetricsSink | None" = None,
 ) -> dict[str, int]:
     """Enrich every record, publish, and only then commit. A publish failure raises and leaves
-    the offset uncommitted, so the message is redelivered and (being idempotent) re-enriched."""
+    the offset uncommitted, so the message is redelivered and (being idempotent) re-enriched.
+
+    `sink` is optional telemetry. It is flushed in a `finally` so a publish failure, which
+    is meant to propagate, still does not strand the buffered measurements."""
     stats = {"published": 0, "skipped_malformed": 0}
-    for record in records:
-        try:
-            key, payload = process_record(record, lookup)
-        except ValueError as exc:
-            logger.warning("skipping malformed message: %s", exc)
-            stats["skipped_malformed"] += 1
+    try:
+        for record in records:
+            try:
+                key, payload = process_record(record, lookup, sink)
+            except ValueError as exc:
+                logger.warning("skipping malformed message: %s", exc)
+                stats["skipped_malformed"] += 1
+                commit(record)
+                continue
+            producer.send(output_topic, key=key, value=payload).get(timeout=publish_timeout)
             commit(record)
-            continue
-        producer.send(output_topic, key=key, value=payload).get(timeout=publish_timeout)
-        commit(record)
-        stats["published"] += 1
+            stats["published"] += 1
+    finally:
+        if sink is not None:
+            sink.close()
     return stats
 
 
@@ -616,8 +735,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 3
     logger.info("enriching %s -> %s (group %s)", cfg.input_topic, cfg.output_topic, cfg.group_id)
+    sink = MetricsSink(cfg)
     try:
-        run(records, producer, commit, lookup, cfg.output_topic)
+        run(records, producer, commit, lookup, cfg.output_topic, sink=sink)
     except KeyboardInterrupt:
         logger.info("stopped")
     return 0

@@ -5,6 +5,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from src.services import enrich
 from src.services.enrich import (
@@ -302,3 +303,95 @@ class BoundaryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MetricsSinkTests(unittest.TestCase):
+    """Telemetry must be optional and must never be able to stop enrichment."""
+
+    def _cfg(self, **over):
+        base = dict(bootstrap="b", input_topic="i", output_topic="o", group_id="g",
+                    auto_offset="earliest", connect_retries=0,
+                    opencti_url="http://x", opencti_token="t")
+        base.update(over)
+        return enrich.Config(**base)
+
+    def test_disabled_without_full_influx_config(self):
+        """Three of four keys is not a configured sink; it is a half-configured one."""
+        self.assertFalse(enrich.MetricsSink(self._cfg()).enabled)
+        partial = self._cfg(influx_url="http://i:8086", influx_token="tok", influx_org="soc")
+        self.assertFalse(enrich.MetricsSink(partial).enabled,
+                         "a missing bucket must disable the sink, not write to a default one")
+
+    def test_disabled_sink_records_nothing_and_never_calls_out(self):
+        sink = enrich.MetricsSink(self._cfg())
+        with patch.object(enrich.urllib.request, "urlopen") as urlopen:
+            sink.record_event({"matched": True, "source": "opencti"}, 1.5)
+            sink.flush()
+            sink.close()
+        urlopen.assert_not_called()
+
+    def _enabled(self, **over):
+        return enrich.MetricsSink(self._cfg(
+            influx_url="http://influx:8086", influx_token="tok",
+            influx_org="soc", influx_bucket="alerts"), **over)
+
+    def test_a_failing_write_does_not_propagate(self):
+        """Losing telemetry is acceptable; losing enrichment because telemetry is down is not."""
+        sink = self._enabled(batch_size=1)
+        with patch.object(enrich.urllib.request, "urlopen", side_effect=OSError("influx down")):
+            sink.record_event({"matched": False, "source": "opencti"}, 2.0)
+            sink.close()  # must not raise
+
+    def test_an_opencti_failure_is_tagged_error_not_a_clean_no_match(self):
+        """An error still publishes with matched false, so without its own tag it would be
+        counted as a genuine no-match and silently depress the IoC match rate."""
+        sink = self._enabled(batch_size=1)
+        sent = {}
+        with patch.object(enrich.urllib.request, "urlopen") as urlopen:
+            urlopen.side_effect = lambda req, timeout=None: sent.update(body=req.data) or MagicMock()
+            sink.record_event({"matched": False, "source": "opencti", "error": "boom"}, 3.0)
+        line = sent["body"].decode()
+        self.assertIn("source=error", line)
+        self.assertIn("matched=false", line)
+
+    def test_line_protocol_shape_and_escaping(self):
+        sink = self._enabled(batch_size=1)
+        sent = {}
+        with patch.object(enrich.urllib.request, "urlopen") as urlopen:
+            urlopen.side_effect = lambda req, timeout=None: sent.update(body=req.data) or MagicMock()
+            sink.record_event({"matched": True, "source": "cache",
+                               "observables_checked": ["1.1.1.1", "8.8.8.8"],
+                               "indicators": [{"id": "x"}]}, 12.25)
+        line = sent["body"].decode()
+        self.assertTrue(line.startswith("soc_enrich,matched=true,source=cache "), line)
+        self.assertIn("latency_ms=12.250", line)
+        self.assertIn("observables=2i", line)
+        self.assertIn("indicators=1i", line)
+        # integers must carry the i suffix or InfluxDB stores them as floats and the field
+        # type conflicts with any later integer write to the same field
+        self.assertNotIn("observables=2,", line)
+
+    def test_tag_escaping_covers_the_characters_line_protocol_breaks_on(self):
+        self.assertEqual(enrich._escape_tag("a,b c=d"), r"a\,b\ c\=d")
+
+    def test_batching_holds_lines_until_the_batch_is_full(self):
+        sink = self._enabled(batch_size=3, flush_interval_s=3600)
+        with patch.object(enrich.urllib.request, "urlopen") as urlopen:
+            for _ in range(2):
+                sink.record_event({"matched": True, "source": "cache"}, 1.0)
+            urlopen.assert_not_called()  # one HTTP call per event would cost more than enrichment
+            sink.record_event({"matched": True, "source": "cache"}, 1.0)
+            self.assertEqual(urlopen.call_count, 1)
+            self.assertEqual(urlopen.call_args[0][0].data.decode().count("\n"), 2)
+
+    def test_run_flushes_the_sink_even_when_publishing_raises(self):
+        """A publish failure is meant to propagate; it must not strand buffered measurements."""
+        sink = self._enabled(batch_size=1000)
+        producer = MagicMock()
+        producer.send.return_value.get.side_effect = RuntimeError("broker gone")
+        record = enrich.Record(key=None, value=b'{"src_ip": "8.8.8.8"}', timestamp_ms=0)
+        with patch.object(enrich.urllib.request, "urlopen") as urlopen:
+            with self.assertRaises(RuntimeError):
+                enrich.run([record], producer, lambda _r: None,
+                           lambda _o: (enrich.Lookup((), ()), "opencti"), "out", sink=sink)
+            urlopen.assert_called_once()
