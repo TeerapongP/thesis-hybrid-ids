@@ -19,12 +19,12 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
 
       - name: Install uv and Python
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
         with:
           version: "0.12.18"
           python-version: "3.13"
@@ -36,5 +36,33 @@ jobs:
       - name: Compile Python sources
         run: uv run python -m compileall -q src tests
 
-      - name: Run unit tests
-        run: uv run python -m unittest discover -s tests -p "test_*.py"
+      # Only the service half of the suite runs here, and the list is explicit rather than
+      # discovered. This job installs the locked uv environment, which has no pandas, so
+      # `discover -p "test_*.py"` loaded 11 of 23 test files, failed all 11 on import, and
+      # left CI red on every push while reporting nothing about the code under test.
+      #
+      # The ML half (pandas, scikit-learn, shap, and a CUDA torch pinned to this project's
+      # GPU) is deliberately NOT installed: it is a ~2 GB download per run to test code
+      # whose inputs are multi-gigabyte parquet files that are gitignored anyway. Run it
+      # locally with the system interpreter:
+      #
+      #     python -m unittest discover -s tests -p "test_[!l]*.py"
+      #
+      # tests/test_ci_test_split.py fails if this list and the set of modules importable
+      # here ever disagree, so a new test file cannot be silently skipped by this job.
+      - name: Run unit tests (service half)
+        run: >
+          uv run python -m unittest
+          tests.test_alert_dispatcher
+          tests.test_ci_test_split
+          tests.test_compose_security
+          tests.test_digest_regression
+          tests.test_enrich_service
+          tests.test_ensemble_eval_artifacts
+          tests.test_fusion_model_used_contract
+          tests.test_llm_faithfulness
+          tests.test_llm_layer
+          tests.test_notebook_eval_integrity
+          tests.test_notification_setup
+          tests.test_notify_gmail_html
+          tests.test_rag_safety

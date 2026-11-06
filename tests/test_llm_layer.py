@@ -198,3 +198,28 @@ class LlmLayerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PriorityConfigRecordTests(unittest.TestCase):
+    """models/llm_layer_config.json is the record of this layer's decisions.
+
+    It stated `fused_score >= 0.80 -> HIGH`, a single cutoff, and "fused_score and
+    fused_prediction only" for three weeks after none of those were true. A config file
+    that describes a rule the code does not implement is worse than no file: it is the
+    thing a reader trusts instead of reading the code.
+    """
+
+    def setUp(self):
+        path = Path(__file__).resolve().parents[1] / "models" / "llm_layer_config.json"
+        if not path.exists():
+            self.skipTest("llm_layer_config.json not present in this checkout")
+        self.rule = json.loads(path.read_text(encoding="utf-8"))["priority_rule"]
+
+    def test_recorded_cutoffs_match_the_deployed_constants(self):
+        self.assertEqual(self.rule["high_min_fused_score_random_forest"],
+                         llm_explain.PRIORITY_HIGH_MIN_SCORE)
+        self.assertEqual(self.rule["high_min_fused_score_if_ae_fallback"],
+                         llm_explain.PRIORITY_HIGH_MIN_SCORE_FALLBACK)
+
+    def test_record_names_model_used_as_an_input(self):
+        self.assertIn("model_used", self.rule["inputs"])

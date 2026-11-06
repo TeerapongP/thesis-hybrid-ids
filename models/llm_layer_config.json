@@ -107,10 +107,15 @@
   },
   "priority_rule": {
     "function": "src/llm/llm_explain.py derive_priority",
-    "rule": "fused_prediction != 1 -> LOW; fused_score >= 0.80 -> HIGH; otherwise MEDIUM",
-    "high_min_fused_score": 0.8,
-    "inputs": "fused_score and fused_prediction only; rf confidence is not used because it measures RF certainty in either direction, not attack risk",
-    "status": "provisional: chosen to match the five tests/fixtures expectations, not tuned on data or validated with analysts"
+    "rule": "fused_prediction != 1 -> LOW; otherwise HIGH if fused_score >= the cutoff belonging to the branch that produced the score, else MEDIUM",
+    "high_min_fused_score_random_forest": 0.8,
+    "high_min_fused_score_if_ae_fallback": 0.4349,
+    "inputs": "fused_score, fused_prediction and model_used. model_used was added on 2026-11-06; before that one cutoff was applied to both branches. RF confidence is still not an input, because it measures certainty in either direction rather than attack risk",
+    "unknown_branch_behaviour": "a missing or unrecognised model_used takes the RF cutoff, the stricter of the two: corrupted data must not make the system page more often",
+    "why_two_cutoffs": "the branches are on incompatible scales. RF's branch emits a probability reaching 1.0; the fallback emits (if_norm + ae_norm)/2, which never exceeded 0.7031 over 250,000 test rows. Under one cutoff of 0.80, 0 of 720 fallback alerts could reach HIGH and the LINE channel was RF-only -- while 213 of the 238 real attacks on that branch had RF name the correct class before being handed to a lower score",
+    "fallback_cutoff_derivation": "p99.5 of the fallback branch's own train-BENIGN fused score distribution, by src/evaluation/derive_priority_cutoffs.py; evidence in reports/priority_cutoff_derivation.txt. NOT anchored to RF's 0.80, which both percentile- and share-matching showed to be vacuous: the 0.95 confidence gate forces an RF-decided row to score >= 0.975 or <= 0.025, so 100% of RF-decided alerts already clear 0.80 and that branch cannot emit a MEDIUM",
+    "fallback_cutoff_effect": "small, and not to be overstated: 6 of 720 fallback alerts become HIGH on the test split, 4 of them real attacks. It is the only swept value where paging beats a coin flip, and 304 of the 308 real attacks on that branch still do not page",
+    "status": "RF's cutoff remains provisional and is recorded as vacuous: it was chosen to match the tests/fixtures expectations, is not tuned on data, and has not been validated with analysts. It is deliberately left unchanged because moving it would move every measured priority in the thesis"
   },
   "m2_measurement": {
     "status": "measured on 100 alerts on the UNIFIED population (the deployed pipeline)",
