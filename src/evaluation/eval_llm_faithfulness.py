@@ -899,7 +899,8 @@ def run_llm(limit: int | None) -> float:
             tech_id, tactic = llm_explain._technique_context(alert["rag_hits"])
             rec["ctx_technique_id"], rec["ctx_tactic"] = tech_id, tactic
             rec["confidence"] = ctx["confidence"]
-            rec["priority"] = llm_explain.derive_priority(ctx["fused_score"], ctx["fused_prediction"])
+            rec["priority"] = llm_explain.derive_priority(
+                ctx["fused_score"], ctx["fused_prediction"], ctx.get("model_used"))
             rec["rag_hit_ids"] = [h["id"] for h in alert["rag_hits"]]
             try:
                 facts_for_shots = {

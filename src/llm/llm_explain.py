@@ -22,9 +22,28 @@ OUTPUT_FIELDS = (
     "priority", "explanation_th", "technique_id", "mitre_tactic", "affected_asset", "remediation",
     "confidence", "response_ms",
 )
-# Provisional, not tuned on data. fused_score already folds RF and AE into one risk measure under
-# rf_ae_or; rf confidence is not used because it is RF certainty in either direction.
+# Provisional, not tuned on data. The comment here used to justify it by `rf_ae_or`, a fusion
+# rule retired on 2026-11-01; under the deployed cascade fused_score is RF's probability on
+# RF-decided rows and `(if_norm + ae_norm) / 2` on the rest. Those are different scales, which
+# is why the fallback branch needs its own cutoff rather than this one -- see
+# PRIORITY_HIGH_MIN_SCORE_FALLBACK below and src/evaluation/derive_priority_cutoffs.py.
 PRIORITY_HIGH_MIN_SCORE = 0.80
+# The fallback branch's own HIGH cutoff, derived by src/evaluation/derive_priority_cutoffs.py
+# as the p99.5 of that branch's train-BENIGN fused-score distribution -- "this far into the
+# tail of normal traffic for this branch", the same form as every siem_baseline threshold.
+#
+# It is NOT derived by matching RF's 0.80, which two attempts showed to be vacuous: the 0.95
+# confidence gate forces an RF-decided row to score >= 0.975 or <= 0.025, so 100% of
+# RF-decided alerts already clear 0.80 and that branch can never emit a MEDIUM. Matching a
+# vacuous threshold reproduced its vacuity -- the share-matched anchor landed on 0.0301, the
+# alert threshold itself, which would page an analyst for all 720 fallback alerts including
+# its 412 false positives.
+#
+# What p99.5 buys is small and must not be oversold: on the test split 6 of 720 fallback
+# alerts become HIGH, 4 of them real attacks. That is the only swept value where paging beats
+# a coin flip, and 304 of the 308 real attacks on this branch still do not page. The fallback
+# score barely ranks attacks above benign within its own branch.
+PRIORITY_HIGH_MIN_SCORE_FALLBACK = 0.4349
 # The examples carry PLACEHOLDERS, never realistic values. Two earlier attempts kept the
 # entities realistic (just changed which ones) and the model still copied them verbatim into
 # real alerts: measured at 30/100 in reports/llm_faithfulness_raw.jsonl. A placeholder has
@@ -144,7 +163,25 @@ def _render_value(value: Any, subs: dict[str, str]) -> Any:
 def render_few_shots(facts: dict[str, Any]) -> list[dict[str, Any]]:
     """The few-shot examples with every placeholder replaced by this alert's own values."""
     subs = _shot_substitutions(facts)
-    rendered = _render_value(FEW_SHOT_TEMPLATES, subs)
+    templates = FEW_SHOT_TEMPLATES
+    if not facts.get("technique_id"):
+        # Shot 1 demonstrates the known-technique case, so rendering it for an alert that
+        # has no technique makes it assert one that does not exist. TECHNIQUE_ID then
+        # resolves to the Thai stand-in "ไม่ระบุเทคนิค" and the clause reads
+        # "ลักษณะตรงกับเทคนิค ไม่ระบุเทคนิค" -- broken Thai, which one alert in the
+        # measured run copied verbatim. Shot 2 already covers the null case, so shot 1
+        # keeps its structure here with the technique clause removed rather than being
+        # dropped: dropping to a single example was measured as far worse (variant C,
+        # echo 100/100).
+        templates = json.loads(json.dumps(FEW_SHOT_TEMPLATES, ensure_ascii=False))
+        shot = templates[0]
+        shot["input"]["technique_id"] = None
+        shot["input"]["mitre_tactic"] = None
+        shot["output"]["explanation_th"] = (
+            "เครื่อง {{SRC_IP}} มีพฤติกรรมการเชื่อมต่อที่ผิดปกติไปยังบริการของ {{ASSET}} "
+            "ที่พอร์ต {{DST_PORT}} จัดเป็นเหตุการณ์ระดับ {{PRIORITY}}"
+        )
+    rendered = _render_value(templates, subs)
     leftover = [t for shot in rendered for t in _PLACEHOLDER_RE.findall(json.dumps(shot, ensure_ascii=False))]
     assert not leftover, f"few-shot templates still contain unrendered placeholders: {sorted(set(leftover))}"
     return rendered
@@ -226,10 +263,18 @@ def load_env_config(env_path: Path = ENV_PATH) -> dict[str, Any]:
     }
 
 
-def derive_priority(fused_score: float, fused_prediction: int) -> str:
+def derive_priority(fused_score: float, fused_prediction: int, model_used: str | None = None) -> str:
+    """Tier an alert, using the cutoff belonging to the branch that produced the score.
+
+    `model_used` defaults to the RF cutoff rather than the fallback's, which is the stricter
+    of the two: a corrupted or missing branch label must not make the system page more
+    often. That default also preserves the behaviour of any caller not yet migrated.
+    """
     if fused_prediction != 1:
         return "LOW"
-    return "HIGH" if fused_score >= PRIORITY_HIGH_MIN_SCORE else "MEDIUM"
+    cutoff = (PRIORITY_HIGH_MIN_SCORE_FALLBACK if model_used == "if_ae_fallback"
+              else PRIORITY_HIGH_MIN_SCORE)
+    return "HIGH" if fused_score >= cutoff else "MEDIUM"
 
 
 def _technique_context(rag_hits: list[dict[str, Any]]) -> tuple[str | None, str | None]:
@@ -264,7 +309,8 @@ def build_prompt(
         "alert_context": shown_context,
         "fused_score": fused_score,
         "fused_prediction": fused_prediction,
-        "priority": derive_priority(fused_score, fused_prediction),
+        "priority": derive_priority(fused_score, fused_prediction,
+                                    alert_context.get("model_used")),
         "technique_id": technique_id,
         "mitre_tactic": tactic,
         "rag_hits": rag_hits,
@@ -348,7 +394,8 @@ def explain_alert(
         _assert_no_foreign_entities(parsed, guard_facts)
     response_ms = round((time.perf_counter() - started) * 1000)
     result = {
-        "priority": derive_priority(fused_score, fused_prediction),
+        "priority": derive_priority(fused_score, fused_prediction,
+                                    alert_context.get("model_used")),
         "explanation_th": parsed["explanation_th"],
         "technique_id": technique_id,
         "mitre_tactic": tactic,

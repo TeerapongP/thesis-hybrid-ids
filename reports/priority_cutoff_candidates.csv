@@ -1,0 +1,9 @@
+candidate,fallback_high_cutoff,fallback_alerts,fallback_high,fallback_high_pct,rf_high
+current (shared 0.80),0.8,720,0,0.0,84680
+percentile-matched,,720,,,84680
+share-matched,0.030128,720,720,100.0,84680
+own-tail p99.0,0.371928,720,14,1.9444,84680
+own-tail p99.5,0.434855,720,6,0.8333,84680
+own-tail p99.9,0.570913,720,1,0.1389,84680
+own-tail p99.95,0.589138,720,1,0.1389,84680
+own-tail p99.99,0.603718,720,1,0.1389,84680

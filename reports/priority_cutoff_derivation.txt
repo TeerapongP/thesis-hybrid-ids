@@ -1,0 +1,68 @@
+==============================================================================
+Per-branch HIGH-priority cutoff derivation
+==============================================================================
+RF branch HIGH cutoff (unchanged, from llm_explain): 0.8
+fusion alert threshold: 0.03
+RF confidence gate: 0.95
+
+train rows: 1,780,362  features: 94
+scoring train split ...
+  RF scored 1,780,362 rows in 18.4s
+  IF scored in 5.7s
+  AE scored in 0.4s on cuda
+
+train BENIGN rows: 1,257,131
+  decided by RF:       1,256,402
+  decided by fallback: 729
+
+fallback-branch fused score, train BENIGN distribution:
+  p50     0.0332
+  p90     0.1362
+  p99     0.3719
+  p99.9   0.5709
+  p99.99  0.6037
+  p100    0.6074
+
+anchor 1 -- percentile-matched
+  0.8 sits at p100.000000 of the RF branch's train-BENIGN scores
+  UNDEFINED: 0.80 is above every RF train-BENIGN score, so the matching
+  percentile is p100 and carries no information. Anchor unusable.
+
+anchor 2 -- share-matched (measured on the TEST split, where alerting rows live)
+  test rows: 504,193; scoring ...
+  RF scored 504,193 rows in 5.2s
+  IF scored in 1.9s
+  AE scored in 0.1s on cuda
+  alerting rows: RF 84,680  fallback 720
+  RF alerting rows that are HIGH: 100.0000%
+  fallback score giving the same share = 0.0301
+  fallback alerting score range: 0.0301 - 0.7031
+
+anchor 3 -- percentile of the FALLBACK branch's own train-BENIGN tail
+  (independent of RF's cutoff, which the two anchors above showed to be vacuous)
+  p99.0   cutoff 0.3719 -> 14 of 720 fallback alerts HIGH
+  p99.5   cutoff 0.4349 -> 6 of 720 fallback alerts HIGH
+  p99.9   cutoff 0.5709 -> 1 of 720 fallback alerts HIGH
+  p99.95  cutoff 0.5891 -> 1 of 720 fallback alerts HIGH
+  p99.99  cutoff 0.6037 -> 1 of 720 fallback alerts HIGH
+
+==============================================================================
+Effect of each candidate on the TEST split
+==============================================================================
+current (shared 0.80)    cutoff 0.8000 -> 0 of 720 fallback alerts become HIGH (0.00%)
+percentile-matched       unusable
+share-matched            cutoff 0.0301 -> 720 of 720 fallback alerts become HIGH (100.00%)
+own-tail p99.0           cutoff 0.3719 -> 14 of 720 fallback alerts become HIGH (1.94%)
+own-tail p99.5           cutoff 0.4349 -> 6 of 720 fallback alerts become HIGH (0.83%)
+own-tail p99.9           cutoff 0.5709 -> 1 of 720 fallback alerts become HIGH (0.14%)
+own-tail p99.95          cutoff 0.5891 -> 1 of 720 fallback alerts become HIGH (0.14%)
+own-tail p99.99          cutoff 0.6037 -> 1 of 720 fallback alerts become HIGH (0.14%)
+
+fallback alerts that are real attacks: 308
+  current (shared 0.80)    -> 0 real attacks reach HIGH, 0 BENIGN rows also reach HIGH
+  share-matched            -> 308 real attacks reach HIGH, 412 BENIGN rows also reach HIGH
+  own-tail p99.0           -> 7 real attacks reach HIGH, 7 BENIGN rows also reach HIGH
+  own-tail p99.5           -> 4 real attacks reach HIGH, 2 BENIGN rows also reach HIGH
+  own-tail p99.9           -> 0 real attacks reach HIGH, 1 BENIGN rows also reach HIGH
+  own-tail p99.95          -> 0 real attacks reach HIGH, 1 BENIGN rows also reach HIGH
+  own-tail p99.99          -> 0 real attacks reach HIGH, 1 BENIGN rows also reach HIGH

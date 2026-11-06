@@ -30,7 +30,7 @@ category keeps DoS Hulk and DDoS (60% of the test attacks) at 7% each. The cost 
 alerts and are descriptive only. Only aggregate rates carry usable confidence intervals, and even those treat alerts as
 independent draws from a category-balanced mix, not from the natural traffic mix. Rates are therefore NOT the rates a
 campus SOC would see; they describe model behavior across attack types.
-Priority mix of the explained alerts: {'LOW': 12, 'HIGH': 77, 'MEDIUM': 11}.
+Priority mix of the explained alerts: {'HIGH': 79, 'MEDIUM': 9, 'LOW': 12}.
 Alert context is real: RF/AE/IF scores from the deployed models, fusion_layer.fuse_with_metadata for fused_score and
 model_used, IPs/ports/timestamps recovered for each sampled row by row-hash join to the raw behavioral file,
 RagRetriever.retrieve (top_k=3) for the hits. Limits of that context: CICIDS-2017 has no hostnames, so affected_asset
@@ -82,13 +82,13 @@ attack type conflicts with the alert (explanation), or a different retrieved tec
 an IP, port, technique, hostname or Latin-script service/product term found nowhere in the alert or retrieved chunk text
 (alias and port-to-service tables in the source; 'SMB' is grounded by dst_port 445/139). supported: it has >=1 checkable
 atom and all are grounded. undecidable: no checkable atom (most Thai prose and generic advice).
-Claims total: 405; verdicts: {'supported': 394, 'undecidable': 2, 'contradicted': 9}
-Hallucination LOWER bound (unsupported+contradicted)/all claims: 9/405 = 2.2% (95% Wilson CI 1.2-4.2%)
-Among mechanically decidable claims only:                       9/403 = 2.2% (95% Wilson CI 1.2-4.2%)
-Undecidable share (not judged either way):                       2/405 = 0.5% (95% Wilson CI 0.1-1.8%)
-Alerts with at least one unsupported/contradicted claim:         9/100 = 9.0% (95% Wilson CI 4.8-16.2%)
-By source: {'explanation': {'supported': 142, 'undecidable': 2, 'contradicted': 9}, 'remediation': {'supported': 252}}
-Rules that fired (claims may fire several): {'priority': 9}
+Claims total: 402; verdicts: {'supported': 402}
+Hallucination LOWER bound (unsupported+contradicted)/all claims: 0/402 = 0.0% (95% Wilson CI 0.0-0.9%)
+Among mechanically decidable claims only:                       0/402 = 0.0% (95% Wilson CI 0.0-0.9%)
+Undecidable share (not judged either way):                       0/402 = 0.0% (95% Wilson CI 0.0-0.9%)
+Alerts with at least one unsupported/contradicted claim:         0/100 = 0.0% (95% Wilson CI 0.0-3.7%)
+By source: {'explanation': {'supported': 133}, 'remediation': {'supported': 269}}
+Rules that fired (claims may fire several): {}
 Reading: a claim marked supported means its checkable atoms are grounded, not that the sentence is true. No LLM judge was
 used. Typhoon grading Typhoon would not be independent, and no second model was available that would not need its own
 validation.
@@ -97,8 +97,8 @@ validation.
 5. KNOWN DEFECTS FROM models/llm_layer_config.json (measured on this set)
 ======================================================================
 Defect C (new, not in quality_issues): few-shot entity copying, which quality_issues_fixed says was fixed.
-  Alerts echoing a rendered few-shot example (difflib ratio >= 0.8): 67/100 = 67.0% (95% Wilson CI 57.3-75.4%)
-    highest similarity seen: 0.9675   mean: 0.8756
+  Alerts echoing a rendered few-shot example (difflib ratio >= 0.8): 68/100 = 68.0% (95% Wilson CI 58.3-76.3%)
+    highest similarity seen: 0.9673   mean: 0.878
     The examples now carry this alert's own values, so a copied entity is the CORRECT
     entity and the old few-shot-leak check cannot fire. Echoing the example's sentence
     is the risk that replaced it, which is what this measures.
@@ -109,23 +109,23 @@ Defect A: PortScan remediation suggesting a WAF block.
   Any alert with WAF while dst_port is non-web and label not Web Attack: 0/100 = 0.0% (95% Wilson CI 0.0-3.7%)
 Defect B: explanation does not state the RAG evidence is insufficient (keyword regex, approximated).
   Truly SSH-Patator alerts where technique abstained:      7/7 = 100.0% (95% Wilson CI 64.6-100.0%)
-  Truly SSH-Patator alerts stating insufficiency:          7/7 = 100.0% (95% Wilson CI 64.6-100.0%)
-  ... among SSH-Patator alerts that abstained:             7/7 = 100.0% (95% Wilson CI 64.6-100.0%)
-  All abstained alerts (any category) stating insufficiency: 50/50 = 100.0% (95% Wilson CI 92.9-100.0%)
+  Truly SSH-Patator alerts stating insufficiency:          3/7 = 42.9% (95% Wilson CI 15.8-75.0%)
+  ... among SSH-Patator alerts that abstained:             3/7 = 42.9% (95% Wilson CI 15.8-75.0%)
+  All abstained alerts (any category) stating insufficiency: 29/50 = 58.0% (95% Wilson CI 44.2-70.6%)
 The prompt only asks for the insufficiency statement when technique_id is null, so the abstained denominators are the fair ones.
 
 ======================================================================
 6. THROUGHPUT (measured)
 ======================================================================
 Alerts with Ollama timing metadata: 100.
-Generation: 15690 tokens in 228.6s of decode = 68.6 tok/s pooled (per-alert median 70.4, min 62.2, max 71.9).
-Mean prompt tokens: 2229. Mean wall time per alert: 5.30s; first alert 5.24s (may include model load).
-Total LLM wall time: 530s. Whole run including alert build and retrieval: 533s.
+Generation: 15915 tokens in 235.0s of decode = 67.7 tok/s pooled (per-alert median 69.4, min 51.4, max 71.8).
+Mean prompt tokens: 2214. Mean wall time per alert: 5.37s; first alert 5.59s (may include model load).
+Total LLM wall time: 537s. Whole run including alert build and retrieval: 268s.
 
 ======================================================================
 7. WHAT IS NOT MEASURED
 ======================================================================
-- Whether undecidable claims (2 of 405) are true. These are the Thai prose statements and generic remediation
+- Whether undecidable claims (0 of 402) are true. These are the Thai prose statements and generic remediation
   advice with no checkable entity. Judging them needs human raters (SOC analysts) against the retrieved chunks.
 - Whether 'supported' claims are true as sentences; only their entities and terms are grounded.
 - Semantic contradictions with no lexical trigger, for example a remediation that is wrong for the attack but uses only

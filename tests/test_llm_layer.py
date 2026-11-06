@@ -49,6 +49,73 @@ class LlmLayerTests(unittest.TestCase):
         self.assertEqual(llm_explain.derive_priority(0.06, 1), "MEDIUM")
         self.assertEqual(llm_explain.derive_priority(0.99, 0), "LOW")
 
+    def test_fallback_branch_uses_its_own_cutoff(self):
+        """The fallback branch could not reach HIGH under the shared 0.80 cutoff.
+
+        Its score is `(if_norm + ae_norm) / 2`, which never exceeded 0.7031 over 250,000
+        test rows, while RF's branch emits a probability reaching 1.0. One cutoff over two
+        incompatible scales meant no unsupervised-only detection could ever page an
+        analyst -- the exact alerts the cascade exists to produce.
+        """
+        fb = llm_explain.PRIORITY_HIGH_MIN_SCORE_FALLBACK
+        self.assertLess(fb, llm_explain.PRIORITY_HIGH_MIN_SCORE)
+        self.assertEqual(llm_explain.derive_priority(fb, 1, "if_ae_fallback"), "HIGH")
+        self.assertEqual(llm_explain.derive_priority(fb - 0.01, 1, "if_ae_fallback"), "MEDIUM")
+        # the same score on RF's branch is MEDIUM, because RF's cutoff still applies there
+        self.assertEqual(llm_explain.derive_priority(fb, 1, "random_forest"), "MEDIUM")
+        # not an attack stays LOW on either branch, whatever the score
+        self.assertEqual(llm_explain.derive_priority(0.99, 0, "if_ae_fallback"), "LOW")
+
+    def test_unknown_branch_takes_the_stricter_cutoff(self):
+        """A corrupted or absent branch label must not make the system page more often."""
+        between = (llm_explain.PRIORITY_HIGH_MIN_SCORE_FALLBACK
+                   + llm_explain.PRIORITY_HIGH_MIN_SCORE) / 2
+        for label in (None, "", "unknown", "nonsense"):
+            with self.subTest(model_used=label):
+                self.assertEqual(llm_explain.derive_priority(between, 1, label), "MEDIUM")
+
+    def test_null_technique_removes_the_technique_clause_from_both_shots(self):
+        """No example may assert a technique for an alert that has none.
+
+        With a null technique, TECHNIQUE_ID rendered as the stand-in "ไม่ระบุเทคนิค" and
+        shot 1's clause became "ลักษณะตรงกับเทคนิค ไม่ระบุเทคนิค" -- broken Thai that one
+        alert in the measured run copied verbatim into its explanation.
+        """
+        facts = {"alert_context": {"source_ip": "10.0.0.1", "dst_ip": "10.0.0.2",
+                                   "dst_port": 80, "rf_predicted_label": "PortScan"},
+                 "priority": "MEDIUM", "technique_id": None, "mitre_tactic": None}
+        for shot in llm_explain.render_few_shots(facts):
+            with self.subTest(label=shot["input"].get("rf_predicted_label")):
+                self.assertNotIn("ไม่ระบุเทคนิค", json.dumps(shot, ensure_ascii=False))
+                self.assertNotIn("ตรงกับเทคนิค", shot["output"]["explanation_th"])
+                self.assertIsNone(shot["input"]["technique_id"])
+
+    def test_known_technique_still_shows_it(self):
+        """The null-technique path must not strip the clause when there IS a technique."""
+        facts = {"alert_context": {"source_ip": "10.0.0.1", "dst_ip": "10.0.0.2",
+                                   "dst_port": 80, "rf_predicted_label": "PortScan"},
+                 "priority": "HIGH", "technique_id": "T1046", "mitre_tactic": "discovery"}
+        shots = llm_explain.render_few_shots(facts)
+        self.assertIn("T1046", shots[0]["output"]["explanation_th"])
+        # and the module-level templates were not mutated by the null-technique branch
+        self.assertIn("{{TECHNIQUE_ID}}",
+                      llm_explain.FEW_SHOT_TEMPLATES[0]["output"]["explanation_th"])
+
+    def test_fallback_cutoff_matches_its_recorded_derivation(self):
+        """Pin the constant to the run that produced it, so a silent edit fails here.
+
+        reports/priority_cutoff_derivation.txt records p99.5 of the fallback branch's
+        train-BENIGN distribution as 0.4349. If that file is regenerated and the number
+        moves, this test is the reminder that the deployed constant has to move with it.
+        """
+        report = (llm_explain.ROOT if hasattr(llm_explain, "ROOT") else Path(__file__).resolve().parents[1])
+        path = Path(report) / "reports" / "priority_cutoff_derivation.txt"
+        if not path.exists():
+            self.skipTest("derivation report not present in this checkout")
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("p99.5", text)
+        self.assertIn(f"{llm_explain.PRIORITY_HIGH_MIN_SCORE_FALLBACK:.4f}", text)
+
     def test_disputed_rag_hits_abstain(self):
         hits = [{"metadata": {"technique_id": value}} for value in ("T1046", "T1498", "T1110")]
         self.assertEqual(llm_explain._technique_context(hits), (None, None))

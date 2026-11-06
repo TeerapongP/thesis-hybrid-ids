@@ -583,7 +583,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             for alert in payload["alerts"]:
                 ctx = alert["alert_context"]
                 alert["priority_if_dispatched"] = llm_explain.derive_priority(
-                    ctx["fused_score"], ctx["fused_prediction"]
+                    ctx["fused_score"], ctx["fused_prediction"], ctx.get("model_used")
                 )
         except Exception as exc:  # langchain missing: report, do not fake a priority
             print(f"[pipeline] priority preview unavailable ({type(exc).__name__}: {exc})", flush=True)
