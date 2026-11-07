@@ -55,8 +55,13 @@ SEAMS FOUND BY RUNNING THIS, recorded rather than papered over:
   * THE RAG QUERY IS THE RF PREDICTED LABEL, including on BENIGN rows, where it degrades to a
     generic anomaly sentence and retrieves T1595/T1046/T1071.001 regardless of the flow. No
     production query builder exists in the repo; eval_llm_faithfulness has the same limitation.
-  * LINE AND GMAIL ARE DRY-RUN ONLY in this environment (no outbound internet, Gmail OAuth2
-    credentials deliberately blank). Expected, not a failure.
+  * LINE SENDS FOR REAL and GMAIL IS DRY-RUN. This paragraph used to say both were dry-run
+    "in this environment (no outbound internet)", and the parenthetical was simply wrong:
+    this machine resolves and completes TLS to api.line.me, and the channel has sent
+    accepted broadcasts. LINE_DELIVERY_MODE=broadcast needs no recipient id, so --dispatch
+    on a HIGH alert reaches a person and consumes 2 of the channel's 300 monthly units.
+    Gmail is dry-run because its OAuth2 credentials are deliberately blank, which is a
+    decision rather than a limitation of the host.
 """
 from __future__ import annotations
 
