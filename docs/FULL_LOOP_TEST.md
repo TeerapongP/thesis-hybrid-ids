@@ -21,12 +21,15 @@
 >
 > **สิ่งที่ runner พิสูจน์ได้คือ "end to end จาก flow event ที่ replay"** ไม่ใช่จาก ingestion หรือจาก
 > traffic ดิบ เพราะ event แบกคุณลักษณะ 94 ตัวไปในตัว และใน repo นี้ไม่มีขั้นสกัดคุณลักษณะจาก log
-> ดูรายละเอียดและข้อบกพร่องที่พบ (เช่น Logstash ปฏิเสธ event ที่มี `features` ด้วย HTTP 400)
-> ใน CLAUDE.md หัวข้อ "Replay runner"
+> ดูรายละเอียดและข้อบกพร่องที่พบใน CLAUDE.md หัวข้อ "Replay runner" ข้อบกพร่องหนึ่งคือ Logstash
+> เคยถูก Elasticsearch ปฏิเสธ event ที่มี `features` ด้วย HTTP 400 (ชื่อคอลัมน์ `Fwd Header Length.1`
+> ชนกับ `Fwd Header Length` เพราะจุดถูกอ่านเป็น path) ตอนนี้ `soc.conf` แปลง `features` เป็นสตริง
+> `features_json` ก่อนเขียน ตรวจแล้วว่าตัวกรองทำงานถูกกับ event จริง แต่ยังไม่มีเอกสารที่มี
+> `features_json` ใน `soc-pa5220.enriched-*` เลย จึงยังไม่เคยเห็นการ index สำเร็จหลังแก้
 >
-> ข้อสังเกตที่ยังไม่ยืนยัน: เงื่อนไขข้อ 5 ด้านล่างบอกว่ากิ่ง fallback ให้ MEDIUM เสมอ แต่ dry-run เมื่อ
-> 2569-11-07 ได้ HIGH สำหรับแถว 215249 และ 24258 (ทั้งคู่ `if_ae_fallback`) และ MEDIUM สำหรับ 103508
-> ยังไม่ได้ dispatch จริง จึงไม่รู้ว่า LINE เด้งหรือไม่ ให้ตรวจก่อนเชื่อข้อ 5
+> **ส่วนที่ยังไม่ยืนยัน** กิ่ง fallback ให้ HIGH ได้แล้ว (ดูเงื่อนไขข้อ 5) และเส้นทาง `send_line_alert`
+> ถูกเรียกตรงมาแล้ว แต่ยังไม่เคยมี alert ที่ fallback ตัดสินถูก dispatch ผ่าน `--dispatch` ของ
+> `src/e2e_replay.py` เอง จึงยังไม่ยืนยันว่า routing นี้ทำงานครบทั้งสายของ runner
 
 ---
 
@@ -37,9 +40,33 @@
 | 1 | Docker stack ทั้งสามขึ้น | ทุกอย่างหลังขั้น 3 ล้มหมด |
 | 2 | **vhost `soc` ถูกสร้าง** | `dispatch_alert` ล้มด้วย `(530) NOT_ALLOWED` ขณะที่ InfluxDB/ES ผ่าน — อ่านเหมือนบั๊กในโค้ด |
 | 3 | Ollama รันพร้อมโมเดล Typhoon2 | ชั้น LLM ล้ม ต้องใช้ `--no-llm` แทน |
-| 4 | **ช่วงเวลา Grafana = ปี 2017** | แผงว่างเปล่า ทั้งที่ข้อมูลเข้าแล้ว |
-| 5 | เลือกแถวที่ **RF ตัดสิน** ถ้าอยากให้ LINE เด้ง | กิ่ง fallback ให้ MEDIUM เสมอ → ไม่ส่ง LINE |
+| 4 | **ช่วงเวลา Grafana และ Kibana = ปี 2017** | แผงว่างเปล่า ทั้งที่ข้อมูลเข้าแล้ว (ดูขั้น 9) |
+| 5 | รู้ว่า priority ขึ้นกับ **เกณฑ์ของกิ่งที่ตัดสิน** | เลือกแถวผิดกิ่งแล้วได้ MEDIUM ทั้งที่คาดว่า HIGH → LINE ไม่เด้ง |
 | 6 | อินเทอร์เน็ตขาออก | LINE ส่งไม่ได้ (แต่ `--dry-run` ไม่ต้องใช้) |
+
+**เงื่อนไขข้อ 5 ในรายละเอียด** `derive_priority` ใน `src/llm/llm_explain.py` ใช้เกณฑ์ HIGH แยกตามกิ่ง
+(เกณฑ์เดียวเดิมที่ `fused_score >= 0.80` ทำให้กิ่ง fallback ไปไม่ถึง HIGH เพราะคะแนน
+`(if_norm + ae_norm) / 2` สูงสุดราว 0.70 บนทราฟฟิกในการแจกแจง)
+
+| กิ่ง (`model_used`) | HIGH เมื่อ | ค่าคงที่ |
+|---|---|---|
+| `random_forest` | `fused_score >= 0.80` | `PRIORITY_HIGH_MIN_SCORE` |
+| `if_ae_fallback` | `fused_score >= 0.4349` | `PRIORITY_HIGH_MIN_SCORE_FALLBACK` |
+
+ทั้งสองกิ่งต้อง `fused_prediction == 1` ก่อน ไม่งั้นเป็น LOW และ `model_used` ที่หายหรือไม่รู้จักใช้เกณฑ์ของ RF
+
+สิ่งที่ผู้ทดสอบควรคาดหวัง
+- แถวที่ RF ตัดสินเกือบทั้งหมดเป็น HIGH (วัดแล้ว 77 จาก 88 ใน 100 alert ของ `reports/llm_faithfulness_raw.jsonl`)
+  เพราะประตูความมั่นใจ 0.95 ทำให้คะแนนอยู่ที่ >= 0.975 หรือ <= 0.025
+- แถว fallback เป็น HIGH ได้ แต่น้อย (วัดแล้ว 2 จาก 12 ใน 100 alert เดียวกัน คือ Heartbleed แถว 215249
+  และ 253320 ที่ fused_score 0.5175 และ 0.5414 หรือ risk 52 และ 54) ที่เหลือเป็น MEDIUM หรือ LOW
+- ดังนั้นไม่ต้องเลือกแถว RF เพื่อให้ LINE เด้งอีกต่อไป แต่ต้องรู้ว่าแถว fallback ส่วนใหญ่ยังเป็น MEDIUM
+  และ MEDIUM ไม่ส่ง LINE ถ้าต้องการให้เด้งแน่นอนใช้แถว 215249 หรือ DoS Hulk ตามขั้น 7
+- risk score ของ alert fallback ที่เป็น HIGH ต่ำกว่า 100 อย่างมีนัย ซึ่งเป็นสัญญาณให้ผู้วิเคราะห์ว่า
+  alert นั้นยืนบนหลักฐานแบบไม่มีผู้สอนอย่างเดียว
+
+**ยังไม่ยืนยัน** ยังไม่เคย dispatch alert ที่ fallback ตัดสินผ่าน `--dispatch` ของ `src/e2e_replay.py`
+เส้นทางนี้ถูกทดสอบผ่าน `send_line_alert` โดยตรงเท่านั้น ห้ามอ้างว่าสาย replay ครบวงสำหรับกิ่ง fallback
 
 ---
 
@@ -183,7 +210,7 @@ uv run python -m src.pipeline --row 215249 --row 103508 --row 24258 --shap
 ## 7. ส่งจริงหนึ่งครั้ง
 
 > **ขั้นนี้ broadcast เข้า LINE ของทุกคนที่ add บอท และกินโควตาตามจำนวนผู้รับ**
-> เลือกแถวที่ RF ตัดสิน ไม่งั้นได้ MEDIUM แล้ว LINE ไม่เด้ง
+> เลือกแถวที่ได้ HIGH (ดูเงื่อนไขข้อ 5) ไม่งั้นได้ MEDIUM แล้ว LINE ไม่เด้ง
 
 ```bash
 uv run python -m src.pipeline --label "DoS Hulk" --dispatch
