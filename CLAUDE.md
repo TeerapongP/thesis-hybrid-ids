@@ -434,6 +434,33 @@ Dry run is the default. `pipeline.py` and the runner share `load_models`, `score
 - **No replayed row matched an indicator.** Each run's `enrichment.matched` was false. A separate live query of the 40 most frequent public IPs in the test split returned no indicator for any, consistent with the corpus limit in "OpenCTI enrichment service" above. So the matched path through this chain was not exercised on real replay data. It is covered only by `enrich.py`'s own live verification.
 - `consume` reads the output topic from the start and filters by `event_id`, which makes a retry idempotent and costs a scan that grows with the topic. SHAP is not run by the runner. `tests/test_e2e_replay.py` covers the pure parts (offline, 30 tests); the Kafka legs were verified only by the live runs above.
 
+### M_RAG ablation — removing RAG collapses the explanation layer into one sentence
+
+Run 2026-11-08, `uv run python -m src.evaluation.eval_llm_faithfulness --no-rag --variant norag`, same 100 alerts, same model, same prompt template, no retrieved hits at all. Outputs in `reports/llm_faithfulness_{raw,metrics,report}.norag.*`. **This is the measured answer to "does the RAG layer affect the output", and it is yes.**
+
+| | deployed | no-RAG |
+|---|---|---|
+| distinct explanations / 100 | **41** | **31** |
+| most-repeated explanation | 12/100 | **49/100** |
+| `example_echo_alerts` | 0.68 | **1.00** |
+| mean echo similarity | 0.878 | **0.955** |
+| distinct remediation lists | 31 | 31 |
+| `entity_pass` | 0.96 | **1.00** |
+| `abstained` | 0.50 | 1.00 |
+| `prose_technique_mention_alerts` | 0.46 | 0.00 |
+| `alerts_with_bad_claim` | 0.000 | 0.000 |
+| `hallucination_lower_bound` | 0.000 | 0.000 |
+
+**Without RAG every single alert echoes a few-shot example (100/100) and one sentence covers 49 of the 100.** That sentence is the deployed one with the technique clause deleted: `เครื่อง 172.16.0.1 มีพฤติกรรมการเชื่อมต่อที่ผิดปกติไปยังบริการของ 192.168.10.50 ที่พอร์ต 80 จัดเป็นเหตุการณ์ระดับ HIGH`. So **RAG's entire measurable contribution to the prose is the technique clause**, which appears on exactly the 50 alerts where the top-3 consensus succeeds. The 42/100 retrieval accuracy recorded below is not a separate finding; it is the mechanism.
+
+**The no-RAG run scores better on every faithfulness axis while being obviously worse output,** which is the Variant C trap this file already documents, reproduced by a different manipulation: `entity_pass` 1.00 (fewer entities to get wrong once no technique id is ever named), `abstained` 1.00, `prose_technique_mention` 0.00, `defect_insufficient_null_all` 0.58 → 0.13. Treat a faithfulness improvement that arrives with a diversity collapse as a warning rather than a result. Two independent manipulations now show it.
+
+**RAG contributes nothing to remediation.** Distinct remediation lists are 31 in both runs. Whatever the retrieved chunks are doing, they are not reaching the remediation field, which is consistent with the two most common lists being the few-shot examples verbatim.
+
+**A confound I predicted that did not materialise, stated because the prediction is on record.** The unsupported-term check grounds prose against the alert *and* the retrieved chunk text, so removing the chunks should have inflated `prose_ungrounded_alerts` mechanically. It stayed at 0.000, because with no technique in FACTS the model stopped naming techniques at all (`prose_technique_mention` 0.46 → 0.00) and there was nothing left to be ungrounded. The confound was real in principle and empty in practice.
+
+**What this does to the lookup-table proposal below.** It stops being a tidiness argument and becomes a testable prediction. RAG adds diversity only through the technique clause, and it supplies that clause on 50 of 100 alerts at 42% accuracy, while `config/mitre_mapping.csv` supplies it on every non-BENIGN alert deterministically. So the table should produce *more* explanation diversity than retrieval currently does, not less. Still **not implemented**, for the reasons given below, but the expected direction is now measured rather than assumed.
+
 ### RAG Layer — retrieval identifies the technique correctly on 42 of 100 alerts, and a 15-row CSV already holds the answer
 
 Root-caused 2026-11-08, after the LINE message format made the gap visible by printing the technique for the first time. **Half the alerts carry no MITRE technique, and it is deterministic per attack category rather than flaky per row.**
