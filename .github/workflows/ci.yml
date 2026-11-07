@@ -57,6 +57,7 @@ jobs:
           tests.test_ci_test_split
           tests.test_compose_security
           tests.test_digest_regression
+          tests.test_e2e_replay
           tests.test_enrich_service
           tests.test_ensemble_eval_artifacts
           tests.test_fusion_model_used_contract
@@ -64,5 +65,7 @@ jobs:
           tests.test_llm_layer
           tests.test_notebook_eval_integrity
           tests.test_notification_setup
+          tests.test_notify_line_message
           tests.test_notify_gmail_html
           tests.test_rag_safety
+          tests.test_threat_intel_facts

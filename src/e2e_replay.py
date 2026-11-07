@@ -135,6 +135,42 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
     return [json.loads(ln) for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
 
 
+def threat_intel_facts(enrichment: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """A compact OpenCTI summary for the explanation layer, or None when nothing matched.
+
+    Until this existed, `enrichment` rode on every alert and no module read it: a grep for it
+    across src/llm, src/notifications and src/modeling returned nothing, so OpenCTI influenced
+    no output at all. `llm_explain.build_prompt` copies the whole `alert_context` into FACTS,
+    so putting the summary there is all that is needed, with no change to the prompt template.
+    FACTS is also what makes these values citable rather than hallucinated, because
+    `explain_alert` rejects output naming an entity absent from it.
+
+    **Returned only on a match, and that is the load-bearing part.** An unmatched alert would
+    otherwise add a constant "no threat intel" block to all 100 prompts, changing every M2
+    number for a field that never varies on this corpus, which holds exactly 2 `ipv4-addr`
+    indicators out of 55,219. Keeping the unmatched prompt byte-identical means the deployed
+    M2 measurements stay valid and only a genuine match changes anything.
+
+    Lists are capped because a prompt is a budget, and an observable with many indicators
+    would otherwise crowd out the alert itself.
+    """
+    if not enrichment or not enrichment.get("matched"):
+        return None
+    indicators = enrichment.get("indicators") or []
+    related = enrichment.get("related") or []
+    return {
+        "observables_checked": list(enrichment.get("observables_checked") or [])[:5],
+        "matched_indicators": [
+            {"name": i.get("name"), "confidence": i.get("confidence")} for i in indicators[:3]
+        ],
+        "related_objects": [
+            {"type": r.get("type"), "name": r.get("name"), "relationship": r.get("relationship")}
+            for r in related[:3]
+        ],
+        "source": enrichment.get("source"),
+    }
+
+
 def vectorize(features: Mapping[str, float], order: Sequence[str]) -> list[float]:
     """Feature values in model-input order, selected by NAME.
 
@@ -354,6 +390,9 @@ def score_stage(args) -> None:
                                      retriever, args.top_k)
         entry["event_id"] = event["event_id"]
         entry["enrichment"] = event["enrichment"]
+        facts = threat_intel_facts(event["enrichment"])
+        if facts:
+            entry["alert_context"]["threat_intel"] = facts
         alerts.append(entry)
 
     payload = {
