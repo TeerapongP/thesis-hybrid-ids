@@ -39,6 +39,12 @@ lost is how orphaned processes accumulated on this project. If it is not running
 DRY RUN IS THE DEFAULT. `--dispatch` is the only way to call dispatch_alert, which sends a
 real LINE broadcast (HIGH priority) and writes InfluxDB and Elasticsearch.
 
+SEAMS FOUND BY RUNNING IT, recorded in CLAUDE.md ("Replay runner") rather than fixed here.
+Logstash rejects every replay event with HTTP 400 because the `Fwd Header Length.1` feature
+name collides with `Fwd Header Length` once Elasticsearch expands dotted names, so the
+enriched topic has no Elasticsearch copy for replay events while this chain reports success.
+The enrichment block is carried on each alert but the LLM and dispatcher never read it.
+
 TIMESTAMPS ARE THE FLOW'S OWN. Replayed CICIDS-2017 flows are dated 2017-07-05, so
 InfluxDB points land in 2017 and Elasticsearch documents in soc-alerts-2017.07.05. That is
 deliberate: stamping wall-clock would assert that 2017 traffic happened today. A Grafana or

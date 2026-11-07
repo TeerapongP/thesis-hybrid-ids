@@ -5,14 +5,12 @@ OpenCTI enrichment service. Consumes a Kafka topic of raw flow events (`KAFKA_IN
 enriches each event against OpenCTI, and publishes to `KAFKA_OUTPUT_TOPIC` (`pa5220.enriched`,
 which `observability/logstash/pipeline/soc.conf` indexes).
 
-**Nothing produces to the input topic in this thesis, and that is a scope decision rather
-than an omission.** The input was to be PA-5220 firewall logs, which the approved proposal
-(scope item 3.2) puts permanently out of scope because the logs were never obtained, and on
-2026-11-07 the decision was taken not to fake them with a replay feed either. This service is
-therefore built, tested and live-verified against a real broker and a real OpenCTI 5.12.17,
-but it is **not wired into the measured detection pipeline** — `src/pipeline.py` reads the
-feature parquet directly and never consumes Kafka. Treat it as a demonstrated component, and
-do not describe the system as ingesting live logs end to end.
+**The only producer is a replay runner.** The input was to be PA-5220 firewall logs, which the
+approved proposal (scope item 3.2) puts permanently out of scope because the logs were never
+obtained. `src/e2e_replay.py` instead publishes pre-extracted CICIDS-2017 flow events here, so
+this service is exercised from a replayed flow event through to notification. That is not
+ingestion of raw logs or traffic, and the measured detection pipeline (`src/pipeline.py`) still
+reads the feature parquet directly. Do not describe the system as ingesting live logs.
 
     python -m src.services.enrich --dry-run            # stubbed OpenCTI + in-memory broker
     python -m src.services.enrich --dry-run --input events.jsonl
