@@ -1,12 +1,14 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import re
 import time
 from collections import Counter
+from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from dotenv import dotenv_values
 
@@ -15,6 +17,14 @@ from .langchain_client import MAX_REMEDIATION, invoke_structured
 ROOT = Path(__file__).resolve().parents[2]
 ENV_PATH = ROOT / ".env"
 KB_PATH = ROOT / "data" / "knowledge_base" / "mitre_techniques.json"
+MAPPING_PATH = ROOT / "config" / "mitre_mapping.csv"
+MAPPING_DATASET = "cicids2017"
+# Where the technique named in FACTS comes from. "rag" is the deployed behaviour: a 2-of-3
+# vote over the retrieved hits. "mapping" looks the RF-predicted label up in the MITRE table.
+# Kept as a named set rather than a boolean so a third source does not change signatures.
+TechniqueSource = Literal["rag", "mapping"]
+TECHNIQUE_SOURCES: tuple[TechniqueSource, ...] = ("rag", "mapping")
+DEFAULT_TECHNIQUE_SOURCE: TechniqueSource = "rag"
 REQUIRED_ENV_KEYS = (
     "LLM_BACKEND", "LLM_BASE_URL", "LLM_MODEL", "LLM_TIMEOUT_S", "LLM_MAX_TOKENS", "LLM_TEMPERATURE",
 )
@@ -290,14 +300,62 @@ def _technique_context(rag_hits: list[dict[str, Any]]) -> tuple[str | None, str 
     return technique_id, tactics[0] if tactics else None
 
 
+@lru_cache(maxsize=None)
+def _label_to_technique() -> dict[str, str]:
+    with MAPPING_PATH.open(newline="", encoding="utf-8-sig") as fh:
+        return {row["source_label"]: row["technique_id"] for row in csv.DictReader(fh)
+                if row["dataset"] == MAPPING_DATASET and row["technique_id"]}
+
+
+@lru_cache(maxsize=None)
+def _kb_techniques() -> dict[str, Any]:
+    return json.loads(KB_PATH.read_text(encoding="utf-8"))["techniques"]
+
+
+def technique_from_label(predicted_label: str | None) -> tuple[str | None, str | None]:
+    """The MITRE technique and tactic that config/mitre_mapping.csv gives a CICIDS-2017 label.
+
+    Pass the label the MODEL predicted (`rf_predicted_label`), never the ground-truth label.
+    A deployed IDS has the prediction and consuming it here sits downstream of the detection
+    decision, so it is not leakage. Keying on the true label would hand the explanation layer
+    the answer the detector is being measured on.
+
+    The table names the technique and the KB supplies its properties. The tactic is read from
+    the KB entry in the KB's own lowercase-hyphenated form, as `_technique_context` does, and
+    not from the CSV's Title Case `tactic` column. That keeps every downstream `mitre_tactic`
+    value unchanged, so only the technique's identity differs between the two sources.
+
+    BENIGN and any label the table lacks return (None, None), which the prompt already
+    treats as "evidence insufficient".
+    """
+    technique_id = _label_to_technique().get(predicted_label or "")
+    if not technique_id:
+        return None, None
+    tactics = _kb_techniques().get(technique_id, {}).get("tactics") or []
+    return technique_id, tactics[0] if tactics else None
+
+
+def resolve_technique(
+    technique_source: TechniqueSource,
+    alert_context: dict[str, Any],
+    rag_hits: list[dict[str, Any]],
+) -> tuple[str | None, str | None]:
+    if technique_source == "rag":
+        return _technique_context(rag_hits)
+    if technique_source == "mapping":
+        return technique_from_label(alert_context.get("rf_predicted_label"))
+    raise ValueError(f"unknown technique_source {technique_source!r}; expected one of {TECHNIQUE_SOURCES}")
+
+
 def build_prompt(
     alert_context: dict[str, Any],
     rag_hits: list[dict[str, Any]],
     fused_score: float,
     fused_prediction: int,
     confidence: float,
+    technique_source: TechniqueSource = DEFAULT_TECHNIQUE_SOURCE,
 ) -> str:
-    technique_id, tactic = _technique_context(rag_hits)
+    technique_id, tactic = resolve_technique(technique_source, alert_context, rag_hits)
     # `confidence` is |P(attack) - 0.5| * 2 -- certainty in EITHER direction, high both when
     # the model is sure it IS an attack and sure it is NOT. Shown to the LLM it reads as
     # certainty-of-attack and produced "ความมั่นใจต่ำ (0.99)" on benign rows in 12/100 alerts.
@@ -370,9 +428,11 @@ def explain_alert(
     fused_prediction: int,
     confidence: float,
     config: dict[str, Any] | None = None,
+    technique_source: TechniqueSource = DEFAULT_TECHNIQUE_SOURCE,
 ) -> dict[str, Any]:
-    technique_id, tactic = _technique_context(rag_hits)
-    prompt = build_prompt(alert_context, rag_hits, fused_score, fused_prediction, confidence)
+    technique_id, tactic = resolve_technique(technique_source, alert_context, rag_hits)
+    prompt = build_prompt(alert_context, rag_hits, fused_score, fused_prediction, confidence,
+                          technique_source)
     guard_facts = {
         "alert_context": alert_context,
         "technique_id": technique_id,

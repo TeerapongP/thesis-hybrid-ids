@@ -223,3 +223,79 @@ class PriorityConfigRecordTests(unittest.TestCase):
 
     def test_record_names_model_used_as_an_input(self):
         self.assertIn("model_used", self.rule["inputs"])
+
+
+class TechniqueSourceTests(unittest.TestCase):
+    """The mapping source names the technique from the RF-predicted label via the MITRE table."""
+
+    KB_TACTICS = json.loads(llm_explain.KB_PATH.read_text(encoding="utf-8"))["techniques"]
+
+    def test_predicted_label_drives_the_technique_not_other_context(self):
+        ctx = {"rf_predicted_label": "SSH-Patator", "Label": "PortScan", "true_label": "PortScan"}
+        self.assertEqual(llm_explain.resolve_technique("mapping", ctx, [])[0], "T1110.001")
+
+    def test_ddos_resolves_to_network_denial_of_service(self):
+        self.assertEqual(llm_explain.technique_from_label("DDoS")[0], "T1498")
+
+    def test_both_patators_resolve_to_password_guessing(self):
+        for label in ("FTP-Patator", "SSH-Patator"):
+            with self.subTest(label=label):
+                self.assertEqual(llm_explain.technique_from_label(label)[0], "T1110.001")
+
+    def test_benign_unknown_and_missing_labels_yield_no_technique(self):
+        for label in ("BENIGN", "NotARealAttack", "", None):
+            with self.subTest(label=label):
+                self.assertEqual(llm_explain.technique_from_label(label), (None, None))
+
+    def test_tactic_comes_from_the_kb_in_its_own_casing(self):
+        for label, technique_id in (("Bot", "T1071.001"), ("PortScan", "T1046"), ("DDoS", "T1498")):
+            with self.subTest(label=label):
+                got_id, tactic = llm_explain.technique_from_label(label)
+                self.assertEqual(got_id, technique_id)
+                self.assertEqual(tactic, self.KB_TACTICS[technique_id]["tactics"][0])
+                self.assertEqual(tactic, tactic.lower())
+                self.assertNotIn(" ", tactic)
+
+    def test_mapping_source_ignores_what_retrieval_found(self):
+        hits = [{"metadata": {"technique_id": "T1499.002"}}] * 3
+        ctx = {"rf_predicted_label": "DDoS"}
+        self.assertEqual(llm_explain.resolve_technique("rag", ctx, hits)[0], "T1499.002")
+        self.assertEqual(llm_explain.resolve_technique("mapping", ctx, hits)[0], "T1498")
+
+    def test_mapping_source_names_a_technique_even_when_retrieval_abstains(self):
+        disputed = [{"metadata": {"technique_id": value}} for value in ("T1046", "T1498", "T1110")]
+        ctx = {"rf_predicted_label": "PortScan"}
+        self.assertEqual(llm_explain.resolve_technique("rag", ctx, disputed), (None, None))
+        self.assertEqual(llm_explain.resolve_technique("mapping", ctx, disputed)[0], "T1046")
+
+    def test_default_source_is_the_rag_consensus(self):
+        hits = [{"metadata": {"technique_id": "T1046"}}] * 2
+        ctx = {"rf_predicted_label": "DDoS", "dst_ip": "192.0.2.10"}
+        self.assertEqual(llm_explain.DEFAULT_TECHNIQUE_SOURCE, "rag")
+        prompt = llm_explain.build_prompt(ctx, hits, 0.9, 1, 0.9)
+        self.assertEqual(prompt, llm_explain.build_prompt(ctx, hits, 0.9, 1, 0.9, "rag"))
+        self.assertIn('"technique_id": "T1046"', prompt)
+
+    def test_prompt_carries_the_mapped_technique_under_mapping(self):
+        hits = [{"metadata": {"technique_id": "T1499.002"}}] * 3
+        ctx = {"rf_predicted_label": "DDoS", "dst_ip": "192.0.2.10"}
+        prompt = llm_explain.build_prompt(ctx, hits, 0.9, 1, 0.9, "mapping")
+        self.assertIn('"technique_id": "T1498"', prompt)
+        self.assertIn('"mitre_tactic": "impact"', prompt)
+
+    def test_explain_alert_reports_the_mapped_technique(self):
+        raw = json.dumps({"explanation_th": "คำอธิบาย", "remediation": ["ตรวจสอบ"]})
+        ctx = {"rf_predicted_label": "PortScan", "dst_ip": "192.0.2.10"}
+        with patch.object(llm_explain, "call_llm", return_value=raw):
+            result = llm_explain.explain_alert(ctx, [], 0.9, 1, 0.9, {}, technique_source="mapping")
+        self.assertEqual((result["technique_id"], result["mitre_tactic"]), ("T1046", "discovery"))
+
+    def test_unknown_source_raises_before_any_llm_call(self):
+        ctx = {"rf_predicted_label": "DDoS", "dst_ip": "192.0.2.10"}
+        with patch.object(llm_explain, "call_llm", side_effect=AssertionError("LLM was called")):
+            with self.assertRaises(ValueError):
+                llm_explain.resolve_technique("mappng", ctx, [])
+            with self.assertRaises(ValueError):
+                llm_explain.build_prompt(ctx, [], 0.9, 1, 0.9, "mappng")
+            with self.assertRaises(ValueError):
+                llm_explain.explain_alert(ctx, [], 0.9, 1, 0.9, {}, technique_source="mappng")
