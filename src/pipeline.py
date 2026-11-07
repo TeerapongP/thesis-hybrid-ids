@@ -241,12 +241,103 @@ def ollama_status(base_url: str, timeout_s: float = 5.0) -> tuple[bool, str]:
 # ----------------------------------------------------------------------------
 # Stage 1 (Anaconda): score, fuse, SHAP, retrieve
 # ----------------------------------------------------------------------------
-def score_stage(args) -> dict[str, Any]:
+def load_models():
+    """(random forest, isolation forest, autoencoder in eval mode) -- the three unified members."""
     import joblib
-    import numpy as np
-    import pandas as pd
     import torch
     import torch.nn as nn
+
+    rf = joblib.load(ROOT / "models/random_forest_unified.pkl")
+    iso = joblib.load(ROOT / "models/isolation_forest_unified.pkl")
+    cfg = json.loads((ROOT / "models/autoencoder_unified_config.json").read_text(encoding="utf-8"))
+    ae = _build_autoencoder(nn, cfg)
+    ae.load_state_dict(torch.load(ROOT / "models/autoencoder_unified.pt", map_location="cpu"))
+    ae.eval()
+    return rf, iso, ae
+
+
+def score_matrix(models, x) -> dict[str, Any]:
+    """Score and fuse a float64 matrix whose columns are in model-input order.
+
+    Both the parquet path (`score_stage`) and the replay path (`src.e2e_replay`) go through
+    here, so the two can differ only in the matrix they hand over.
+    """
+    import numpy as np
+    import torch
+
+    from src.modeling import fusion_layer
+
+    rf, iso, ae = models
+    t0 = time.perf_counter()
+    proba = rf.predict_proba(x)
+    classes = list(rf.classes_)
+    rf_attack = 1.0 - proba[:, classes.index("BENIGN")]
+    rf_label = np.asarray(classes)[proba.argmax(1)]
+    if_score = -iso.score_samples(x)
+    with torch.no_grad():
+        t = torch.as_tensor(x.astype(np.float32))
+        ae_err = torch.mean((ae(t) - t) ** 2, dim=1).numpy()
+    fused, pred, margin, model_used = fusion_layer.fuse_with_metadata(rf_attack, if_score, ae_err)
+    return {
+        "rf_attack": rf_attack, "rf_label": rf_label, "if_score": if_score, "ae_err": ae_err,
+        "fused": fused, "pred": pred, "margin": margin, "model_used": model_used,
+        "latency_s_per_row": (time.perf_counter() - t0) / len(x),
+    }
+
+
+def alert_entry(
+    row_index: int,
+    true_label: str,
+    ident_row: Mapping[str, Any],
+    scored: Mapping[str, Any],
+    i: int,
+    retriever,
+    top_k: int,
+    shap_record: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """One element of the payload's `alerts`, built from row `i` of `score_matrix`'s output."""
+    from src.modeling import fusion_layer
+
+    rf_attack, pred = scored["rf_attack"], scored["pred"]
+    ctx = build_alert_context(
+        ident_row, str(scored["rf_label"][i]), float(scored["fused"][i]), int(pred[i]),
+        float(abs(rf_attack[i] - 0.5) * 2), str(scored["model_used"][i]),
+        scored["latency_s_per_row"],
+    )
+    query = rag_query_for(ctx["rf_predicted_label"])
+    hits = retriever.retrieve(query, top_k=top_k)
+    return {
+        "test_row_index": int(row_index),
+        "true_label": str(true_label),
+        # The fusion rule has already decided this flow is not an attack. Marking it
+        # here is what stops the LLM and dispatch stages from treating it as one.
+        # derive_priority maps a non-attack to LOW, which answers "how urgent is this
+        # alert" -- a fair question only once something has decided an alert exists.
+        # That decision belongs here, not there.
+        "suppressed": int(pred[i]) != 1,
+        "alert_context": ctx,
+        "scores": {
+            "rf_attack_probability": float(rf_attack[i]),
+            "rf_predicted_label": str(scored["rf_label"][i]),
+            "if_anomaly_score": float(scored["if_score"][i]),
+            "ae_reconstruction_error": float(scored["ae_err"][i]),
+            "if_norm": float(fusion_layer.normalize_if_score(scored["if_score"][i])),
+            "ae_norm": float(fusion_layer.normalize_ae_score(scored["ae_err"][i])),
+            "margin": float(scored["margin"][i]),
+        },
+        "shap": shap_record,
+        "rag_query": query,
+        "rag_hits": [
+            {"rank": h["rank"], "id": h["id"], "metadata": h["metadata"],
+             "document": h["document"], "combined_score": float(h["combined_score"])}
+            for h in hits
+        ],
+    }
+
+
+def score_stage(args) -> dict[str, Any]:
+    import numpy as np
+    import pandas as pd
 
     sys.path.insert(0, str(ROOT))
     from src.features import build_unified_population as BUP
@@ -267,24 +358,8 @@ def score_stage(args) -> dict[str, Any]:
     _, _, raw_test = BUP.split_population(pd.read_parquet(BUP.SOURCE, columns=ident_cols))
     ident = recover_identifiers(raw_test, pos_idx, labels)
 
-    rf = joblib.load(ROOT / "models/random_forest_unified.pkl")
-    iso = joblib.load(ROOT / "models/isolation_forest_unified.pkl")
-    cfg = json.loads((ROOT / "models/autoencoder_unified_config.json").read_text(encoding="utf-8"))
-    ae = _build_autoencoder(nn, cfg)
-    ae.load_state_dict(torch.load(ROOT / "models/autoencoder_unified.pt", map_location="cpu"))
-    ae.eval()
-
-    t0 = time.perf_counter()
-    proba = rf.predict_proba(x)
-    classes = list(rf.classes_)
-    rf_attack = 1.0 - proba[:, classes.index("BENIGN")]
-    rf_label = np.asarray(classes)[proba.argmax(1)]
-    if_score = -iso.score_samples(x)
-    with torch.no_grad():
-        t = torch.as_tensor(x.astype(np.float32))
-        ae_err = torch.mean((ae(t) - t) ** 2, dim=1).numpy()
-    fused, pred, margin, model_used = fusion_layer.fuse_with_metadata(rf_attack, if_score, ae_err)
-    score_latency_s = (time.perf_counter() - t0) / len(pos_idx)
+    scored = score_matrix(load_models(), x)
+    score_latency_s = scored["latency_s_per_row"]
     print(f"[score] fused {len(pos_idx)} row(s) in {score_latency_s * len(pos_idx):.3f}s "
           f"({score_latency_s * 1000:.1f} ms/row)", flush=True)
 
@@ -297,41 +372,11 @@ def score_stage(args) -> dict[str, Any]:
         shap_records = [dict(r) for r in explainer.explain(sample, top_k=5)]
 
     retriever = RagRetriever()
-    alerts = []
-    for i, row_index in enumerate(pos_idx):
-        ctx = build_alert_context(
-            ident.iloc[i], str(rf_label[i]), float(fused[i]), int(pred[i]),
-            float(abs(rf_attack[i] - 0.5) * 2), str(model_used[i]), score_latency_s,
-        )
-        query = rag_query_for(ctx["rf_predicted_label"])
-        hits = retriever.retrieve(query, top_k=args.top_k)
-        alerts.append({
-            "test_row_index": int(row_index),
-            "true_label": str(sample.loc[i, "Label"]),
-            # The fusion rule has already decided this flow is not an attack. Marking it
-            # here is what stops the LLM and dispatch stages from treating it as one.
-            # derive_priority maps a non-attack to LOW, which answers "how urgent is this
-            # alert" -- a fair question only once something has decided an alert exists.
-            # That decision belongs here, not there.
-            "suppressed": int(pred[i]) != 1,
-            "alert_context": ctx,
-            "scores": {
-                "rf_attack_probability": float(rf_attack[i]),
-                "rf_predicted_label": str(rf_label[i]),
-                "if_anomaly_score": float(if_score[i]),
-                "ae_reconstruction_error": float(ae_err[i]),
-                "if_norm": float(fusion_layer.normalize_if_score(if_score[i])),
-                "ae_norm": float(fusion_layer.normalize_ae_score(ae_err[i])),
-                "margin": float(margin[i]),
-            },
-            "shap": shap_records[i],
-            "rag_query": query,
-            "rag_hits": [
-                {"rank": h["rank"], "id": h["id"], "metadata": h["metadata"],
-                 "document": h["document"], "combined_score": float(h["combined_score"])}
-                for h in hits
-            ],
-        })
+    alerts = [
+        alert_entry(row_index, sample.loc[i, "Label"], ident.iloc[i], scored, i,
+                    retriever, args.top_k, shap_records[i])
+        for i, row_index in enumerate(pos_idx)
+    ]
 
     payload = {
         "stage": "score",
