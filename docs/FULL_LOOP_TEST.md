@@ -283,6 +283,21 @@ uv run python -m src.services.enrich --dry-run
 
 ต้องได้ `dry-run done: {'published': 3, 'skipped_malformed': 0}`
 
+**event ตกค้างบน `KAFKA_INPUT_TOPIC` (`pa5220.raw`)** ถ้า runner ถูกขัดจังหวะตอน `enrich.py` ปิดอยู่
+event ที่ produce ไปแล้วจะค้างและถูกประมวลผลเมื่อ `enrich.py` เปิดครั้งถัดไป ดู lag ได้แบบอ่านอย่างเดียว
+
+```bash
+docker exec grafana-kafka-broker-1 kafka-consumer-groups --bootstrap-server localhost:9092 --describe --group enrich-group
+```
+
+กรณีที่พบเมื่อ 2569-11-08 คือ `e2e-20261107230150-0` (แถว 44999, BENIGN) ค้างอยู่ 1 รายการที่ partition 0
+ถือว่าไม่เป็นอันตราย จึงปล่อยไว้ เหตุผลคือ `enrich.py` แค่เติม `enrichment` แล้ว publish ไป
+`pa5220.enriched` ไม่เรียก `dispatch_alert` จึงไม่มี LINE และไม่มีการเขียน alert ส่วน `consume` ของ runner
+กรองด้วย `event_id` ของรอบที่รันเอง จึงข้าม event เก่า ผลข้างเคียงที่เหลือคือ lookup OpenCTI หนึ่งครั้ง
+จุดข้อมูล `soc_enrich` หนึ่งจุด และเอกสารหนึ่งฉบับใน `soc-pa5220.enriched-2017.07.06` ซึ่งตัวกรอง
+`features_json` ใน `soc.conf` แปลง `features` ให้ก่อนเขียน (ทดสอบตัวกรองกับ event นี้จริงแล้วได้
+`features_json` 94 คีย์และไม่มี `features`) ส่วนการ index สำเร็จจริงยังไม่เคยเห็น
+
 ---
 
 ## 11. ปิดงาน
