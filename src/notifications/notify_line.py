@@ -40,16 +40,99 @@ def summarize_two_lines(explanation_th: str, max_chars: int = 150) -> str:
     return text[:cut].rstrip(" ,;-—") + "..."
 
 
+SERVICE_BY_PORT = {
+    20: "FTP-DATA", 21: "FTP", 22: "SSH", 23: "TELNET", 25: "SMTP", 53: "DNS", 67: "DHCP",
+    80: "HTTP", 110: "POP3", 123: "NTP", 143: "IMAP", 161: "SNMP", 389: "LDAP", 443: "HTTPS",
+    445: "SMB", 465: "SMTPS", 587: "SMTP", 636: "LDAPS", 993: "IMAPS", 995: "POP3S",
+    1433: "MSSQL", 1521: "Oracle", 3306: "MySQL", 3389: "RDP", 5432: "PostgreSQL",
+    5900: "VNC", 6379: "Redis", 8080: "HTTP-ALT", 8443: "HTTPS-ALT", 27017: "MongoDB",
+}
+
+SEVERITY_ICON = {"HIGH": "🔴", "MEDIUM": "🟠", "LOW": "🟡"}
+
+# Only HIGH is told to act now. dispatch_alert routes HIGH here and nothing else, but this
+# builder is a pure function anyone can call, and a MEDIUM alert that says "immediate
+# investigation" trains an analyst to stop reading the severity line.
+CLOSING_BY_PRIORITY = {
+    "HIGH": "This alert requires immediate investigation by the SOC team.",
+    "MEDIUM": "Review this alert during the current SOC shift.",
+    "LOW": "Logged for the daily SOC digest. No immediate action required.",
+}
+
+_KB_NAMES: dict[str, str] | None = None
+
+
+def technique_name(technique_id: str | None) -> str | None:
+    """The ATT&CK name for a technique id, from the same KB the LLM layer reads.
+
+    llm_explain derives technique_id from the RAG hits by looking it up in this file, so
+    reading the name here cannot disagree with the id it accompanies. A missing KB returns
+    None and the caller drops the name rather than inventing one.
+    """
+    global _KB_NAMES
+    if not technique_id:
+        return None
+    if _KB_NAMES is None:
+        try:
+            import json
+            from pathlib import Path
+
+            kb = Path(__file__).resolve().parents[2] / "data/knowledge_base/mitre_techniques.json"
+            raw = json.loads(kb.read_text(encoding="utf-8"))["techniques"]
+            _KB_NAMES = {k: v.get("name", "") for k, v in raw.items()}
+        except Exception as exc:
+            logger.warning("technique name lookup unavailable: %s", exc)
+            _KB_NAMES = {}
+    return _KB_NAMES.get(technique_id) or None
+
+
+def port_label(port: Any) -> str:
+    if port is None:
+        return "?"
+    try:
+        number = int(port)
+    except (TypeError, ValueError):
+        return str(port)
+    service = SERVICE_BY_PORT.get(number)
+    return f"{number} ({service})" if service else str(number)
+
+
 def build_line_message(record: dict[str, Any], config: dict[str, Any]) -> str:
-    summary = summarize_two_lines(record.get("explanation_th", ""))
+    """The analyst-facing LINE text.
+
+    LINE renders plain text with no Markdown, so there is no formatting to lean on. Emoji
+    and indentation carry the structure, and backticks would print literally.
+    """
+    priority = str(record.get("priority") or "UNKNOWN").upper()
+    icon = SEVERITY_ICON.get(priority, "⚪")
+    summary = summarize_two_lines(record.get("explanation_th", ""), max_chars=220)
+    technique_id = record.get("technique_id")
+    name = technique_name(technique_id)
+    technique = f"{technique_id} — {name}" if name else (technique_id or "?")
     grafana_link = f"{config['line_grafana_base_url'].rstrip('/')}/d/soc-main"
-    return (
-        f"\n[SOC ALERT - {record.get('priority', '?')}]\n"
-        f"src_ip: {record.get('source_ip', '?')}\n"
-        f"mitre_tactic: {record.get('mitre_tactic', '?')}\n"
-        f"{summary}\n"
-        f"Grafana: {grafana_link}"
-    )
+
+    lines = [
+        f"🚨 [SOC SECURITY ALERT — {priority} SEVERITY]",
+        "Security Event Detected",
+        "",
+    ]
+    if summary:
+        lines += [summary, ""]
+    lines += [
+        "Incident Details",
+        f"• Source IP: {record.get('source_ip') or '?'}",
+        f"• Destination IP: {record.get('dst_ip') or '?'}",
+        f"• Destination Port: {port_label(record.get('dst_port'))}",
+        f"• MITRE ATT&CK Tactic: {record.get('mitre_tactic') or '?'}",
+        f"• MITRE Technique: {technique}",
+        f"• Severity: {icon} {priority}",
+        "",
+        "📊 Grafana SOC Dashboard:",
+        grafana_link,
+        "",
+        CLOSING_BY_PRIORITY.get(priority, "Review this alert."),
+    ]
+    return '\n'.join(lines)
 
 
 def resolve_delivery(config: dict[str, Any]) -> tuple[str, str | None]:
