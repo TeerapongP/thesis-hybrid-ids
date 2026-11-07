@@ -59,6 +59,13 @@ CLOSING_BY_PRIORITY = {
     "LOW": "Logged for the daily SOC digest. No immediate action required.",
 }
 
+# Half the measured alerts carry no technique at all: llm_explain derives it by majority
+# vote over the RAG hits and returns nothing when they disagree, so technique_id and
+# mitre_tactic are both null for 50 of the 100 alerts in reports/llm_faithfulness_raw.jsonl.
+# That is an honest absence, not a failure, and it reads as one only if the message says so.
+# Printing "?" against those labels makes a working system look broken.
+UNKNOWN_TECHNIQUE_LINE = "• MITRE ATT&CK: ไม่ระบุ (RAG ไม่พบเทคนิคที่สอดคล้องกัน)"
+
 _KB_NAMES: dict[str, str] | None = None
 
 
@@ -86,6 +93,14 @@ def technique_name(technique_id: str | None) -> str | None:
     return _KB_NAMES.get(technique_id) or None
 
 
+def tactic_label(tactic: str | None) -> str | None:
+    """ATT&CK tactics arrive lowercase and hyphenated. Analysts read them as MITRE writes them."""
+    if not tactic:
+        return None
+    words = str(tactic).replace("_", "-").split("-")
+    return " ".join(w if w == "and" else w.capitalize() for w in (w.lower() for w in words))
+
+
 def port_label(port: Any) -> str:
     if port is None:
         return "?"
@@ -107,8 +122,7 @@ def build_line_message(record: dict[str, Any], config: dict[str, Any]) -> str:
     icon = SEVERITY_ICON.get(priority, "⚪")
     summary = summarize_two_lines(record.get("explanation_th", ""), max_chars=220)
     technique_id = record.get("technique_id")
-    name = technique_name(technique_id)
-    technique = f"{technique_id} — {name}" if name else (technique_id or "?")
+    tactic = tactic_label(record.get("mitre_tactic"))
     grafana_link = f"{config['line_grafana_base_url'].rstrip('/')}/d/soc-main"
 
     lines = [
@@ -123,8 +137,17 @@ def build_line_message(record: dict[str, Any], config: dict[str, Any]) -> str:
         f"• Source IP: {record.get('source_ip') or '?'}",
         f"• Destination IP: {record.get('dst_ip') or '?'}",
         f"• Destination Port: {port_label(record.get('dst_port'))}",
-        f"• MITRE ATT&CK Tactic: {record.get('mitre_tactic') or '?'}",
-        f"• MITRE Technique: {technique}",
+    ]
+    if technique_id or tactic:
+        name = technique_name(technique_id)
+        lines += [
+            f"• MITRE ATT&CK Tactic: {tactic or 'ไม่ระบุ'}",
+            f"• MITRE Technique: "
+            + (f"{technique_id} — {name}" if name else (technique_id or "ไม่ระบุ")),
+        ]
+    else:
+        lines.append(UNKNOWN_TECHNIQUE_LINE)
+    lines += [
         f"• Severity: {icon} {priority}",
         "",
         "📊 Grafana SOC Dashboard:",

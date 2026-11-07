@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.notifications.notify_line import (  # noqa: E402
     build_line_message,
     port_label,
+    tactic_label,
     technique_name,
 )
 
@@ -71,6 +72,39 @@ class BuildLineMessage(unittest.TestCase):
         message = build_line_message({"priority": "HIGH"}, CONFIG)
         self.assertIn("Source IP: ?", message)
         self.assertNotIn("None", message)
+
+
+class AbsentTechnique(unittest.TestCase):
+    """50 of the 100 measured alerts carry no technique: the RAG hits disagreed.
+
+    The message has to read as "not determined" rather than as a rendering failure, so a
+    bare question mark against a MITRE label is a bug even though nothing raises.
+    """
+
+    def test_says_it_was_not_determined_instead_of_printing_a_question_mark(self):
+        record = dict(HIGH_RECORD, technique_id=None, mitre_tactic=None)
+        message = build_line_message(record, CONFIG)
+        self.assertIn("MITRE ATT&CK: ไม่ระบุ", message)
+        self.assertNotIn("MITRE Technique: ?", message)
+        self.assertNotIn("Tactic: ?", message)
+
+    def test_the_rest_of_the_incident_block_survives(self):
+        record = dict(HIGH_RECORD, technique_id=None, mitre_tactic=None)
+        message = build_line_message(record, CONFIG)
+        self.assertIn("Destination Port: 80 (HTTP)", message)
+        self.assertIn("Severity:", message)
+
+
+class TacticLabel(unittest.TestCase):
+    def test_rendered_as_mitre_writes_it(self):
+        self.assertEqual(tactic_label("impact"), "Impact")
+        self.assertEqual(tactic_label("credential-access"), "Credential Access")
+
+    def test_and_stays_lowercase(self):
+        self.assertEqual(tactic_label("command-and-control"), "Command and Control")
+
+    def test_absent_tactic_is_none(self):
+        self.assertIsNone(tactic_label(None))
 
 
 class PortLabel(unittest.TestCase):
