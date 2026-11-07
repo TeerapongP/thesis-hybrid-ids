@@ -202,6 +202,29 @@ python -m src.evaluation.fusion_or_sweep --checkpoint-dir fusion_layer_loao_unif
 
 M1c is **not** unblocked by this. CIC-UNSW-NB15's `Data.csv` carries no `Source IP` or `Timestamp`, so the 12 behavioral columns cannot be computed for it and the unsupervised members still cannot take part in cross-dataset evaluation.
 
+### Split robustness — the deployed split has 96.36% group overlap, and this is the one in-dataset result the cascade wins
+
+**Found 2026-11-08 by auditing chapter 3. `src/evaluation/split_robustness.py` has existed since 2026-11-04 with a complete report trail, and nothing in this file mentioned it.** `grep -c split_robustness CLAUDE.md` returned 0, which means any session rewriting the split section from this file would have reproduced the gap. Read `reports/split_robustness_report_177001f4ad.txt` and `reports/split_robustness_summary_177001f4ad.json`; run id `177001f4ad`, 5 outer splits, group key `day_group | Source IP | 5-minute block` over 128,929 groups.
+
+**The exposure.** The deployed 60/20/20 stratified split assigns rows at random, and CICIDS-2017 flows are not independent: the same source IP in the same 5-minute window produces many near-identical rows. Measured, **96.36% of test rows belong to a group that also appears in train** (93.50% for test-val and train-val). A grouped split puts 0.00% by construction. A reader who knows this dataset will ask about it, and in-dataset F1 near 0.9996 is exactly the figure that invites the question.
+
+**Pooled over the identical 2,520,961-row set** (the summary records `comparison_valid: true`, `"both schemes cover the identical row set"`, and the same `row_id_set_hash` for both schemes, so this is a controlled comparison rather than two separate runs):
+
+| model | random split | grouped split | delta |
+|---|---|---|---|
+| Random Forest | **0.9996** | **0.9535** | −0.0461 |
+| **fused cascade** | 0.9967 | **0.9747** | −0.0220 |
+| Autoencoder | 0.8902 | 0.8766 | −0.0136 |
+| Isolation Forest | 0.5594 | 0.5632 | +0.0038 |
+
+**This is the only in-dataset measurement in the thesis where the deployed cascade beats Random Forest solo**, by 2.12pp, and it is the strongest available answer to "why not just use Random Forest". The supervised member is the one that leans on the leakage; the cascade degrades half as much.
+
+**Report the variance, not only the mean, because it is the sharper finding.** Across the five grouped folds RF's F1 is 0.9260 ± **0.1195** against 0.9996 ± 0.0001 on the random split, and one grouped fold drops RF to recall 0.5665 / F1 0.7154. The cascade holds 0.9751 ± 0.0176. So grouping does not merely lower RF's score, it makes it unstable, which matters more for a deployment than a mean does.
+
+**Two honesty notes.** 6,185 rows are excluded from **both** schemes so the comparison stays fair, because grouped folds can leave a class entirely absent from train (DoS GoldenEye 6,164 rows, Web Attack - Sql Injection 21). And this does not retract the in-dataset result reported elsewhere in this file: on a random split RF solo really does beat the cascade by 0.29pp. **The honest position is three-part and must be written as one** — zero-day LOAO favours the cascade by 0.45pp, in-dataset on a random split favours RF solo, in-dataset on a group-aware split favours the cascade by 2.12pp. Any one of the three quoted alone over- or under-claims.
+
+**Not in chapter 3.** §3.3.4 presents the split with no mention of group overlap, and the word "group" appears there once, inside the `day_group` exclusion list. This is the chapter's largest gap and its strongest unused argument at the same time.
+
 ### Supervised baseline comparison — why Random Forest, with evidence
 
 `src/evaluation/baseline_model_comparison.py` answers the advisor's question "why these three models" by measuring the obvious alternative on the identical unified population, features and split. Previously that choice rested on convention; now it rests on a number.
