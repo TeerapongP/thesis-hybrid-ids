@@ -47,6 +47,13 @@ METRICS_PATH = ROOT / "reports" / "llm_faithfulness_metrics.csv"
 REPORT_PATH = ROOT / "reports" / "llm_faithfulness_report.txt"
 ML_PYTHON = os.environ.get("ML_PYTHON", "C:/Users/devMrX/anaconda3/python.exe")
 
+# Set by --no-rag. The ablation that answers "does the retrieval layer change the output",
+# which is a question no argument settles. Blanking the hits removes both of RAG's
+# contributions at once: the retrieved chunks in the prompt, and the technique_id/mitre_tactic
+# that _technique_context derives from their top-3 consensus. That is the whole layer, which
+# is what the question asks about, but it means the result cannot say which half mattered.
+NO_RAG = False
+
 SEED = 42
 PER_CATEGORY_CAP = 7
 BENIGN_N = 10
@@ -517,7 +524,8 @@ def _fmt(r: dict[str, Any]) -> str:
     return f'{r["num"]}/{r["den"]} = {r["rate"]*100:.1f}% (95% Wilson CI {r["ci_lo"]*100:.1f}-{r["ci_hi"]*100:.1f}%)'
 
 
-def write_metrics_csv(s: dict[str, Any], path: Path = METRICS_PATH) -> None:
+def write_metrics_csv(s: dict[str, Any], path: Path | None = None) -> None:
+    path = path or METRICS_PATH
     rows: list[list[Any]] = []
     rows.append(["# aggregate rates (each row recomputable from llm_faithfulness_raw.jsonl; see report section 8)"])
     rows.append(["metric", "numerator", "denominator", "rate", "ci95_lo", "ci95_hi", "basis"])
@@ -589,7 +597,8 @@ def write_metrics_csv(s: dict[str, Any], path: Path = METRICS_PATH) -> None:
         csv.writer(fh).writerows(rows)
 
 
-def write_report(s: dict[str, Any], records: list[dict[str, Any]], path: Path = REPORT_PATH, wall_total_s: float | None = None) -> None:
+def write_report(s: dict[str, Any], records: list[dict[str, Any]], path: Path | None = None, wall_total_s: float | None = None) -> None:
+    path = path or REPORT_PATH
     ok = [r for r in records if r.get("status") == "ok"]
     L: list[str] = []
     bar = "=" * 70
@@ -896,12 +905,13 @@ def run_llm(limit: int | None) -> float:
             sink.clear()
             t0 = time.perf_counter()
             rec = {k: v for k, v in alert.items()}
-            tech_id, tactic = llm_explain._technique_context(alert["rag_hits"])
+            hits = [] if NO_RAG else alert["rag_hits"]
+            tech_id, tactic = llm_explain._technique_context(hits)
             rec["ctx_technique_id"], rec["ctx_tactic"] = tech_id, tactic
             rec["confidence"] = ctx["confidence"]
             rec["priority"] = llm_explain.derive_priority(
                 ctx["fused_score"], ctx["fused_prediction"], ctx.get("model_used"))
-            rec["rag_hit_ids"] = [h["id"] for h in alert["rag_hits"]]
+            rec["rag_hit_ids"] = [h["id"] for h in hits]
             try:
                 facts_for_shots = {
                     "alert_context": ctx, "confidence": ctx["confidence"],
@@ -910,7 +920,7 @@ def run_llm(limit: int | None) -> float:
                 rec["rendered_example_explanations"] = [
                     sh["output"]["explanation_th"] for sh in llm_explain.render_few_shots(facts_for_shots)
                 ]
-                output = llm_explain.explain_alert(ctx, alert["rag_hits"], ctx["fused_score"], ctx["fused_prediction"], ctx["confidence"], config)
+                output = llm_explain.explain_alert(ctx, hits, ctx["fused_score"], ctx["fused_prediction"], ctx["confidence"], config)
                 rec.update(status="ok", error=None, output=output)
             except Exception as exc:
                 rec.update(status="error", error=f"{type(exc).__name__}: {exc}", output=None)
@@ -958,7 +968,23 @@ def main() -> int:
     ap.add_argument("--limit", type=int)
     ap.add_argument("--rescore", action="store_true")
     ap.add_argument("--rebuild-alerts", action="store_true")
+    ap.add_argument("--no-rag", action="store_true",
+                    help="ablation: run with no retrieved hits at all, so technique_id and "
+                         "mitre_tactic are null for every alert and the prompt carries no chunks")
+    ap.add_argument("--variant", help="suffix the raw/metrics/report filenames, so a run cannot "
+                                      "overwrite the deployed numbers")
     args = ap.parse_args()
+    global NO_RAG, RAW_PATH, METRICS_PATH, REPORT_PATH
+    NO_RAG = args.no_rag
+    if args.variant:
+        RAW_PATH = RAW_PATH.with_suffix(f".{args.variant}.jsonl")
+        METRICS_PATH = METRICS_PATH.with_suffix(f".{args.variant}.csv")
+        REPORT_PATH = REPORT_PATH.with_suffix(f".{args.variant}.txt")
+        print(f"[variant] writing {RAW_PATH.name}, {METRICS_PATH.name}, {REPORT_PATH.name}")
+    if NO_RAG:
+        print("[no-rag] ABLATION: no retrieved hits; the grounding corpus for the unsupported-term "
+              "check shrinks with them, so prose_ungrounded/unsupported are NOT comparable to the "
+              "deployed run. Diversity, echo and entity_pass are.")
     if args.stage == "alerts":
         build_alerts()
         return 0
