@@ -434,6 +434,27 @@ Dry run is the default. `pipeline.py` and the runner share `load_models`, `score
 - **No replayed row matched an indicator.** Each run's `enrichment.matched` was false. A separate live query of the 40 most frequent public IPs in the test split returned no indicator for any, consistent with the corpus limit in "OpenCTI enrichment service" above. So the matched path through this chain was not exercised on real replay data. It is covered only by `enrich.py`'s own live verification.
 - `consume` reads the output topic from the start and filters by `event_id`, which makes a retry idempotent and costs a scan that grows with the topic. SHAP is not run by the runner. `tests/test_e2e_replay.py` covers the pure parts (offline, 30 tests); the Kafka legs were verified only by the live runs above.
 
+### RAG Layer — retrieval identifies the technique correctly on 42 of 100 alerts, and a 15-row CSV already holds the answer
+
+Root-caused 2026-11-08, after the LINE message format made the gap visible by printing the technique for the first time. **Half the alerts carry no MITRE technique, and it is deterministic per attack category rather than flaky per row.**
+
+The proximate cause is one line, `src/llm/llm_explain.py:284`: `_technique_context` takes the `technique_id` of the top 3 RAG hits and requires **2 of 3 to agree**, returning `(None, None)` otherwise. Measured over the 100 alerts in `reports/llm_faithfulness_raw.jsonl`: metadata is never missing (0 cases), 8 alerts had all 3 hits agree, 42 had 2 of 3 agree, and **50 had three different techniques with one vote each**. The vote rule is sound. It is refusing to name a technique when its evidence does not converge, which is the correct behaviour and the reason no wrong technique is asserted on those rows.
+
+The real cause is upstream. `pipeline.rag_query_for` builds the query from `rf_predicted_label`, so a given category always produces the same query and the same three hits, and the split is exact:
+
+| outcome | predicted labels |
+|---|---|
+| technique named (50) | DDoS, DoS GoldenEye, DoS Hulk, DoS Slowhttptest, DoS slowloris, PortScan, Web Attack - Brute Force |
+| `ไม่ระบุ` (50) | BENIGN, Bot, FTP-Patator, SSH-Patator, Web Attack - XSS, Web Attack - Sql Injection, Infiltration, Heartbleed |
+
+**And the answer was in the repository the whole time.** Every failing label except BENIGN already has its correct technique in `config/mitre_mapping.csv`, and every one of those techniques is already in the 11-technique KB: Bot → T1071.001, FTP-/SSH-Patator → T1110.001, XSS/Sql Injection/Infiltration/Heartbleed → T1190. So retrieval is not failing for lack of a knowledge base. It fails because the query is a **tool name** ("FTP-Patator") rather than a behaviour description, which BM25 cannot match against the KB's prose and the dense encoder embeds weakly.
+
+Scored against that lookup table as ground truth, retrieval **matches on 42, disagrees on 8, says nothing on 50**. This is the same phenomenon as the measured `P@3` of 0.50, from the other direction, and the two corroborate each other.
+
+**What this means for the write-up, and it is a finding rather than a defect to hide.** A 15-row CSV identifies the technique deterministically and auditably for every category the dataset contains, while a hybrid BM25 + dense retriever over a purpose-built KB gets it right 42% of the time from the same input. Reported honestly, that is a useful negative result about retrieval for *classification-style* lookup, and it argues for the architectural split the system does not currently make: **a lookup table should name the technique, and retrieval should supply the prose** (detection guidance, mitigations) that no table can hold.
+
+**Using the mapping at inference is not label leakage, and the distinction matters.** `config/mitre_mapping.csv` is keyed on `source_label`, the *true* label, which is why its derived CTI columns are excluded from model input. Keying it on `rf_predicted_label` instead consumes the model's own output, downstream of the detection decision, which is what a deployed IDS does when it translates a classifier verdict into ATT&CK terms. **Not yet implemented** — it would move the M2 numbers and reduce the retrieval layer's role in the pipeline, so it is the author's call rather than a silent fix.
+
 ### RAG Layer — knowledge base source decision (OpenCTI investigated, permanently not adopted)
 
 `data/knowledge_base/mitre_techniques.json` (the Phase 1 knowledge base behind the RAG layer's approved 45-chunk design — 11 techniques, `T1046, T1059, T1071.001, T1110, T1110.001, T1190, T1210, T1498, T1499.002, T1505.003, T1595`) is sourced from a direct fetch of the raw `mitre-attack/attack-stix-data` GitHub STIX bundle (`enterprise-attack/enterprise-attack.json`, ATT&CK v19.1), **not** from OpenCTI, even though the architecture diagrams (formerly `diagrams/thesis_dataflow_v2.drawio`, now in `E:\thesis-doc\03_Diagrams\`) show OpenCTI → Vector DB. This was a deliberate choice, investigated thoroughly (2026-07-17) and closed permanently — do not re-open this question in a future session without new evidence (e.g. a confirmed OpenCTI upstream release that adds Detection Strategies support or fixes the dedup bug below).
