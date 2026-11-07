@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.notifications.notify_line import (  # noqa: E402
     build_line_message,
     port_label,
+    risk_suffix,
     tactic_label,
     technique_name,
 )
@@ -72,6 +73,21 @@ class BuildLineMessage(unittest.TestCase):
         message = build_line_message({"priority": "HIGH"}, CONFIG)
         self.assertIn("Source IP: ?", message)
         self.assertNotIn("None", message)
+
+
+class RiskScore(unittest.TestCase):
+    def test_shown_beside_the_severity_so_two_highs_can_be_ordered(self):
+        message = build_line_message(dict(HIGH_RECORD, risk_score=87), CONFIG)
+        self.assertIn("Severity:", message)
+        self.assertIn("(risk 87/100)", message)
+
+    def test_absent_score_leaves_the_severity_line_alone(self):
+        message = build_line_message(HIGH_RECORD, CONFIG)
+        self.assertNotIn("risk", message)
+
+    def test_unusable_value_is_dropped_rather_than_crashing_the_alert(self):
+        """A malformed score must not be what stops a HIGH alert reaching an analyst."""
+        self.assertEqual(risk_suffix("not a number"), "")
 
 
 class AbsentTechnique(unittest.TestCase):

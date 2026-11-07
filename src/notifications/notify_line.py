@@ -112,6 +112,34 @@ def port_label(port: Any) -> str:
     return f"{number} ({service})" if service else str(number)
 
 
+def risk_suffix(risk_score: Any) -> str:
+    """` (risk 87/100)` beside the severity.
+
+    This was added to let an analyst order two HIGH alerts, and measuring it showed that is
+    mostly not what it does. Across the 100 alerts in reports/llm_faithfulness_raw.jsonl,
+    73 of the 79 HIGH alerts sit at exactly 100, because the cascade uses Random Forest's
+    own P(attack) as the fused score wherever RF is confident and RF saturates near 1.0 on
+    in-distribution attacks. So the field does not rank HIGH alerts in general.
+
+    It is kept because of what the 6 exceptions turn out to be. Every HIGH alert below 100
+    except one at 98 was decided by the if_ae_fallback branch, at risk 52 and 54, which is
+    the branch that fires when RF abstains. Those are the alerts resting on unsupervised
+    evidence alone, and an analyst has good reason to read them differently. The number
+    discriminates where it matters and is constant elsewhere.
+
+    The value is round(fused_score * 100) clamped to 100 by alert_dispatcher, and the clamp
+    matters: normalized component scores are deliberately unclipped, so a fallback-decided
+    alert on out-of-distribution input can carry a fused_score of 8.94. A risk of 100 means
+    "at or above the top of the scale", not "maximally certain".
+    """
+    if risk_score is None:
+        return ""
+    try:
+        return f" (risk {int(risk_score)}/100)"
+    except (TypeError, ValueError):
+        return ""
+
+
 def build_line_message(record: dict[str, Any], config: dict[str, Any]) -> str:
     """The analyst-facing LINE text.
 
@@ -148,7 +176,7 @@ def build_line_message(record: dict[str, Any], config: dict[str, Any]) -> str:
     else:
         lines.append(UNKNOWN_TECHNIQUE_LINE)
     lines += [
-        f"• Severity: {icon} {priority}",
+        f"• Severity: {icon} {priority}{risk_suffix(record.get('risk_score'))}",
         "",
         "📊 Grafana SOC Dashboard:",
         grafana_link,
