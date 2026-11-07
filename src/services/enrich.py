@@ -1,9 +1,18 @@
 """
 enrich.py
 =========
-OpenCTI enrichment service. Consumes Kafka `pa5220.raw`, enriches each event against OpenCTI,
-and publishes to `pa5220.enriched` (which `observability/logstash/pipeline/soc.conf` already
-indexes).
+OpenCTI enrichment service. Consumes a Kafka topic of raw flow events (`KAFKA_INPUT_TOPIC`),
+enriches each event against OpenCTI, and publishes to `KAFKA_OUTPUT_TOPIC` (`pa5220.enriched`,
+which `observability/logstash/pipeline/soc.conf` indexes).
+
+**Nothing produces to the input topic in this thesis, and that is a scope decision rather
+than an omission.** The input was to be PA-5220 firewall logs, which the approved proposal
+(scope item 3.2) puts permanently out of scope because the logs were never obtained, and on
+2026-11-07 the decision was taken not to fake them with a replay feed either. This service is
+therefore built, tested and live-verified against a real broker and a real OpenCTI 5.12.17,
+but it is **not wired into the measured detection pipeline** — `src/pipeline.py` reads the
+feature parquet directly and never consumes Kafka. Treat it as a demonstrated component, and
+do not describe the system as ingesting live logs end to end.
 
     python -m src.services.enrich --dry-run            # stubbed OpenCTI + in-memory broker
     python -m src.services.enrich --dry-run --input events.jsonl
@@ -12,7 +21,7 @@ indexes).
 Output contract: the enriched event is the raw event plus ONE additive `enrichment` object
 (`matched`, `observables_checked`, `indicators`, `related`, `enriched_at`, `source`, and an
 `error` string only when OpenCTI could not be reached). No raw field is ever changed or removed,
-so `pa5220.raw` and `pa5220.enriched` stay diffable in Elasticsearch.
+so the input and output topics stay diffable in Elasticsearch.
 
 Operational properties:
   * Idempotent. Every field of the output is a pure function of (raw event, OpenCTI answer,
@@ -703,7 +712,7 @@ def _dry_run_records(path: Path | None) -> list[Record]:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m src.services.enrich",
-        description="Enrich pa5220.raw events against OpenCTI and publish to pa5220.enriched.",
+        description="Enrich raw flow events against OpenCTI and publish to the enriched topic.",
     )
     parser.add_argument("--dry-run", action="store_true",
                         help="stubbed OpenCTI and in-memory broker; no network, no .env required")
