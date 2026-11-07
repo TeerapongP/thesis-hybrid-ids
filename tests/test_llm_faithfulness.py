@@ -112,5 +112,99 @@ class FaithfulnessScoringTests(unittest.TestCase):
         self.assertGreater(hi, 0.2)
 
 
+def mapping_run_record(**overrides):
+    """A DDoS alert whose retrieval says T1499.002 while the table says T1498."""
+    rec = copy.deepcopy(FIXTURE["good"])
+    rec["technique_source"] = "mapping"
+    rec["true_label"] = "DDoS"
+    rec["alert_context"]["rf_predicted_label"] = "DDoS"
+    rec["ctx_technique_id"] = "T1498"
+    rec["pred_label_mapping_technique_id"] = "T1498"
+    rec["rag_hits"] = [{"rank": 1, "id": "x", "document": "d", "metadata": {"technique_id": "T1499.002"}}]
+    rec["output"]["technique_id"] = "T1498"
+    rec["output"]["explanation_th"] = ("พบการโจมตี DDoS จากเครื่อง 172.16.0.1 ไปยัง 192.168.10.50 "
+                                       "ที่พอร์ต 80 ตรงกับเทคนิค T1498")
+    rec.update(overrides)
+    return rec
+
+
+def finished(rec):
+    return {**rec, "status": "ok", "checks": m2.score_record(rec, KB), "llm_metrics": {"wall_s": 1.0}}
+
+
+class TechniqueProvenanceTests(unittest.TestCase):
+    def test_supplied_technique_is_not_a_hallucination_when_retrieval_missed_it(self):
+        grounding = m2.score_record(mapping_run_record(), KB)["grounding"]
+        self.assertEqual(grounding["prose_technique_ids"], ["T1498"])
+        self.assertEqual(grounding["prose_ungrounded"], [])
+
+    def test_a_technique_that_is_neither_supplied_nor_retrieved_is_still_flagged(self):
+        rec = mapping_run_record()
+        rec["output"]["explanation_th"] += " และ T1046"
+        self.assertEqual(m2.score_record(rec, KB)["grounding"]["prose_ungrounded"], ["T1046"])
+
+    def test_mapped_technique_absent_from_hits_is_measured_as_a_retrieval_miss(self):
+        grounding = m2.score_record(mapping_run_record(), KB)["grounding"]
+        self.assertFalse(grounding["mapped_pred_technique_in_hits"])
+        hit = mapping_run_record()
+        hit["rag_hits"][0]["metadata"]["technique_id"] = "T1498"
+        self.assertTrue(m2.score_record(hit, KB)["grounding"]["mapped_pred_technique_in_hits"])
+
+    def test_naming_the_retrieved_technique_instead_of_the_supplied_one_is_contradicted(self):
+        rec = mapping_run_record()
+        rec["output"]["explanation_th"] = rec["output"]["explanation_th"].replace("T1498", "T1499.002")
+        checks = m2.score_record(rec, KB)
+        self.assertIn("technique_id:T1499.002", checks["entity"]["foreign"])
+        reasons = [r for c in checks["claims"] for r in c["reasons"]]
+        self.assertIn("technique_differs_from_mapping:T1499.002", reasons)
+
+    def test_mapping_run_reports_the_two_provenance_dependent_checks_as_not_applicable(self):
+        s = m2.summarize([finished(mapping_run_record())])
+        self.assertEqual(s["technique_source"], "mapping")
+        self.assertIsNone(s["result_technique_in_hits"])
+        self.assertIsNone(s["consensus_matches_label_mapping"])
+        self.assertEqual(s["retrieval_hits_contain_mapped_technique"]["den"], 1)
+        self.assertEqual(s["retrieval_hits_contain_mapped_technique"]["num"], 0)
+
+    def test_records_without_a_source_are_rag_and_keep_both_guards(self):
+        rec = copy.deepcopy(FIXTURE["good"])
+        rec["rag_hits"][0]["metadata"]["technique_id"] = "T1499.002"
+        s = m2.summarize([finished(rec)])
+        self.assertEqual(s["technique_source"], "rag")
+        self.assertEqual(s["result_technique_in_hits"]["den"], 1)
+        self.assertIsNotNone(s["consensus_matches_label_mapping"])
+
+    def test_a_run_cannot_mix_sources(self):
+        mixed = [finished(mapping_run_record()), finished(copy.deepcopy(FIXTURE["good"]))]
+        with self.assertRaises(ValueError):
+            m2.summarize(mixed)
+
+    def test_metrics_csv_states_provenance_and_marks_inapplicable_rows(self):
+        import csv
+        import tempfile
+
+        s = m2.summarize([finished(mapping_run_record())])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "metrics.csv"
+            m2.write_metrics_csv(s, path)
+            rows = list(csv.reader(path.read_text(encoding="utf-8").splitlines()))
+        by_key = {r[0]: r for r in rows if r}
+        self.assertEqual(by_key["# technique_source"][1], "mapping")
+        for key in ("result_technique_in_hits", "consensus_matches_label_mapping"):
+            self.assertEqual(by_key[key][3], "n/a")
+            self.assertIn("n/a under technique_source=mapping", by_key[key][6])
+        self.assertIn("retrieval_hits_contain_mapped_technique", by_key)
+
+    def test_report_states_provenance(self):
+        import tempfile
+
+        records = [finished(mapping_run_record())]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "report.txt"
+            m2.write_report(m2.summarize(records), records, path)
+            text = path.read_text(encoding="utf-8")
+        self.assertIn("Technique source for this run: mapping", text)
+
+
 if __name__ == "__main__":
     unittest.main()

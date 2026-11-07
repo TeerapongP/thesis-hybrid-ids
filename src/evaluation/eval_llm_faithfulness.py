@@ -54,6 +54,14 @@ ML_PYTHON = os.environ.get("ML_PYTHON", "C:/Users/devMrX/anaconda3/python.exe")
 # is what the question asks about, but it means the result cannot say which half mattered.
 NO_RAG = False
 
+# Set by --technique-source. Where the technique in FACTS comes from, and therefore what
+# several grounding checks mean: under "rag" the technique is derived from the retrieved hits,
+# so "is it among the hits" is a tautology. Under "mapping" it comes from the MITRE table
+# keyed on the RF-predicted label, and the same question becomes a real measurement of
+# retrieval accuracy. Each record carries its own `technique_source`, so rescoring a stored
+# run needs no flag.
+TECHNIQUE_SOURCE = "rag"
+
 SEED = 42
 PER_CATEGORY_CAP = 7
 BENIGN_N = 10
@@ -246,8 +254,12 @@ def check_grounding(rec: dict[str, Any], kb: dict[str, Any]) -> dict[str, Any]:
         tactic_ok = bool(kb_tactics) and tactic == kb_tactics[0] and tactic == tactic.lower()
     prose = out["explanation_th"] + "\n" + "\n".join(out["remediation"])
     prose_ids = sorted(set(TECH_RE.findall(prose)))
-    ungrounded = [t for t in prose_ids if t not in hit_ids]
+    # The supplied technique is grounded by being the supplied technique. Under "rag" it is
+    # always among the hits too, so this clause changes nothing there. Under "mapping" it
+    # stops the correct technique counting as a hallucination when retrieval missed it.
+    ungrounded = [t for t in prose_ids if t not in hit_ids and t != tid]
     mapped = rec.get("label_mapping_technique_id")
+    mapped_pred = rec.get("pred_label_mapping_technique_id")
     return {
         "result_technique_id": tid,
         "result_tactic": tactic,
@@ -256,6 +268,7 @@ def check_grounding(rec: dict[str, Any], kb: dict[str, Any]) -> dict[str, Any]:
         "prose_technique_ids": prose_ids,
         "prose_ungrounded": ungrounded,
         "matches_label_mapping": (tid == mapped) if (tid and mapped) else None,
+        "mapped_pred_technique_in_hits": (mapped_pred in hit_ids) if mapped_pred else None,
     }
 
 
@@ -301,7 +314,8 @@ def classify_claim(text: str, source: str, rec: dict[str, Any]) -> dict[str, Any
         if tid not in hit_ids:
             unsupported.append(f"technique_not_retrieved:{tid}")
         elif chosen:
-            contradicted.append(f"technique_differs_from_consensus:{tid}")
+            origin = "mapping" if rec.get("technique_source") == "mapping" else "consensus"
+            contradicted.append(f"technique_differs_from_{origin}:{tid}")
         else:
             unsupported.append(f"technique_named_despite_abstention:{tid}")
     for m in CONF_RE.finditer(text):
@@ -413,6 +427,11 @@ def _rate(k: int, n: int) -> dict[str, Any]:
 def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
     ok = [r for r in records if r.get("status") == "ok"]
     s: dict[str, Any] = {"n_total": len(records), "n_ok": len(ok), "n_error": len(records) - len(ok)}
+    sources = {r.get("technique_source", "rag") for r in records}
+    if len(sources) > 1:
+        raise ValueError(f"records mix technique sources {sorted(sources)}; a run has exactly one")
+    s["technique_source"] = sources.pop() if sources else "rag"
+    from_rag = s["technique_source"] == "rag"
 
     def count(pred, population=None):
         pop = ok if population is None else population
@@ -435,12 +454,21 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
 
     nonnull = [r for r in ok if r["checks"]["grounding"]["result_technique_id"]]
     s["abstained"] = _rate(len(ok) - len(nonnull), len(ok))
-    s["result_technique_in_hits"] = _rate(count(lambda r: r["checks"]["grounding"]["technique_in_hits"], nonnull), len(nonnull))
+    # None means not applicable under this provenance, never zero. Under "mapping" the
+    # technique is not derived from the hits, so the guard has nothing to report.
+    s["result_technique_in_hits"] = (
+        _rate(count(lambda r: r["checks"]["grounding"]["technique_in_hits"], nonnull), len(nonnull))
+        if from_rag else None)
     s["result_tactic_matches_kb"] = _rate(count(lambda r: r["checks"]["grounding"]["tactic_matches_kb"], nonnull), len(nonnull))
     s["prose_ungrounded_alerts"] = _rate(count(lambda r: r["checks"]["grounding"]["prose_ungrounded"]), len(ok))
     s["prose_technique_mention_alerts"] = _rate(count(lambda r: r["checks"]["grounding"]["prose_technique_ids"]), len(ok))
     attack_nonnull = [r for r in nonnull if r["true_label"] != "BENIGN" and r["checks"]["grounding"]["matches_label_mapping"] is not None]
-    s["consensus_matches_label_mapping"] = _rate(count(lambda r: r["checks"]["grounding"]["matches_label_mapping"], attack_nonnull), len(attack_nonnull))
+    s["consensus_matches_label_mapping"] = (
+        _rate(count(lambda r: r["checks"]["grounding"]["matches_label_mapping"], attack_nonnull), len(attack_nonnull))
+        if from_rag else None)
+    mapped_pred = [r for r in ok if r["checks"]["grounding"].get("mapped_pred_technique_in_hits") is not None]
+    s["retrieval_hits_contain_mapped_technique"] = _rate(
+        count(lambda r: r["checks"]["grounding"]["mapped_pred_technique_in_hits"], mapped_pred), len(mapped_pred))
 
     verdicts: Counter = Counter()
     by_src: dict[str, Counter] = {"explanation": Counter(), "remediation": Counter()}
@@ -520,25 +548,56 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
     return s
 
 
-def _fmt(r: dict[str, Any]) -> str:
+PROVENANCE = {
+    "rag": "technique_id and mitre_tactic come from the 2-of-3 consensus of the top-3 retrieved RAG hits (the deployed behaviour)",
+    "mapping": "technique_id comes from config/mitre_mapping.csv keyed on the RF-PREDICTED label and mitre_tactic from the KB; retrieval does not choose it",
+}
+# What each provenance-dependent check means. Under "rag" two of them are guards that cannot
+# fail by construction; under "mapping" the same questions would silently change meaning, so
+# they are reported as n/a with the reason instead of as a number nobody can interpret.
+PROVENANCE_BASIS = {
+    "rag": {
+        "abstained": "measured: technique_id null (fewer than 2 of top-3 RAG hits agree)",
+        "result_technique_in_hits": "measured (by construction near-certain: technique_id is code-derived from hits)",
+        "prose_ungrounded_alerts": "measured: alert prose names a technique id absent from retrieved hits",
+        "consensus_matches_label_mapping": "measured, informational: RAG consensus technique equals MITRE mapping of the TRUE label; mixes retrieval error with classification error, so retrieval alone is retrieval_hits_contain_mapped_technique",
+    },
+    "mapping": {
+        "abstained": "measured: technique_id null (RF-predicted label is BENIGN or absent from the mapping table)",
+        "result_technique_in_hits": "n/a under technique_source=mapping: the technique is not derived from the hits, so its presence among them is retrieval accuracy, reported as retrieval_hits_contain_mapped_technique rather than as a guard",
+        "prose_ungrounded_alerts": "measured: alert prose names a technique id that is neither the supplied technique nor among retrieved hits",
+        "consensus_matches_label_mapping": "n/a under technique_source=mapping: the result technique is the mapping of the PREDICTED label, so comparing it with the mapping of the TRUE label measures RF classification error, not retrieval",
+    },
+}
+RETRIEVAL_ACCURACY_BASIS = ("measured, informational retrieval accuracy (not hallucination): the technique the mapping table gives the "
+                            "RF-PREDICTED label is among the technique ids of the 3 retrieved hits; the RAG query is that same predicted "
+                            "label, so classification error is not mixed in")
+
+
+def _fmt(r: dict[str, Any] | None) -> str:
+    if r is None:
+        return "n/a (see basis)"
     return f'{r["num"]}/{r["den"]} = {r["rate"]*100:.1f}% (95% Wilson CI {r["ci_lo"]*100:.1f}-{r["ci_hi"]*100:.1f}%)'
 
 
 def write_metrics_csv(s: dict[str, Any], path: Path | None = None) -> None:
     path = path or METRICS_PATH
     rows: list[list[Any]] = []
+    source = s["technique_source"]
+    rows.append(["# technique_source", source, PROVENANCE[source]])
     rows.append(["# aggregate rates (each row recomputable from llm_faithfulness_raw.jsonl; see report section 8)"])
     rows.append(["metric", "numerator", "denominator", "rate", "ci95_lo", "ci95_hi", "basis"])
     basis = {
         "entity_pass": "measured: no omitted and no foreign/altered entity (strict)",
         "entity_corruption_free": "measured: no foreign/altered IP, port, technique id, hostname; no Thai digits",
         "entity_complete": "measured: every context IP/port/hostname/technique id appears verbatim",
-        "abstained": "measured: technique_id null (fewer than 2 of top-3 RAG hits agree)",
-        "result_technique_in_hits": "measured (by construction near-certain: technique_id is code-derived from hits)",
+        "abstained": PROVENANCE_BASIS[source]["abstained"],
+        "result_technique_in_hits": PROVENANCE_BASIS[source]["result_technique_in_hits"],
         "result_tactic_matches_kb": "measured (by construction near-certain: tactic is code-derived from KB)",
-        "prose_ungrounded_alerts": "measured: alert prose names a technique id absent from retrieved hits",
+        "prose_ungrounded_alerts": PROVENANCE_BASIS[source]["prose_ungrounded_alerts"],
         "prose_technique_mention_alerts": "measured: alert prose names any technique id",
-        "consensus_matches_label_mapping": "measured, informational: RAG consensus technique equals MITRE mapping of true label (retrieval accuracy, not hallucination)",
+        "consensus_matches_label_mapping": PROVENANCE_BASIS[source]["consensus_matches_label_mapping"],
+        "retrieval_hits_contain_mapped_technique": RETRIEVAL_ACCURACY_BASIS,
         "alerts_with_bad_claim": "approximated: alert has >=1 unsupported/contradicted claim by mechanical rules",
         "defect_waf_portscan_pred": "measured: WAF in remediation, alerts RF-predicted PortScan",
         "defect_waf_portscan_true": "measured: WAF in remediation, alerts truly PortScan",
@@ -552,6 +611,9 @@ def write_metrics_csv(s: dict[str, Any], path: Path | None = None) -> None:
     }
     for key, why in basis.items():
         r = s[key]
+        if r is None:
+            rows.append([key, "", "", "n/a", "", "", why])
+            continue
         rows.append([key, r["num"], r["den"], f'{r["rate"]:.6f}', f'{r["ci_lo"]:.6f}', f'{r["ci_hi"]:.6f}', why])
     # Plain scalars, not proportions -- they have no numerator/denominator or CI, so they get
     # their own rows rather than being forced into the rate columns.
@@ -641,16 +703,30 @@ def write_report(s: dict[str, Any], records: list[dict[str, Any]], path: Path | 
         if not e["pass"]:
             L.append(f"  {r['alert_id']} [{r['true_label']}] omitted={e['missing']} foreign={e['foreign']} thai_digits={e['thai_digits']}")
     L.append("")
-    L += [bar, "3. TECHNIQUE GROUNDING (measured)", bar]
-    L += ["The Typhoon draft schema has no technique_id or tactic field. explain_alert fills both from the RAG top-3 consensus and the",
-          "KB, so the result-level fields cannot be hallucinated by the model by construction. Those rates are reported as a",
-          "regression guard, not a model measurement. The model-dependent question is whether its PROSE names technique ids.",
-          f"Abstained (technique_id null):                 {_fmt(s['abstained'])}",
-          f"Result technique_id present in retrieved hits: {_fmt(s['result_technique_in_hits'])}  (guard)",
-          f"Result mitre_tactic equals KB lowercase tactic: {_fmt(s['result_tactic_matches_kb'])}  (guard)",
-          f"Alerts whose prose names any technique id:     {_fmt(s['prose_technique_mention_alerts'])}",
-          f"Alerts whose prose names an id NOT retrieved:   {_fmt(s['prose_ungrounded_alerts'])}   <- technique hallucination rate",
-          f"Informational, not hallucination: RAG consensus technique equals MITRE mapping of the true label: {_fmt(s['consensus_matches_label_mapping'])}",
+    src = s["technique_source"]
+    L += [bar, "3. TECHNIQUE GROUNDING (measured)", bar,
+          f"Technique source for this run: {src}. {PROVENANCE[src]}."]
+    if src == "rag":
+        L += ["The Typhoon draft schema has no technique_id or tactic field. explain_alert fills both from the RAG top-3 consensus and the",
+              "KB, so the result-level fields cannot be hallucinated by the model by construction. Those rates are reported as a",
+              "regression guard, not a model measurement. The model-dependent question is whether its PROSE names technique ids.",
+              f"Abstained (technique_id null):                 {_fmt(s['abstained'])}",
+              f"Result technique_id present in retrieved hits: {_fmt(s['result_technique_in_hits'])}  (guard)",
+              f"Result mitre_tactic equals KB lowercase tactic: {_fmt(s['result_tactic_matches_kb'])}  (guard)",
+              f"Informational, not hallucination: RAG consensus technique equals MITRE mapping of the TRUE label: {_fmt(s['consensus_matches_label_mapping'])}",
+              "  (mixes retrieval error with classification error; the retrieval line below isolates retrieval)"]
+    else:
+        L += ["explain_alert fills technique_id from the MITRE mapping table for the RF-predicted label and mitre_tactic from the KB, so the",
+              "result-level fields cannot be hallucinated by the model by construction. Retrieval no longer chooses the technique, which",
+              "changes what two checks mean. Whether the technique is among the hits is now retrieval accuracy and not a guard, and",
+              "comparing it with the mapping of the TRUE label would measure RF classification error. Both are therefore reported as n/a.",
+              f"Abstained (technique_id null, predicted BENIGN or unmapped): {_fmt(s['abstained'])}",
+              f"Result technique_id present in retrieved hits: {_fmt(s['result_technique_in_hits'])}",
+              f"Result mitre_tactic equals KB lowercase tactic: {_fmt(s['result_tactic_matches_kb'])}  (guard)",
+              f"RAG consensus equals mapping of the TRUE label: {_fmt(s['consensus_matches_label_mapping'])}"]
+    L += [f"Alerts whose prose names any technique id:     {_fmt(s['prose_technique_mention_alerts'])}",
+          f"Alerts whose prose names an id neither supplied nor retrieved: {_fmt(s['prose_ungrounded_alerts'])}   <- technique hallucination rate",
+          f"Informational retrieval accuracy, not hallucination: mapped technique of the PREDICTED label among the 3 hits' technique ids: {_fmt(s['retrieval_hits_contain_mapped_technique'])}",
           ""]
     L += [bar, "4. CLAIM-LEVEL SUPPORT (approximated, partial)", bar]
     c = s["claims"]
@@ -906,8 +982,11 @@ def run_llm(limit: int | None) -> float:
             t0 = time.perf_counter()
             rec = {k: v for k, v in alert.items()}
             hits = [] if NO_RAG else alert["rag_hits"]
-            tech_id, tactic = llm_explain._technique_context(hits)
+            tech_id, tactic = llm_explain.resolve_technique(TECHNIQUE_SOURCE, ctx, hits)
+            rec["technique_source"] = TECHNIQUE_SOURCE
             rec["ctx_technique_id"], rec["ctx_tactic"] = tech_id, tactic
+            rec["rag_consensus_technique_id"] = llm_explain._technique_context(hits)[0]
+            rec["pred_label_mapping_technique_id"] = llm_explain.technique_from_label(ctx["rf_predicted_label"])[0]
             rec["confidence"] = ctx["confidence"]
             rec["priority"] = llm_explain.derive_priority(
                 ctx["fused_score"], ctx["fused_prediction"], ctx.get("model_used"))
@@ -920,7 +999,8 @@ def run_llm(limit: int | None) -> float:
                 rec["rendered_example_explanations"] = [
                     sh["output"]["explanation_th"] for sh in llm_explain.render_few_shots(facts_for_shots)
                 ]
-                output = llm_explain.explain_alert(ctx, hits, ctx["fused_score"], ctx["fused_prediction"], ctx["confidence"], config)
+                output = llm_explain.explain_alert(ctx, hits, ctx["fused_score"], ctx["fused_prediction"], ctx["confidence"], config,
+                                                  technique_source=TECHNIQUE_SOURCE)
                 rec.update(status="ok", error=None, output=output)
             except Exception as exc:
                 rec.update(status="error", error=f"{type(exc).__name__}: {exc}", output=None)
@@ -949,8 +1029,12 @@ def run_llm(limit: int | None) -> float:
 def finalize(rescore: bool, wall_total_s: float | None) -> None:
     records = _read_jsonl(RAW_PATH)
     if rescore:
+        from src.llm import llm_explain
+
         kb = load_kb()
         for r in records:
+            r.setdefault("pred_label_mapping_technique_id",
+                         llm_explain.technique_from_label(r["alert_context"]["rf_predicted_label"])[0])
             if r["status"] == "ok":
                 r["checks"] = score_record(r, kb)
         RAW_PATH.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records), encoding="utf-8")
@@ -971,11 +1055,15 @@ def main() -> int:
     ap.add_argument("--no-rag", action="store_true",
                     help="ablation: run with no retrieved hits at all, so technique_id and "
                          "mitre_tactic are null for every alert and the prompt carries no chunks")
+    ap.add_argument("--technique-source", choices=("rag", "mapping"), default="rag",
+                    help="where technique_id comes from: the RAG top-3 consensus (deployed) or "
+                         "config/mitre_mapping.csv keyed on the RF-predicted label")
     ap.add_argument("--variant", help="suffix the raw/metrics/report filenames, so a run cannot "
                                       "overwrite the deployed numbers")
     args = ap.parse_args()
-    global NO_RAG, RAW_PATH, METRICS_PATH, REPORT_PATH
+    global NO_RAG, TECHNIQUE_SOURCE, RAW_PATH, METRICS_PATH, REPORT_PATH
     NO_RAG = args.no_rag
+    TECHNIQUE_SOURCE = args.technique_source
     if args.variant:
         RAW_PATH = RAW_PATH.with_suffix(f".{args.variant}.jsonl")
         METRICS_PATH = METRICS_PATH.with_suffix(f".{args.variant}.csv")
@@ -985,6 +1073,9 @@ def main() -> int:
         print("[no-rag] ABLATION: no retrieved hits; the grounding corpus for the unsupported-term "
               "check shrinks with them, so prose_ungrounded/unsupported are NOT comparable to the "
               "deployed run. Diversity, echo and entity_pass are.")
+    if TECHNIQUE_SOURCE != "rag":
+        print(f"[technique-source] {TECHNIQUE_SOURCE}: {PROVENANCE[TECHNIQUE_SOURCE]}. "
+              "result_technique_in_hits and consensus_matches_label_mapping are reported as n/a.")
     if args.stage == "alerts":
         build_alerts()
         return 0
