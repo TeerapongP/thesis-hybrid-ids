@@ -1,21 +1,8 @@
 ﻿version: '3.8'
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-#  OpenCTI Stack â€” M2 (ARM64) Compatible
-#  Includes: Platform, Worker, and all Feed Connectors
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-#
-#  BEFORE FIRST RUN:
-#    docker network create soc_shared
-#    docker compose up -d
-#
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 services:
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#  Redis  âœ“ Native ARM64
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   opencti-redis:
     image: redis:7.2-alpine
     platform: linux/amd64
@@ -35,19 +22,19 @@ services:
       timeout: 5s
       retries: 5
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#  Elasticsearch  âœ“ Native ARM64 (v8.13.4)
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   opencti-elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
     platform: linux/amd64
     restart: unless-stopped
     networks:
-      - soc_mgmt
+      soc_mgmt: {}
+      soc_elastic:
+        aliases:
+          - opencti-elasticsearch
     volumes:
       - opencti_esdata:/usr/share/elasticsearch/data
     ports:
-      - "9200:9200"
+      - "127.0.0.1:9200:9200"
     environment:
       discovery.type: single-node
       xpack.security.enabled: "true"
@@ -67,12 +54,6 @@ services:
       retries: 10
       start_period: 60s
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#  MinIO  âœ“ Native ARM64
-#  FIX: extended start_period to 60s â€” MinIO starts
-#       successfully but HTTP endpoint needs more time
-#       to become ready on ARM64/Rosetta
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   opencti-minio:
     image: minio/minio:RELEASE.2024-01-18T22-51-28Z
     platform: linux/amd64
@@ -86,8 +67,8 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     command: server /data --console-address ":9001"
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 15s
@@ -95,9 +76,6 @@ services:
       retries: 10
       start_period: 60s
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#  RabbitMQ  âœ“ Native ARM64
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   opencti-rabbitmq:
     image: rabbitmq:3.12-management
     platform: linux/amd64
@@ -110,8 +88,8 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 30s
@@ -119,9 +97,6 @@ services:
       retries: 5
       start_period: 30s
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#  OpenCTI Platform  ~ Rosetta 2 on M2
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   opencti-platform:
     image: opencti/platform:5.12.17
     platform: linux/amd64
@@ -139,13 +114,13 @@ services:
       - soc_shared
       - soc_mgmt
     ports:
-      - "8082:8080"
+      - "127.0.0.1:8082:8080"
     environment:
       APP__PORT: 8080
       APP__BASE_URL: ${OPENCTI_BASE_URL:-http://localhost:8082}
       APP__ADMIN__EMAIL: ${OPENCTI_ADMIN_EMAIL}
       APP__ADMIN__PASSWORD: ${OPENCTI_ADMIN_PASSWORD}
-      APP__ADMIN__TOKEN: ${OPENCTI_ADMIN_TOKEN}
+      APP__ADMIN__TOKEN: ${OPENCTI_ADMIN_TOKEN:?Set OPENCTI_ADMIN_TOKEN in opencti/.env}
 
       REDIS__HOSTNAME: opencti-redis
       REDIS__PORT: 6379
@@ -179,9 +154,6 @@ services:
       retries: 10
       start_period: 120s
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#  OpenCTI Worker  ~ Rosetta 2 on M2
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   opencti-worker:
     image: opencti/worker:5.12.17
     platform: linux/amd64
@@ -194,20 +166,14 @@ services:
       - soc_shared
     environment:
       OPENCTI_URL: http://opencti-platform:8080
-      OPENCTI_TOKEN: ${OPENCTI_ADMIN_TOKEN}
+      OPENCTI_TOKEN: ${OPENCTI_WORKER_ADMIN_TOKEN:?Set dedicated admin/bypass OPENCTI_WORKER_ADMIN_TOKEN in opencti/.env}
       WORKER_LOG_LEVEL: info
     deploy:
       resources:
         limits:
           memory: 1G
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-#  CONNECTORS â€” EXTERNAL IMPORT
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#  Connector: MITRE ATT&CK
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   connector-mitre:
     image: opencti/connector-mitre:5.12.17
     platform: linux/amd64
@@ -220,7 +186,7 @@ services:
       - soc_mgmt
     environment:
       OPENCTI_URL: http://opencti-platform:8080
-      OPENCTI_TOKEN: ${OPENCTI_ADMIN_TOKEN}
+      OPENCTI_TOKEN: ${OPENCTI_MITRE_CONNECTOR_TOKEN:?Set OPENCTI_MITRE_CONNECTOR_TOKEN in opencti/.env}
       CONNECTOR_ID: ${MITRE_CONNECTOR_ID}
       CONNECTOR_TYPE: EXTERNAL_IMPORT
       CONNECTOR_NAME: "MITRE ATT&CK"
@@ -235,9 +201,6 @@ services:
         limits:
           memory: 512M
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#  Connector: AlienVault OTX
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   connector-alienvault:
     image: opencti/connector-alienvault:5.12.17
     platform: linux/amd64
@@ -250,7 +213,7 @@ services:
       - soc_mgmt
     environment:
       OPENCTI_URL: http://opencti-platform:8080
-      OPENCTI_TOKEN: ${OPENCTI_ADMIN_TOKEN}
+      OPENCTI_TOKEN: ${OPENCTI_ALIENVAULT_CONNECTOR_TOKEN:?Set OPENCTI_ALIENVAULT_CONNECTOR_TOKEN in opencti/.env}
       CONNECTOR_ID: ${OTX_CONNECTOR_ID}
       CONNECTOR_TYPE: EXTERNAL_IMPORT
       CONNECTOR_NAME: "AlienVault OTX"
@@ -277,9 +240,6 @@ services:
         limits:
           memory: 512M
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#  Connector: Abuse.ch SSL Blacklist
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   connector-abuse-ssl:
     image: opencti/connector-abuse-ssl:5.12.17
     platform: linux/amd64
@@ -292,7 +252,7 @@ services:
       - soc_mgmt
     environment:
       OPENCTI_URL: http://opencti-platform:8080
-      OPENCTI_TOKEN: ${OPENCTI_ADMIN_TOKEN}
+      OPENCTI_TOKEN: ${OPENCTI_ABUSE_SSL_CONNECTOR_TOKEN:?Set OPENCTI_ABUSE_SSL_CONNECTOR_TOKEN in opencti/.env}
       CONNECTOR_ID: ${ABUSE_SSL_CONNECTOR_ID}
       CONNECTOR_TYPE: EXTERNAL_IMPORT
       CONNECTOR_NAME: "Abuse.ch SSL Blacklist"
@@ -306,9 +266,6 @@ services:
         limits:
           memory: 256M
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#  Connector: URLhaus
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   connector-urlhaus:
     image: opencti/connector-urlhaus:5.12.17
     platform: linux/amd64
@@ -321,7 +278,7 @@ services:
       - soc_mgmt
     environment:
       OPENCTI_URL: http://opencti-platform:8080
-      OPENCTI_TOKEN: ${OPENCTI_ADMIN_TOKEN}
+      OPENCTI_TOKEN: ${OPENCTI_URLHAUS_CONNECTOR_TOKEN:?Set OPENCTI_URLHAUS_CONNECTOR_TOKEN in opencti/.env}
       CONNECTOR_ID: ${URLHAUS_CONNECTOR_ID}
       CONNECTOR_TYPE: EXTERNAL_IMPORT
       CONNECTOR_NAME: "URLhaus"
@@ -337,9 +294,6 @@ services:
         limits:
           memory: 256M
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#  Connector: VirusTotal Livehunt Notifications
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   connector-virustotal-livehunt:
     image: opencti/connector-virustotal-livehunt-notifications:5.12.17
     platform: linux/amd64
@@ -352,7 +306,7 @@ services:
       - soc_mgmt
     environment:
       OPENCTI_URL: http://opencti-platform:8080
-      OPENCTI_TOKEN: ${OPENCTI_ADMIN_TOKEN}
+      OPENCTI_TOKEN: ${OPENCTI_VIRUSTOTAL_LIVEHUNT_CONNECTOR_TOKEN:?Set OPENCTI_VIRUSTOTAL_LIVEHUNT_CONNECTOR_TOKEN in opencti/.env}
       CONNECTOR_ID: ${VIRUSTOTAL_LIVEHUNT_CONNECTOR_ID}
       CONNECTOR_TYPE: EXTERNAL_IMPORT
       CONNECTOR_NAME: "VirusTotal Livehunt"
@@ -369,13 +323,7 @@ services:
         limits:
           memory: 256M
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-#  CONNECTORS â€” INTERNAL ENRICHMENT
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#  Connector: VirusTotal (Enrichment)
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   connector-virustotal:
     image: opencti/connector-virustotal:5.12.17
     platform: linux/amd64
@@ -388,7 +336,7 @@ services:
       - soc_mgmt
     environment:
       OPENCTI_URL: http://opencti-platform:8080
-      OPENCTI_TOKEN: ${OPENCTI_ADMIN_TOKEN}
+      OPENCTI_TOKEN: ${OPENCTI_VIRUSTOTAL_CONNECTOR_TOKEN:?Set OPENCTI_VIRUSTOTAL_CONNECTOR_TOKEN in opencti/.env}
       CONNECTOR_ID: ${VIRUSTOTAL_CONNECTOR_ID}
       CONNECTOR_TYPE: INTERNAL_ENRICHMENT
       CONNECTOR_NAME: "VirusTotal"
@@ -416,9 +364,6 @@ services:
         limits:
           memory: 256M
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#  Connector: AbuseIPDB
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   connector-abuseipdb:
     image: opencti/connector-abuseipdb:5.12.17
     platform: linux/amd64
@@ -431,7 +376,7 @@ services:
       - soc_mgmt
     environment:
       OPENCTI_URL: http://opencti-platform:8080
-      OPENCTI_TOKEN: ${OPENCTI_ADMIN_TOKEN}
+      OPENCTI_TOKEN: ${OPENCTI_ABUSEIPDB_CONNECTOR_TOKEN:?Set OPENCTI_ABUSEIPDB_CONNECTOR_TOKEN in opencti/.env}
       CONNECTOR_ID: ${ABUSEIPDB_CONNECTOR_ID}
       CONNECTOR_TYPE: INTERNAL_ENRICHMENT
       CONNECTOR_NAME: "AbuseIPDB"
@@ -447,9 +392,6 @@ services:
         limits:
           memory: 256M
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#  Connector: IPInfo
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   connector-ipinfo:
     image: opencti/connector-ipinfo:5.12.17
     platform: linux/amd64
@@ -462,7 +404,7 @@ services:
       - soc_mgmt
     environment:
       OPENCTI_URL: http://opencti-platform:8080
-      OPENCTI_TOKEN: ${OPENCTI_ADMIN_TOKEN}
+      OPENCTI_TOKEN: ${OPENCTI_IPINFO_CONNECTOR_TOKEN:?Set OPENCTI_IPINFO_CONNECTOR_TOKEN in opencti/.env}
       CONNECTOR_ID: ${IPINFO_CONNECTOR_ID}
       CONNECTOR_TYPE: INTERNAL_ENRICHMENT
       CONNECTOR_NAME: "IPInfo"
@@ -477,9 +419,6 @@ services:
         limits:
           memory: 256M
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#  Connector: Shodan
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   connector-shodan:
     image: opencti/connector-shodan:5.12.17
     platform: linux/amd64
@@ -492,7 +431,7 @@ services:
       - soc_mgmt
     environment:
       OPENCTI_URL: http://opencti-platform:8080
-      OPENCTI_TOKEN: ${OPENCTI_ADMIN_TOKEN}
+      OPENCTI_TOKEN: ${OPENCTI_SHODAN_CONNECTOR_TOKEN:?Set OPENCTI_SHODAN_CONNECTOR_TOKEN in opencti/.env}
       CONNECTOR_ID: ${SHODAN_CONNECTOR_ID}
       CONNECTOR_TYPE: INTERNAL_ENRICHMENT
       CONNECTOR_NAME: "Shodan"
@@ -508,20 +447,17 @@ services:
         limits:
           memory: 256M
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#  Networks
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 networks:
   soc_shared:
     external: true
-    # Create before first run: docker network create soc_shared
 
   soc_mgmt:
     driver: bridge
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#  Volumes
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  soc_elastic:
+    name: soc_elastic
+    driver: bridge
+
 volumes:
   opencti_redis_data:
   opencti_esdata:

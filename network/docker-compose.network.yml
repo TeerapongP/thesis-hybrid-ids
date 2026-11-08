@@ -2,9 +2,6 @@ version: "3.9"
 
 services:
 
-  # =========================
-  #  APP (NGINX)
-  # =========================
   app:
     image: nginx:latest
     container_name: app
@@ -19,29 +16,21 @@ services:
       interval: 30s
       timeout: 5s
       retries: 5
-# =========================
-#  NETWORKS
-# =========================
 networks:
   targets_zone:
     name: targets_zone
     driver: bridge
-  # shared communication (สำคัญสุด)
   soc_shared:
     name: soc_shared
     driver: bridge
     ipam:
       config:
         - subnet: 172.21.10.0/24
-  # management private (สำหรับบริการที่ต้องการแยกออกจากโซนอื่นๆ)
   soc_mgmt:
     name: soc_mgmt
     driver: bridge
     ipam:
       config:
         - subnet: 172.21.20.0/24
-# =========================
-#  VOLUMES
-# =========================
 volumes:
   mongo_data:
