@@ -1,0 +1,5 @@
+[alerts] sampled 100 rows: {'BENIGN': 10, 'Bot': 7, 'DDoS': 7, 'DoS GoldenEye': 7, 'DoS Hulk': 7, 'DoS Slowhttptest': 7, 'DoS slowloris': 7, 'FTP-Patator': 7, 'Infiltration': 7, 'PortScan': 7, 'SSH-Patator': 7, 'Web Attack - Brute Force': 7, 'Web Attack - XSS': 7, 'Web Attack - Sql Injection': 4, 'Heartbleed': 2}
+[alerts] re-deriving the unified test split to recover IP/timestamp ...
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/391 [00:00<?, ?it/s]Loading weights: 100%|██████████| 391/391 [00:00<00:00, 58033.65it/s]
+[alerts] wrote 100 alerts to E:\thesis\reports\llm_faithfulness_alerts.jsonl

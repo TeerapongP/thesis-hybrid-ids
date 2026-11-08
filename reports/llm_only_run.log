@@ -1,0 +1,261 @@
+[1/190] F000 BENIGN                       6.0s attack=False type=None
+[2/190] F001 DoS Slowhttptest             1.8s attack=False type=None
+[3/190] F002 BENIGN                       0.4s attack=False type=None
+[4/190] F003 BENIGN                       0.4s attack=False type=None
+[5/190] F004 Infiltration                 0.4s attack=False type=None
+[6/190] F005 BENIGN                       0.4s attack=False type=None
+[7/190] F006 DDoS                         0.4s attack=False type=None
+[8/190] F007 DoS Slowhttptest             0.4s attack=False type=None
+[9/190] F008 BENIGN                       0.4s attack=False type=None
+[10/190] F009 Web Attack - Brute Force     0.5s attack=False type=None
+[11/190] F010 BENIGN                       0.4s attack=False type=None
+[12/190] F011 BENIGN                       0.8s attack=True type=DDoS
+[13/190] F012 DoS GoldenEye                0.4s attack=False type=None
+[14/190] F013 BENIGN                       0.5s attack=True type=PortScan
+[15/190] F014 DDoS                         0.4s attack=False type=None
+[16/190] F015 BENIGN                       0.4s attack=False type=None
+[17/190] F016 FTP-Patator                  0.5s attack=True type=PortScan
+[18/190] F017 Bot                          0.5s attack=False type=None
+[19/190] F018 BENIGN                       0.5s attack=False type=None
+[20/190] F019 BENIGN                       0.4s attack=False type=None
+[21/190] F020 BENIGN                       0.5s attack=False type=None
+[22/190] F021 DoS GoldenEye                0.5s attack=False type=None
+[23/190] F022 BENIGN                       0.4s attack=False type=None
+[24/190] F023 Bot                          0.4s attack=False type=None
+[25/190] F024 FTP-Patator                  0.4s attack=False type=None
+[26/190] F025 Infiltration                 0.5s attack=False type=None
+[27/190] F026 BENIGN                       0.5s attack=True type=PortScan
+[28/190] F027 BENIGN                       0.4s attack=False type=None
+[29/190] F028 PortScan                     0.4s attack=False type=None
+[30/190] F029 BENIGN                       0.4s attack=False type=None
+[31/190] F030 BENIGN                       0.5s attack=False type=None
+[32/190] F031 BENIGN                       0.4s attack=False type=None
+[33/190] F032 FTP-Patator                  0.5s attack=True type=PortScan
+[34/190] F033 BENIGN                       0.4s attack=False type=None
+[35/190] F034 Web Attack - Sql Injection   0.4s attack=False type=None
+[36/190] F035 BENIGN                       0.4s attack=False type=None
+[37/190] F036 BENIGN                       0.5s attack=True type=None
+[38/190] F037 BENIGN                       0.4s attack=False type=None
+[39/190] F038 SSH-Patator                  0.8s attack=True type=BruteForce
+[40/190] F039 Infiltration                 0.6s attack=True type=DoS
+[41/190] F040 DoS Hulk                     0.4s attack=False type=None
+[42/190] F041 Web Attack - Brute Force     0.4s attack=False type=None
+[43/190] F042 DDoS                         0.4s attack=False type=None
+[44/190] F043 DoS Slowhttptest             0.5s attack=False type=None
+[45/190] F044 BENIGN                       0.5s attack=False type=None
+[46/190] F045 DoS slowloris                0.4s attack=False type=None
+[47/190] F046 BENIGN                       0.4s attack=False type=None
+[48/190] F047 PortScan                     0.4s attack=False type=None
+[49/190] F048 BENIGN                       0.5s attack=False type=None
+[50/190] F049 Bot                          0.5s attack=True type=PortScan
+[51/190] F050 SSH-Patator                  0.6s attack=True type=BruteForce
+[52/190] F051 DoS GoldenEye                0.4s attack=False type=None
+[53/190] F052 BENIGN                       0.5s attack=False type=None
+[54/190] F053 Bot                          0.4s attack=False type=None
+[55/190] F054 BENIGN                       0.5s attack=False type=None
+[56/190] F055 Infiltration                 0.4s attack=False type=None
+[57/190] F056 DoS slowloris                0.4s attack=False type=None
+[58/190] F057 FTP-Patator                  0.4s attack=False type=None
+[59/190] F058 Web Attack - XSS             0.5s attack=False type=None
+[60/190] F059 BENIGN                       0.4s attack=False type=None
+[61/190] F060 BENIGN                       0.4s attack=False type=None
+[62/190] F061 DoS Hulk                     0.4s attack=False type=None
+[63/190] F062 BENIGN                       0.5s attack=False type=None
+[64/190] F063 BENIGN                       0.4s attack=False type=None
+[65/190] F064 BENIGN                       0.4s attack=False type=None
+[66/190] F065 BENIGN                       0.4s attack=False type=None
+[67/190] F066 BENIGN                       0.4s attack=False type=None
+[68/190] F067 Web Attack - XSS             0.5s attack=False type=None
+[69/190] F068 BENIGN                       0.4s attack=False type=None
+[70/190] F069 Heartbleed                   0.6s attack=True type=DoS
+[71/190] F070 BENIGN                       0.5s attack=False type=None
+[72/190] F071 BENIGN                       0.4s attack=False type=None
+[73/190] F072 BENIGN                       0.4s attack=False type=None
+[74/190] F073 BENIGN                       0.5s attack=False type=None
+[75/190] F074 DoS slowloris                0.4s attack=False type=None
+[76/190] F075 BENIGN                       0.5s attack=False type=None
+[77/190] F076 BENIGN                       0.4s attack=False type=None
+[78/190] F077 DDoS                         0.4s attack=False type=None
+[79/190] F078 DDoS                         0.4s attack=False type=None
+[80/190] F079 BENIGN                       0.4s attack=False type=None
+[81/190] F080 BENIGN                       0.4s attack=False type=None
+[82/190] F081 Web Attack - Sql Injection   0.5s attack=False type=None
+[83/190] F082 DoS Hulk                     0.8s attack=True type=None
+[84/190] F083 BENIGN                       0.6s attack=True type=None
+[85/190] F084 PortScan                     0.5s attack=False type=None
+[86/190] F085 BENIGN                       0.6s attack=True type=None
+[87/190] F086 BENIGN                       0.4s attack=False type=None
+[88/190] F087 BENIGN                       0.4s attack=False type=None
+[89/190] F088 DoS Slowhttptest             0.5s attack=False type=None
+[90/190] F089 SSH-Patator                  0.4s attack=False type=None
+[91/190] F090 DoS Hulk                     0.4s attack=False type=None
+[92/190] F091 DoS Slowhttptest             0.4s attack=False type=None
+[93/190] F092 BENIGN                       0.4s attack=False type=None
+[94/190] F093 BENIGN                       0.5s attack=False type=None
+[95/190] F094 Heartbleed                   0.6s attack=True type=PortScan
+[96/190] F095 FTP-Patator                  0.4s attack=False type=None
+[97/190] F096 SSH-Patator                  0.8s attack=True type=BruteForce
+[98/190] F097 BENIGN                       0.4s attack=False type=None
+[99/190] F098 Web Attack - XSS             0.4s attack=False type=None
+[100/190] F099 Bot                          0.9s attack=True type=PortScan
+[101/190] F100 BENIGN                       0.4s attack=False type=None
+[102/190] F101 Web Attack - Sql Injection   0.4s attack=False type=None
+[103/190] F102 Bot                          0.4s attack=False type=None
+[104/190] F103 BENIGN                       0.4s attack=False type=None
+[105/190] F104 BENIGN                       0.5s attack=False type=None
+[106/190] F105 PortScan                     0.4s attack=False type=None
+[107/190] F106 Web Attack - XSS             0.4s attack=False type=None
+[108/190] F107 BENIGN                       0.4s attack=False type=None
+[109/190] F108 Infiltration                 0.5s attack=False type=None
+[110/190] F109 BENIGN                       0.4s attack=False type=None
+[111/190] F110 Web Attack - Brute Force     0.4s attack=False type=None
+[112/190] F111 DoS slowloris                0.4s attack=False type=None
+[113/190] F112 DoS GoldenEye                0.4s attack=False type=None
+[114/190] F113 PortScan                     0.5s attack=False type=None
+[115/190] F114 DoS slowloris                0.4s attack=False type=None
+[116/190] F115 DoS slowloris                0.4s attack=False type=None
+[117/190] F116 DoS GoldenEye                0.5s attack=False type=None
+[118/190] F117 DoS GoldenEye                0.5s attack=False type=None
+[119/190] F118 BENIGN                       0.4s attack=False type=None
+[120/190] F119 BENIGN                       0.4s attack=False type=None
+[121/190] F120 BENIGN                       0.4s attack=False type=None
+[122/190] F121 BENIGN                       0.4s attack=False type=None
+[123/190] F122 DoS GoldenEye                0.5s attack=False type=None
+[124/190] F123 BENIGN                       0.5s attack=False type=None
+[125/190] F124 DoS Slowhttptest             0.4s attack=False type=None
+[126/190] F125 BENIGN                       0.4s attack=False type=None
+[127/190] F126 BENIGN                       0.4s attack=False type=None
+[128/190] F127 BENIGN                       0.5s attack=False type=None
+[129/190] F128 BENIGN                       0.4s attack=False type=None
+[130/190] F129 FTP-Patator                  0.5s attack=True type=PortScan
+[131/190] F130 BENIGN                       0.5s attack=False type=None
+[132/190] F131 Web Attack - Brute Force     0.5s attack=False type=None
+[133/190] F132 BENIGN                       0.7s attack=True type=DoS
+[134/190] F133 FTP-Patator                  0.5s attack=False type=None
+[135/190] F134 BENIGN                       0.5s attack=False type=None
+[136/190] F135 BENIGN                       0.8s attack=True type=DoS
+[137/190] F136 DoS Hulk                     0.4s attack=False type=None
+[138/190] F137 BENIGN                       0.4s attack=False type=None
+[139/190] F138 BENIGN                       0.4s attack=False type=None
+[140/190] F139 Web Attack - Brute Force     0.4s attack=False type=None
+[141/190] F140 DDoS                         0.4s attack=False type=None
+[142/190] F141 BENIGN                       0.7s attack=True type=None
+[143/190] F142 BENIGN                       0.4s attack=False type=None
+[144/190] F143 BENIGN                       0.5s attack=False type=None
+[145/190] F144 BENIGN                       0.4s attack=False type=None
+[146/190] F145 BENIGN                       0.4s attack=False type=None
+[147/190] F146 DoS Slowhttptest             0.4s attack=False type=None
+[148/190] F147 BENIGN                       0.4s attack=False type=None
+[149/190] F148 BENIGN                       0.5s attack=True type=None
+[150/190] F149 BENIGN                       0.5s attack=False type=None
+[151/190] F150 BENIGN                       0.5s attack=False type=None
+[152/190] F151 BENIGN                       0.4s attack=False type=None
+[153/190] F152 DDoS                         0.4s attack=False type=None
+[154/190] F153 SSH-Patator                  0.7s attack=True type=None
+[155/190] F154 BENIGN                       0.5s attack=False type=None
+[156/190] F155 BENIGN                       0.4s attack=False type=None
+[157/190] F156 Web Attack - Sql Injection   0.4s attack=False type=None
+[158/190] F157 PortScan                     0.4s attack=False type=None
+[159/190] F158 BENIGN                       0.5s attack=False type=None
+[160/190] F159 Infiltration                 0.5s attack=True type=PortScan
+[161/190] F160 BENIGN                       0.4s attack=False type=None
+[162/190] F161 BENIGN                       0.4s attack=False type=None
+[163/190] F162 BENIGN                       0.5s attack=False type=None
+[164/190] F163 SSH-Patator                  0.4s attack=False type=None
+[165/190] F164 BENIGN                       0.4s attack=False type=None
+[166/190] F165 BENIGN                       0.4s attack=False type=None
+[167/190] F166 Infiltration                 0.4s attack=False type=None
+[168/190] F167 PortScan                     0.4s attack=False type=None
+[169/190] F168 BENIGN                       0.4s attack=False type=None
+[170/190] F169 BENIGN                       0.4s attack=False type=None
+[171/190] F170 Web Attack - XSS             0.5s attack=False type=None
+[172/190] F171 Web Attack - XSS             0.4s attack=False type=None
+[173/190] F172 BENIGN                       0.4s attack=False type=None
+[174/190] F173 BENIGN                       0.4s attack=False type=None
+[175/190] F174 BENIGN                       0.5s attack=False type=None
+[176/190] F175 Bot                          0.5s attack=True type=PortScan
+[177/190] F176 BENIGN                       0.4s attack=False type=None
+[178/190] F177 DoS Hulk                     0.5s attack=False type=None
+[179/190] F178 BENIGN                       0.4s attack=False type=None
+[180/190] F179 BENIGN                       0.4s attack=False type=None
+[181/190] F180 Web Attack - Brute Force     0.5s attack=False type=None
+[182/190] F181 SSH-Patator                  0.4s attack=False type=None
+[183/190] F182 BENIGN                       0.4s attack=False type=None
+[184/190] F183 DoS Hulk                     0.4s attack=False type=None
+[185/190] F184 BENIGN                       0.4s attack=False type=None
+[186/190] F185 BENIGN                       0.4s attack=False type=None
+[187/190] F186 BENIGN                       0.4s attack=False type=None
+[188/190] F187 DoS slowloris                0.4s attack=False type=None
+[189/190] F188 Web Attack - Brute Force     0.4s attack=False type=None
+[190/190] F189 Web Attack - XSS             0.4s attack=False type=None
+==========================================================================
+LLM-ONLY DETECTION BASELINE (4-way ablation arm)
+==========================================================================
+Command: uv run python -m src.evaluation.eval_llm_only_baseline
+
+==========================================================================
+1. WHAT THIS ARM IS
+==========================================================================
+The Thai LLM is given ONE network flow in physical units and asked to judge it.
+No ML output reaches the prompt: no RF predicted label, no fused score, no anomaly
+score. Including any of them would make this a measurement of the ensemble rather
+than of the LLM. The true label is withheld too.
+Fields shown to the model: 27 flow statistics in physical units
+(the 94 model features are MinMax-scaled and carry no meaning a language model can
+reason about).
+
+==========================================================================
+2. SAMPLE
+==========================================================================
+Scored: 190 flows (0 errors out of 190).
+Attack rows 90, benign rows 100.
+Deliberately balanced: estimating a false-positive rate needs benign rows, and
+running the full 504,193-row test split through an 8B model is not feasible.
+
+==========================================================================
+3. RESULT
+==========================================================================
+  Recall : 0.1667   (15 of 90 attacks detected)
+  FPR    : 0.1000   (10 of 100 benign flows flagged)
+  Mean latency: 0.5 s/flow
+
+PRECISION IS DELIBERATELY NOT REPORTED HERE. It depends on class prevalence, and
+this arm's sample is balanced while the SIEM and hybrid arms are measured on the
+natural-prevalence test split. A precision column would invite a comparison that is
+not valid. Recall and FPR do not depend on prevalence and are the figures to compare.
+
+==========================================================================
+4. PER ATTACK CATEGORY
+==========================================================================
+  category                      detected     n   recall
+  Bot                                  3     7    0.429
+  DDoS                                 0     7    0.000
+  DoS GoldenEye                        0     7    0.000
+  DoS Hulk                             1     7    0.143
+  DoS Slowhttptest                     0     7    0.000
+  DoS slowloris                        0     7    0.000
+  FTP-Patator                          3     7    0.429
+  Heartbleed                           2     2    1.000
+  Infiltration                         2     7    0.286
+  PortScan                             0     7    0.000
+  SSH-Patator                          4     7    0.571
+  Web Attack - Brute Force             0     7    0.000
+  Web Attack - Sql Injection           0     4    0.000
+  Web Attack - XSS                     0     7    0.000
+
+  Per-category counts are 2-7 flows, so these are descriptive only. A single
+  flow moves a category's recall by 0.14 or more.
+
+==========================================================================
+5. HOW TO USE THIS IN THE 4-WAY ABLATION
+==========================================================================
+The four arms do not all measure the same thing, and the table must say so:
+  rule-based SIEM : detection, natural prevalence, full test split
+  LLM-only        : detection, balanced subsample -- compare recall/FPR only
+  ML-only         : detection -- IDENTICAL to the hybrid, because the LLM layer
+                    writes explanations and does not touch the decision
+  hybrid          : detection, natural prevalence, full test split
+So ML-only and hybrid differ only in ANALYST OUTCOME, which is the A/B triage-time
+study (RQ4), not a detection metric. Presenting all four in one detection table
+would print the same row twice and imply a comparison that does not exist.
+

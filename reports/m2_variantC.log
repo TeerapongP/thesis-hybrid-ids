@@ -1,0 +1,101 @@
+[1/100] A000 BENIGN                       5.8s ok entity_pass=True tok/s=63.4
+[2/100] A001 BENIGN                       5.8s ok entity_pass=True tok/s=63.7
+[3/100] A002 BENIGN                       5.8s ok entity_pass=True tok/s=64.5
+[4/100] A003 BENIGN                       5.7s ok entity_pass=True tok/s=63.6
+[5/100] A004 BENIGN                       5.9s ok entity_pass=True tok/s=63.9
+[6/100] A005 BENIGN                       5.8s ok entity_pass=True tok/s=65.2
+[7/100] A006 BENIGN                       5.8s ok entity_pass=True tok/s=62.5
+[8/100] A007 BENIGN                       5.8s ok entity_pass=True tok/s=64.0
+[9/100] A008 BENIGN                       5.9s ok entity_pass=True tok/s=63.5
+[10/100] A009 BENIGN                       5.9s ok entity_pass=True tok/s=64.0
+[11/100] A010 Bot                          5.9s ok entity_pass=True tok/s=65.6
+[12/100] A011 Bot                          5.7s ok entity_pass=True tok/s=63.5
+[13/100] A012 Bot                          5.8s ok entity_pass=True tok/s=67.8
+[14/100] A013 Bot                          5.9s ok entity_pass=True tok/s=66.3
+[15/100] A014 Bot                          5.8s ok entity_pass=True tok/s=64.2
+[16/100] A015 Bot                          5.8s ok entity_pass=True tok/s=66.6
+[17/100] A016 Bot                          5.8s ok entity_pass=True tok/s=65.2
+[18/100] A017 DDoS                         5.9s ok entity_pass=True tok/s=66.4
+[19/100] A018 DDoS                         6.2s ok entity_pass=True tok/s=56.2
+[20/100] A019 DDoS                         5.8s ok entity_pass=True tok/s=65.9
+[21/100] A020 DDoS                         5.8s ok entity_pass=True tok/s=65.4
+[22/100] A021 DDoS                         5.8s ok entity_pass=True tok/s=66.0
+[23/100] A022 DDoS                         5.8s ok entity_pass=True tok/s=65.0
+[24/100] A023 DDoS                         5.8s ok entity_pass=True tok/s=64.3
+[25/100] A024 DoS GoldenEye                5.9s ok entity_pass=True tok/s=65.3
+[26/100] A025 DoS GoldenEye                5.8s ok entity_pass=True tok/s=65.6
+[27/100] A026 DoS GoldenEye                5.2s ok entity_pass=True tok/s=58.4
+[28/100] A027 DoS GoldenEye                5.8s ok entity_pass=True tok/s=65.7
+[29/100] A028 DoS GoldenEye                5.4s ok entity_pass=True tok/s=58.1
+[30/100] A029 DoS GoldenEye                5.7s ok entity_pass=True tok/s=66.9
+[31/100] A030 DoS GoldenEye                5.2s ok entity_pass=True tok/s=58.0
+[32/100] A031 DoS Hulk                     5.9s ok entity_pass=True tok/s=67.0
+[33/100] A032 DoS Hulk                     5.7s ok entity_pass=True tok/s=66.5
+[34/100] A033 DoS Hulk                     5.8s ok entity_pass=True tok/s=66.3
+[35/100] A034 DoS Hulk                     5.3s ok entity_pass=True tok/s=59.8
+[36/100] A035 DoS Hulk                     5.3s ok entity_pass=True tok/s=58.7
+[37/100] A036 DoS Hulk                     5.4s ok entity_pass=True tok/s=58.1
+[38/100] A037 DoS Hulk                     5.8s ok entity_pass=True tok/s=65.1
+[39/100] A038 DoS Slowhttptest             5.9s ok entity_pass=True tok/s=66.3
+[40/100] A039 DoS Slowhttptest             5.2s ok entity_pass=True tok/s=58.2
+[41/100] A040 DoS Slowhttptest             5.8s ok entity_pass=True tok/s=66.8
+[42/100] A041 DoS Slowhttptest             5.8s ok entity_pass=True tok/s=66.8
+[43/100] A042 DoS Slowhttptest             5.8s ok entity_pass=True tok/s=66.6
+[44/100] A043 DoS Slowhttptest             5.4s ok entity_pass=True tok/s=57.9
+[45/100] A044 DoS Slowhttptest             5.8s ok entity_pass=True tok/s=65.9
+[46/100] A045 DoS slowloris                5.9s ok entity_pass=True tok/s=67.1
+[47/100] A046 DoS slowloris                5.9s ok entity_pass=True tok/s=66.7
+[48/100] A047 DoS slowloris                5.8s ok entity_pass=True tok/s=66.2
+[49/100] A048 DoS slowloris                5.8s ok entity_pass=True tok/s=66.6
+[50/100] A049 DoS slowloris                5.7s ok entity_pass=True tok/s=68.4
+[51/100] A050 DoS slowloris                5.2s ok entity_pass=True tok/s=58.3
+[52/100] A051 DoS slowloris                5.7s ok entity_pass=True tok/s=67.2
+[53/100] A052 FTP-Patator                  6.0s ok entity_pass=True tok/s=68.4
+[54/100] A053 FTP-Patator                  5.9s ok entity_pass=True tok/s=67.6
+[55/100] A054 FTP-Patator                  5.9s ok entity_pass=True tok/s=66.3
+[56/100] A055 FTP-Patator                  5.5s ok entity_pass=True tok/s=57.9
+[57/100] A056 FTP-Patator                  5.9s ok entity_pass=True tok/s=66.4
+[58/100] A057 FTP-Patator                  5.9s ok entity_pass=True tok/s=66.9
+[59/100] A058 FTP-Patator                  5.9s ok entity_pass=True tok/s=66.1
+[60/100] A059 Heartbleed                   5.7s ok entity_pass=True tok/s=69.9
+[61/100] A060 Heartbleed                   5.8s ok entity_pass=True tok/s=63.7
+[62/100] A061 Infiltration                 6.1s ok entity_pass=True tok/s=62.2
+[63/100] A062 Infiltration                 6.0s ok entity_pass=True tok/s=67.1
+[64/100] A063 Infiltration                 6.2s ok entity_pass=True tok/s=60.7
+[65/100] A064 Infiltration                 6.2s ok entity_pass=True tok/s=63.0
+[66/100] A065 Infiltration                 6.2s ok entity_pass=True tok/s=63.5
+[67/100] A066 Infiltration                 7.0s ok entity_pass=True tok/s=45.5
+[68/100] A067 Infiltration                 8.3s ok entity_pass=True tok/s=43.2
+[69/100] A068 PortScan                     8.2s ok entity_pass=True tok/s=44.6
+[70/100] A069 PortScan                     8.0s ok entity_pass=True tok/s=44.8
+[71/100] A070 PortScan                     8.5s ok entity_pass=True tok/s=44.2
+[72/100] A071 PortScan                     8.2s ok entity_pass=True tok/s=44.8
+[73/100] A072 PortScan                     8.0s ok entity_pass=True tok/s=44.7
+[74/100] A073 PortScan                     8.1s ok entity_pass=True tok/s=44.7
+[75/100] A074 PortScan                     8.2s ok entity_pass=True tok/s=43.9
+[76/100] A075 SSH-Patator                  8.5s ok entity_pass=True tok/s=44.8
+[77/100] A076 SSH-Patator                  8.0s ok entity_pass=True tok/s=44.3
+[78/100] A077 SSH-Patator                  8.0s ok entity_pass=True tok/s=43.8
+[79/100] A078 SSH-Patator                  8.3s ok entity_pass=True tok/s=44.5
+[80/100] A079 SSH-Patator                  8.1s ok entity_pass=True tok/s=44.6
+[81/100] A080 SSH-Patator                  8.3s ok entity_pass=True tok/s=44.0
+[82/100] A081 SSH-Patator                  8.4s ok entity_pass=True tok/s=44.3
+[83/100] A082 Web Attack - Brute Force     8.4s ok entity_pass=True tok/s=44.2
+[84/100] A083 Web Attack - Brute Force     8.4s ok entity_pass=True tok/s=44.0
+[85/100] A084 Web Attack - Brute Force     7.8s ok entity_pass=True tok/s=52.0
+[86/100] A085 Web Attack - Brute Force     8.3s ok entity_pass=True tok/s=43.5
+[87/100] A086 Web Attack - Brute Force     8.1s ok entity_pass=True tok/s=48.6
+[88/100] A087 Web Attack - Brute Force     8.4s ok entity_pass=True tok/s=44.0
+[89/100] A088 Web Attack - Brute Force     8.2s ok entity_pass=True tok/s=42.4
+[90/100] A089 Web Attack - Sql Injection   7.7s ok entity_pass=True tok/s=49.0
+[91/100] A090 Web Attack - Sql Injection   7.1s ok entity_pass=True tok/s=54.8
+[92/100] A091 Web Attack - Sql Injection   6.6s ok entity_pass=True tok/s=58.0
+[93/100] A092 Web Attack - Sql Injection   6.1s ok entity_pass=True tok/s=63.0
+[94/100] A093 Web Attack - XSS             6.1s ok entity_pass=True tok/s=65.3
+[95/100] A094 Web Attack - XSS             6.0s ok entity_pass=True tok/s=64.9
+[96/100] A095 Web Attack - XSS             8.2s ok entity_pass=True tok/s=33.6
+[97/100] A096 Web Attack - XSS             6.1s ok entity_pass=True tok/s=65.9
+[98/100] A097 Web Attack - XSS             6.0s ok entity_pass=True tok/s=65.0
+[99/100] A098 Web Attack - XSS             6.2s ok entity_pass=True tok/s=62.5
+[100/100] A099 Web Attack - XSS             6.1s ok entity_pass=True tok/s=66.0
+[finalize] wrote llm_faithfulness_metrics.csv and llm_faithfulness_report.txt from 100 raw records

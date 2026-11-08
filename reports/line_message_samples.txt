@@ -1,0 +1,276 @@
+########## DDoS  [HIGH]  technique=yes  model=random_forest
+🚨 [SOC SECURITY ALERT — HIGH SEVERITY]
+Security Event Detected
+
+พบการเชื่อมต่อจาก 172.16.0.1 ไปยัง 192.168.10.50 ที่พอร์ต 80 โดยมีลักษณะตรงกับเทคนิค T1499.002 จัดเป็นเหตุการณ์ระดับ HIGH
+
+Incident Details
+• Source IP: 172.16.0.1
+• Destination IP: 192.168.10.50
+• Destination Port: 80 (HTTP)
+• MITRE ATT&CK Tactic: Impact
+• MITRE Technique: T1499.002 — Service Exhaustion Flood
+• Severity: 🔴 HIGH
+
+📊 Grafana SOC Dashboard:
+http://localhost:3000/d/soc-main
+
+This alert requires immediate investigation by the SOC team.
+
+########## DoS GoldenEye  [HIGH]  technique=yes  model=random_forest
+🚨 [SOC SECURITY ALERT — HIGH SEVERITY]
+Security Event Detected
+
+พบการเชื่อมต่อจาก 172.16.0.1 ไปยัง 192.168.10.50 ที่พอร์ต 80 โดยมีลักษณะตรงกับเทคนิค T1499.002 จัดเป็นเหตุการณ์ระดับสูง
+
+Incident Details
+• Source IP: 172.16.0.1
+• Destination IP: 192.168.10.50
+• Destination Port: 80 (HTTP)
+• MITRE ATT&CK Tactic: Impact
+• MITRE Technique: T1499.002 — Service Exhaustion Flood
+• Severity: 🔴 HIGH
+
+📊 Grafana SOC Dashboard:
+http://localhost:3000/d/soc-main
+
+This alert requires immediate investigation by the SOC team.
+
+########## DoS Hulk  [HIGH]  technique=yes  model=random_forest
+🚨 [SOC SECURITY ALERT — HIGH SEVERITY]
+Security Event Detected
+
+พบการเชื่อมต่อจาก 172.16.0.1 ไปยัง 192.168.10.50 ที่พอร์ต 80 โดยมีลักษณะตรงกับเทคนิค T1499.002 จัดเป็นเหตุการณ์ระดับ HIGH
+
+Incident Details
+• Source IP: 172.16.0.1
+• Destination IP: 192.168.10.50
+• Destination Port: 80 (HTTP)
+• MITRE ATT&CK Tactic: Impact
+• MITRE Technique: T1499.002 — Service Exhaustion Flood
+• Severity: 🔴 HIGH
+
+📊 Grafana SOC Dashboard:
+http://localhost:3000/d/soc-main
+
+This alert requires immediate investigation by the SOC team.
+
+########## DoS Slowhttptest  [HIGH]  technique=yes  model=random_forest
+🚨 [SOC SECURITY ALERT — HIGH SEVERITY]
+Security Event Detected
+
+พบการเชื่อมต่อจาก 172.16.0.1 ไปยัง 192.168.10.50 ที่พอร์ต 80 แต่หลักฐานจาก RAG ไม่สอดคล้องกันพอที่จะระบุเทคนิค MITRE ได้ จัดเป็นเหตุการณ์ระดับ HIGH
+
+Incident Details
+• Source IP: 172.16.0.1
+• Destination IP: 192.168.10.50
+• Destination Port: 80 (HTTP)
+• MITRE ATT&CK Tactic: Impact
+• MITRE Technique: T1499.002 — Service Exhaustion Flood
+• Severity: 🔴 HIGH
+
+📊 Grafana SOC Dashboard:
+http://localhost:3000/d/soc-main
+
+This alert requires immediate investigation by the SOC team.
+
+########## DoS slowloris  [HIGH]  technique=yes  model=random_forest
+🚨 [SOC SECURITY ALERT — HIGH SEVERITY]
+Security Event Detected
+
+พบการเชื่อมต่อจาก 172.16.0.1 ไปยัง 192.168.10.50 ที่พอร์ต 80 โดยมีลักษณะตรงกับเทคนิค T1499.002 จัดเป็นเหตุการณ์ระดับ HIGH
+
+Incident Details
+• Source IP: 172.16.0.1
+• Destination IP: 192.168.10.50
+• Destination Port: 80 (HTTP)
+• MITRE ATT&CK Tactic: Impact
+• MITRE Technique: T1499.002 — Service Exhaustion Flood
+• Severity: 🔴 HIGH
+
+📊 Grafana SOC Dashboard:
+http://localhost:3000/d/soc-main
+
+This alert requires immediate investigation by the SOC team.
+
+########## PortScan  [HIGH]  technique=yes  model=random_forest
+🚨 [SOC SECURITY ALERT — HIGH SEVERITY]
+Security Event Detected
+
+พบการเชื่อมต่อจาก 172.16.0.1 ไปยัง 192.168.10.50 ที่พอร์ต 444 ซึ่งตรงกับเทคนิค T1046 จัดเป็นเหตุการณ์ระดับสูง
+
+Incident Details
+• Source IP: 172.16.0.1
+• Destination IP: 192.168.10.50
+• Destination Port: 444
+• MITRE ATT&CK Tactic: Discovery
+• MITRE Technique: T1046 — Network Service Discovery
+• Severity: 🔴 HIGH
+
+📊 Grafana SOC Dashboard:
+http://localhost:3000/d/soc-main
+
+This alert requires immediate investigation by the SOC team.
+
+########## Web Attack - Brute Force  [HIGH]  technique=yes  model=random_forest
+🚨 [SOC SECURITY ALERT — HIGH SEVERITY]
+Security Event Detected
+
+เครื่อง 172.16.0.1 มีพฤติกรรมการเชื่อมต่อที่ผิดปกติไปยังบริการของ 192.168.10.50 ที่พอร์ต 80 ลักษณะตรงกับเทคนิค T1110 จัดเป็นเหตุการณ์ระดับ HIGH
+
+Incident Details
+• Source IP: 172.16.0.1
+• Destination IP: 192.168.10.50
+• Destination Port: 80 (HTTP)
+• MITRE ATT&CK Tactic: Credential Access
+• MITRE Technique: T1110 — Brute Force
+• Severity: 🔴 HIGH
+
+📊 Grafana SOC Dashboard:
+http://localhost:3000/d/soc-main
+
+This alert requires immediate investigation by the SOC team.
+
+########## BENIGN  [LOW]  technique=none  model=random_forest
+🚨 [SOC SECURITY ALERT — LOW SEVERITY]
+Security Event Detected
+
+พบการเชื่อมต่อจาก 192.168.10.12 ไปยัง 23.61.187.27 ที่พอร์ต 80 แต่หลักฐานจาก RAG ไม่สอดคล้องกันพอที่จะระบุเทคนิค MITRE ได้ จัดเป็นเหตุการณ์ระดับ LOW
+
+Incident Details
+• Source IP: 192.168.10.12
+• Destination IP: 23.61.187.27
+• Destination Port: 80 (HTTP)
+• MITRE ATT&CK: ไม่ระบุ (RAG ไม่พบเทคนิคที่สอดคล้องกัน)
+• Severity: 🟡 LOW
+
+📊 Grafana SOC Dashboard:
+http://localhost:3000/d/soc-main
+
+Logged for the daily SOC digest. No immediate action required.
+
+########## Bot  [HIGH]  technique=none  model=random_forest
+🚨 [SOC SECURITY ALERT — HIGH SEVERITY]
+Security Event Detected
+
+พบการเชื่อมต่อจาก 192.168.10.15 ไปยัง 205.174.165.73 ที่พอร์ต 8080 แต่หลักฐานจาก RAG ไม่สอดคล้องกันพอที่จะระบุเทคนิค MITRE ได้ จัดเป็นเหตุการณ์ระดับ HIGH
+
+Incident Details
+• Source IP: 192.168.10.15
+• Destination IP: 205.174.165.73
+• Destination Port: 8080 (HTTP-ALT)
+• MITRE ATT&CK: ไม่ระบุ (RAG ไม่พบเทคนิคที่สอดคล้องกัน)
+• Severity: 🔴 HIGH
+
+📊 Grafana SOC Dashboard:
+http://localhost:3000/d/soc-main
+
+This alert requires immediate investigation by the SOC team.
+
+########## FTP-Patator  [HIGH]  technique=none  model=random_forest
+🚨 [SOC SECURITY ALERT — HIGH SEVERITY]
+Security Event Detected
+
+เครื่อง 172.16.0.1 มีพฤติกรรมการเชื่อมต่อที่ผิดปกติไปยังบริการของ 192.168.10.50 ที่พอร์ต 21 จัดเป็นเหตุการณ์ระดับ HIGH
+
+Incident Details
+• Source IP: 172.16.0.1
+• Destination IP: 192.168.10.50
+• Destination Port: 21 (FTP)
+• MITRE ATT&CK: ไม่ระบุ (RAG ไม่พบเทคนิคที่สอดคล้องกัน)
+• Severity: 🔴 HIGH
+
+📊 Grafana SOC Dashboard:
+http://localhost:3000/d/soc-main
+
+This alert requires immediate investigation by the SOC team.
+
+########## Heartbleed  [HIGH]  technique=none  model=if_ae_fallback
+🚨 [SOC SECURITY ALERT — HIGH SEVERITY]
+Security Event Detected
+
+เครื่อง 172.16.0.1 มีพฤติกรรมการเชื่อมต่อที่ผิดปกติไปยังบริการของ 192.168.10.51 ที่พอร์ต 444 จัดเป็นเหตุการณ์ระดับ HIGH
+
+Incident Details
+• Source IP: 172.16.0.1
+• Destination IP: 192.168.10.51
+• Destination Port: 444
+• MITRE ATT&CK: ไม่ระบุ (RAG ไม่พบเทคนิคที่สอดคล้องกัน)
+• Severity: 🔴 HIGH
+
+📊 Grafana SOC Dashboard:
+http://localhost:3000/d/soc-main
+
+This alert requires immediate investigation by the SOC team.
+
+########## Infiltration  [MEDIUM]  technique=none  model=if_ae_fallback
+🚨 [SOC SECURITY ALERT — MEDIUM SEVERITY]
+Security Event Detected
+
+พบการเชื่อมต่อจาก 192.168.10.8 ไปยัง 205.174.165.73 ที่พอร์ต 444 แต่หลักฐานจาก RAG ไม่สอดคล้องกันพอที่จะระบุเทคนิค MITRE ได้ จัดเป็นเหตุการณ์ระดับ MEDIUM
+
+Incident Details
+• Source IP: 192.168.10.8
+• Destination IP: 205.174.165.73
+• Destination Port: 444
+• MITRE ATT&CK: ไม่ระบุ (RAG ไม่พบเทคนิคที่สอดคล้องกัน)
+• Severity: 🟠 MEDIUM
+
+📊 Grafana SOC Dashboard:
+http://localhost:3000/d/soc-main
+
+Review this alert during the current SOC shift.
+
+########## SSH-Patator  [HIGH]  technique=none  model=random_forest
+🚨 [SOC SECURITY ALERT — HIGH SEVERITY]
+Security Event Detected
+
+เครื่อง 172.16.0.1 มีพฤติกรรมการเชื่อมต่อที่ผิดปกติไปยังบริการของ 192.168.10.50 ที่พอร์ต 22 จัดเป็นเหตุการณ์ระดับ HIGH
+
+Incident Details
+• Source IP: 172.16.0.1
+• Destination IP: 192.168.10.50
+• Destination Port: 22 (SSH)
+• MITRE ATT&CK: ไม่ระบุ (RAG ไม่พบเทคนิคที่สอดคล้องกัน)
+• Severity: 🔴 HIGH
+
+📊 Grafana SOC Dashboard:
+http://localhost:3000/d/soc-main
+
+This alert requires immediate investigation by the SOC team.
+
+########## Web Attack - Sql Injection  [HIGH]  technique=none  model=random_forest
+🚨 [SOC SECURITY ALERT — HIGH SEVERITY]
+Security Event Detected
+
+เครื่อง 172.16.0.1 มีพฤติกรรมการเชื่อมต่อที่ผิดปกติไปยังบริการของ 192.168.10.50 ที่พอร์ต 80 จัดเป็นเหตุการณ์ระดับ HIGH
+
+Incident Details
+• Source IP: 172.16.0.1
+• Destination IP: 192.168.10.50
+• Destination Port: 80 (HTTP)
+• MITRE ATT&CK: ไม่ระบุ (RAG ไม่พบเทคนิคที่สอดคล้องกัน)
+• Severity: 🔴 HIGH
+
+📊 Grafana SOC Dashboard:
+http://localhost:3000/d/soc-main
+
+This alert requires immediate investigation by the SOC team.
+
+########## Web Attack - XSS  [HIGH]  technique=none  model=random_forest
+🚨 [SOC SECURITY ALERT — HIGH SEVERITY]
+Security Event Detected
+
+พบการเชื่อมต่อจาก 172.16.0.1 ไปยัง 192.168.10.50 ที่พอร์ต 80 แต่หลักฐานจาก RAG ไม่สอดคล้องกันพอที่จะระบุเทคนิค MITRE ได้ จัดเป็นเหตุการณ์ระดับ HIGH
+
+Incident Details
+• Source IP: 172.16.0.1
+• Destination IP: 192.168.10.50
+• Destination Port: 80 (HTTP)
+• MITRE ATT&CK: ไม่ระบุ (RAG ไม่พบเทคนิคที่สอดคล้องกัน)
+• Severity: 🔴 HIGH
+
+📊 Grafana SOC Dashboard:
+http://localhost:3000/d/soc-main
+
+This alert requires immediate investigation by the SOC team.
