@@ -34,7 +34,7 @@ class GmailHtmlEscapingTests(unittest.TestCase):
             "source_ip": "<source-ip>", "dst_port": "<dst-port>", "affected_asset": "<asset>",
             "technique_id": "<technique>", "mitre_tactic": "<tactic>", "risk_score": "<risk>",
             "explanation_th": "<explanation>", "remediation": ["<remediation>"]
-        })
+        }, {"line_grafana_base_url": "http://localhost:3000"})
         for value in ("priority", "alert-id", "timestamp", "source-ip", "dst-port", "asset",
                       "technique", "tactic", "risk", "explanation", "remediation"):
             with self.subTest(value=value):

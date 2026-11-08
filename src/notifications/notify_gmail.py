@@ -43,6 +43,9 @@ try/except; flush_low_priority_digest does not.
 Every value interpolated into the HTML bodies goes through html.escape, because the fields carry
 model output (explanation_th, remediation steps) and flow-derived strings.
 
+The MEDIUM email is multipart/alternative: a plain-text body plus templates/email_alert.html rendered
+with string.Template.substitute. A render failure falls back to the text body alone.
+
 Real-vs-dry-run rule (same discipline src/notifications/notify_line.py uses for LINE_CHANNEL_ACCESS_TOKEN,
 mirrored here per HANDOFF_OUTPUT_LAYER.md's instruction to keep the two channels consistent):
 if GMAIL_CLIENT_ID/GMAIL_CLIENT_SECRET/GMAIL_REFRESH_TOKEN/GMAIL_SENDER_ADDRESS don't all look
@@ -58,8 +61,17 @@ import logging
 from email import policy
 from email.errors import MessageError
 from email.message import EmailMessage
-from typing import Any
+from pathlib import Path
+from string import Template
+from typing import Any, NamedTuple
 
+from .alert_format import (
+    UNKNOWN_TECHNIQUE_TEXT,
+    grafana_dashboard_url,
+    port_label,
+    tactic_label,
+    technique_name,
+)
 from .config_utils import looks_real
 
 logger = logging.getLogger("alert_dispatcher.notify_gmail")
@@ -175,35 +187,169 @@ def _send_email(
     return {"status": "sent", "message_id": resp.get("id")}
 
 
-def build_immediate_email_html(record: dict[str, Any]) -> str:
-    """MEDIUM content spec (unchanged from the Graph stub it replaces): alert_id/timestamp/
-    source_ip/dst_port/affected_asset/technique_id+mitre_tactic/risk_score/explanation_th/
-    remediation. Every value is HTML-escaped."""
-    remediation_html = "".join(f"<li>{escape(str(step))}</li>" for step in (record.get("remediation") or []))
-    return (
-        "<html><body>"
-        f"<h2>SOC Alert - {escape(str(record.get('priority', '?')))}</h2>"
-        f"<p><b>alert_id:</b> {escape(str(record.get('alert_id', '?')))}<br>"
-        f"<b>timestamp:</b> {escape(str(record.get('timestamp', '?')))}<br>"
-        f"<b>source_ip:</b> {escape(str(record.get('source_ip', '?')))}<br>"
-        f"<b>dst_port:</b> {escape(str(record.get('dst_port', '?')))}<br>"
-        f"<b>affected_asset:</b> {escape(str(record.get('affected_asset', '?')))}<br>"
-        f"<b>technique:</b> {escape(str(record.get('technique_id', '?')))} ({escape(str(record.get('mitre_tactic', '?')))})<br>"
-        f"<b>risk_score:</b> {escape(str(record.get('risk_score', '?')))}</p>"
-        f"<p>{escape(str(record.get('explanation_th', '')))}</p>"
-        f"<ul>{remediation_html}</ul>"
-        "</body></html>"
+EMAIL_TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "email_alert.html"
+DEFAULT_SYSTEM_NAME = "Hybrid IDS | Campus SOC"
+NO_REMEDIATION_TEXT = "No remediation steps were provided with this alert."
+NO_EXPLANATION_TEXT = "No explanation was generated for this alert."
+
+
+class SeverityStyle(NamedTuple):
+    background: str
+    border: str
+    color: str
+
+
+# Hue matches notify_line.SEVERITY_ICON (red, orange, yellow). Each text colour is the 700-800
+# step of its hue so it stays readable on its own pale background.
+SEVERITY_STYLE = {
+    "HIGH": SeverityStyle("#fef2f2", "#fca5a5", "#b91c1c"),
+    "MEDIUM": SeverityStyle("#fff7ed", "#fdba74", "#c2410c"),
+    "LOW": SeverityStyle("#fefce8", "#fde047", "#854d0e"),
+}
+UNKNOWN_SEVERITY_STYLE = SeverityStyle("#f1f5f9", "#cbd5e1", "#475569")
+
+
+def severity_style(priority: Any) -> SeverityStyle:
+    return SEVERITY_STYLE.get(str(priority).upper(), UNKNOWN_SEVERITY_STYLE)
+
+
+def _shown(value: Any, default: str = "?") -> str:
+    return default if value is None or value == "" else str(value)
+
+
+def _technique_text(record: dict[str, Any]) -> str:
+    technique_id = record.get("technique_id")
+    tactic = tactic_label(record.get("mitre_tactic"))
+    if not (technique_id or tactic):
+        return UNKNOWN_TECHNIQUE_TEXT
+    head = " - ".join(part for part in (technique_id, technique_name(technique_id)) if part)
+    if not tactic:
+        return head
+    return f"{head or 'ไม่ระบุ'} ({tactic})"
+
+
+def _risk_text(risk_score: Any) -> str:
+    try:
+        return f"{int(risk_score)}/100"
+    except (TypeError, ValueError):
+        return _shown(risk_score)
+
+
+def _alert_fields(record: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+    """Every displayed value as plain text, before any channel-specific escaping.
+
+    Both bodies are built from this one dict so the text and HTML parts cannot disagree.
+    """
+    steps = [str(step) for step in (record.get("remediation") or [])]
+    anomaly = _shown(record.get("anomaly_type"), "Security event")
+    return {
+        "priority": _shown(record.get("priority"), "UNKNOWN"),
+        "title": f"{anomaly} detected from {_shown(record.get('source_ip'))}",
+        "description": _shown(record.get("explanation_th"), NO_EXPLANATION_TEXT),
+        "alert_id": _shown(record.get("alert_id")),
+        "timestamp": _shown(record.get("timestamp")),
+        "source_ip": _shown(record.get("source_ip")),
+        "destination_ip": _shown(record.get("dst_ip") or record.get("affected_asset")),
+        "destination_port": port_label(record.get("dst_port")),
+        "technique": _technique_text(record),
+        "risk_score": _risk_text(record.get("risk_score")),
+        "steps": steps,
+        "dashboard_url": grafana_dashboard_url(config["line_grafana_base_url"]),
+        "system_name": config.get("soc_system_name") or DEFAULT_SYSTEM_NAME,
+    }
+
+
+def _actions_markup(steps: list[str]) -> str:
+    """Escape each step, then join with markup. Escaping after the join would print the tags."""
+    if not steps:
+        return escape(NO_REMEDIATION_TEXT)
+    return "".join(
+        f'<div style="padding:2px 0 2px 14px; text-indent:-14px;">&#8226;&nbsp;{escape(step)}</div>'
+        for step in steps
     )
+
+
+def email_template_values(record: dict[str, Any], config: dict[str, Any]) -> dict[str, str]:
+    """The ${name} values email_alert.html expects, each already safe to place in markup."""
+    f = _alert_fields(record, config)
+    style = severity_style(f["priority"])
+    return {
+        "severityBackground": style.background,
+        "severityBorder": style.border,
+        "severityColor": style.color,
+        "severity": escape(f["priority"]),
+        "alertTitle": escape(f["title"]),
+        "alertDescription": escape(f["description"]),
+        "alertId": escape(f["alert_id"]),
+        "timestamp": escape(f["timestamp"]),
+        "sourceIp": escape(f["source_ip"]),
+        "affectedAsset": escape(f["destination_ip"]),
+        "destinationPort": escape(f["destination_port"]),
+        "technique": escape(f["technique"]),
+        "riskScore": escape(f["risk_score"]),
+        "requiredActions": _actions_markup(f["steps"]),
+        "grafanaUrl": escape(f["dashboard_url"]),
+        "systemName": escape(f["system_name"]),
+    }
+
+
+def build_immediate_email_html(record: dict[str, Any], config: dict[str, Any]) -> str:
+    """Render templates/email_alert.html for one alert.
+
+    Template.substitute, not safe_substitute: a placeholder with no value raises KeyError, so a
+    template edit that outruns this module fails a test instead of putting a literal ${sourceIp}
+    in an analyst's inbox.
+    """
+    template = Template(EMAIL_TEMPLATE_PATH.read_text(encoding="utf-8"))
+    return template.substitute(email_template_values(record, config))
+
+
+def build_immediate_email_text(record: dict[str, Any], config: dict[str, Any]) -> str:
+    f = _alert_fields(record, config)
+    steps = [f"{n}. {step}" for n, step in enumerate(f["steps"], 1)] or [NO_REMEDIATION_TEXT]
+    return "\n".join([
+        f"[SOC SECURITY ALERT - {f['priority']} SEVERITY]",
+        f["title"],
+        "",
+        f["description"],
+        "",
+        "Incident Details",
+        f"Alert ID: {f['alert_id']}",
+        f"Timestamp: {f['timestamp']}",
+        f"Source IP: {f['source_ip']}",
+        f"Destination IP: {f['destination_ip']}",
+        f"Destination Port: {f['destination_port']}",
+        f"MITRE Technique: {f['technique']}",
+        f"Risk Score: {f['risk_score']}",
+        "",
+        "Required Actions",
+        *steps,
+        "",
+        f"SOC Dashboard: {f['dashboard_url']}",
+        "",
+        f["system_name"],
+    ])
 
 
 def send_immediate_email(record: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
     """Send (or dry-run-log) a MEDIUM-priority immediate email for one assembled alert `record`
     (see src/notifications/alert_dispatcher.py's assemble_alert_record). Called by
-    src/alert_dispatcher.dispatch_alert() when priority == "MEDIUM". Same error contract as
-    _send_email."""
+    dispatch_alert() when priority == "MEDIUM". Same error contract as _send_email.
+
+    The message is multipart/alternative: the plain-text body for screen readers and text-only
+    clients, the template for everyone else. If rendering the template fails for any reason the
+    text body is sent alone. Losing the formatting is acceptable and losing the alert is not,
+    and rendering is pure, so catching broadly here cannot hide a half-finished send.
+    """
     subject = f"[SOC ALERT - MEDIUM] {record.get('anomaly_type', '?')} @ {record.get('source_ip', '?')}"
-    html = build_immediate_email_html(record)
-    return _send_email(config, subject, "MEDIUM immediate", html_body=html)
+    text = build_immediate_email_text(record, config)
+    try:
+        html = build_immediate_email_html(record, config)
+    except Exception:
+        logger.exception("[notify_gmail] HTML template failed -- sending the plain-text body only")
+        html = None
+    result = _send_email(config, subject, "MEDIUM immediate", html_body=html, text_body=text)
+    return {**result, "body_format": "multipart" if html is not None else "text_only"}
 
 
 def build_digest_email_html(rows: list[dict[str, Any]], stats: dict[str, Any]) -> str:

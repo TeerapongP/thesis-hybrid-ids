@@ -85,6 +85,9 @@ def load_env_config(env_path: Path = NOTIFICATION_ENV_PATH) -> dict[str, Any]:
         "gmail_client_secret": raw["GMAIL_CLIENT_SECRET"],
         "gmail_refresh_token": raw["GMAIL_REFRESH_TOKEN"],
         "gmail_sender_address": raw["GMAIL_SENDER_ADDRESS"],
+        # Optional, like LINE_DELIVERY_MODE: an older notification/.env keeps loading, and
+        # notify_gmail owns the default.
+        "soc_system_name": raw.get("SOC_SYSTEM_NAME"),
         "low_digest_schedule": raw["LOW_DIGEST_SCHEDULE"],
     }
 
