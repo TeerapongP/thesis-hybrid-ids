@@ -10,7 +10,14 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 class LlmLayerTests(unittest.TestCase):
     def test_explain_alert_overrides_model_supplied_facts(self):
-        alert = {"dst_ip": "192.0.2.10", "affected_asset": "host.example"}
+        """A technique the model invented must never survive into the result.
+
+        Asserted under both sources rather than under whichever is deployed, so flipping
+        DEFAULT_TECHNIQUE_SOURCE cannot quietly stop testing the override. T9999 is not a
+        real technique and reaching an analyst would send them to look up nothing.
+        """
+        alert = {"dst_ip": "192.0.2.10", "affected_asset": "host.example",
+                 "rf_predicted_label": "PortScan"}
         hits = [
             {"metadata": {"technique_id": "T1046"}, "document": "one"},
             {"metadata": {"technique_id": "T1046"}, "document": "two"},
@@ -19,11 +26,14 @@ class LlmLayerTests(unittest.TestCase):
             "priority": "HIGH", "explanation_th": "คำอธิบาย", "remediation": ["ตรวจสอบ"],
             "technique_id": "T9999", "confidence": 0.01,
         })
-        with patch.object(llm_explain, "call_llm", return_value=raw):
-            result = llm_explain.explain_alert(alert, hits, 0.9, 1, 0.97, {})
-        self.assertEqual(result["technique_id"], "T1046")
-        self.assertEqual(result["confidence"], 0.97)
-        self.assertEqual(result["affected_asset"], "host.example")
+        for source, expected in (("rag", "T1046"), ("mapping", "T1046")):
+            with self.subTest(source=source):
+                with patch.object(llm_explain, "call_llm", return_value=raw):
+                    result = llm_explain.explain_alert(alert, hits, 0.9, 1, 0.97, {},
+                                                       technique_source=source)
+                self.assertEqual(result["technique_id"], expected)
+                self.assertEqual(result["confidence"], 0.97)
+                self.assertEqual(result["affected_asset"], "host.example")
         self.assertEqual(result["priority"], "HIGH")
 
     def test_priority_comes_from_rule_not_model(self):
@@ -268,13 +278,23 @@ class TechniqueSourceTests(unittest.TestCase):
         self.assertEqual(llm_explain.resolve_technique("rag", ctx, disputed), (None, None))
         self.assertEqual(llm_explain.resolve_technique("mapping", ctx, disputed)[0], "T1046")
 
-    def test_default_source_is_the_rag_consensus(self):
+    def test_the_deployed_default_is_the_mitre_table(self):
+        """Chosen on the measured ablation, so the assertion names the winner, not a preference.
+
+        Pinned because flipping it moves every M2 figure and five sections of chapter 4: the
+        default must not drift without someone editing this line and noticing why.
+        """
+        self.assertEqual(llm_explain.DEFAULT_TECHNIQUE_SOURCE, "mapping")
+
+    def test_omitting_the_source_uses_the_deployed_default(self):
         hits = [{"metadata": {"technique_id": "T1046"}}] * 2
         ctx = {"rf_predicted_label": "DDoS", "dst_ip": "192.0.2.10"}
-        self.assertEqual(llm_explain.DEFAULT_TECHNIQUE_SOURCE, "rag")
         prompt = llm_explain.build_prompt(ctx, hits, 0.9, 1, 0.9)
-        self.assertEqual(prompt, llm_explain.build_prompt(ctx, hits, 0.9, 1, 0.9, "rag"))
-        self.assertIn('"technique_id": "T1046"', prompt)
+        explicit = llm_explain.build_prompt(ctx, hits, 0.9, 1, 0.9,
+                                            llm_explain.DEFAULT_TECHNIQUE_SOURCE)
+        self.assertEqual(prompt, explicit)
+        # DDoS maps to T1498, while the hits vote T1046, so this also proves which won.
+        self.assertIn('"technique_id": "T1498"', prompt)
 
     def test_prompt_carries_the_mapped_technique_under_mapping(self):
         hits = [{"metadata": {"technique_id": "T1499.002"}}] * 3

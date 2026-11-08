@@ -60,7 +60,13 @@ NO_RAG = False
 # keyed on the RF-predicted label, and the same question becomes a real measurement of
 # retrieval accuracy. Each record carries its own `technique_source`, so rescoring a stored
 # run needs no flag.
-TECHNIQUE_SOURCE = "rag"
+# Duplicates llm_explain.DEFAULT_TECHNIQUE_SOURCE rather than importing it, because this
+# module's alert-building stage runs under Anaconda, which has no langchain, so llm_explain
+# cannot be imported at module level. tests/test_technique_source_contract.py fails if the
+# two ever drift. fusion_layer.MODEL_USED_VALUES and alert_dispatcher.derive_model_used
+# already use the same arrangement, for the same reason. Letting this
+# diverge would make the evaluator silently measure a configuration the system does not run.
+TECHNIQUE_SOURCE = "mapping"
 
 SEED = 42
 PER_CATEGORY_CAP = 7
@@ -549,8 +555,8 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 PROVENANCE = {
-    "rag": "technique_id and mitre_tactic come from the 2-of-3 consensus of the top-3 retrieved RAG hits (the deployed behaviour)",
-    "mapping": "technique_id comes from config/mitre_mapping.csv keyed on the RF-PREDICTED label and mitre_tactic from the KB; retrieval does not choose it",
+    "rag": "technique_id and mitre_tactic come from the 2-of-3 consensus of the top-3 retrieved RAG hits (deployed until 2026-11-08)",
+    "mapping": "technique_id comes from config/mitre_mapping.csv keyed on the RF-PREDICTED label and mitre_tactic from the KB; retrieval does not choose it (the deployed behaviour)",
 }
 # What each provenance-dependent check means. Under "rag" two of them are guards that cannot
 # fail by construction; under "mapping" the same questions would silently change meaning, so
@@ -1053,6 +1059,9 @@ def finalize(rescore: bool, wall_total_s: float | None) -> None:
 def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    # Declared before the first mention of TECHNIQUE_SOURCE: Python rejects a name used
+    # earlier in a scope that later declares it global.
+    global NO_RAG, TECHNIQUE_SOURCE, RAW_PATH, METRICS_PATH, REPORT_PATH
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", choices=["alerts", "all"], default="all")
     ap.add_argument("--limit", type=int)
@@ -1061,13 +1070,12 @@ def main() -> int:
     ap.add_argument("--no-rag", action="store_true",
                     help="ablation: run with no retrieved hits at all, so technique_id and "
                          "mitre_tactic are null for every alert and the prompt carries no chunks")
-    ap.add_argument("--technique-source", choices=("rag", "mapping"), default="rag",
-                    help="where technique_id comes from: the RAG top-3 consensus (deployed) or "
-                         "config/mitre_mapping.csv keyed on the RF-predicted label")
+    ap.add_argument("--technique-source", choices=("rag", "mapping"), default=TECHNIQUE_SOURCE,
+                    help="where technique_id comes from: the RAG top-3 consensus or "
+                         "config/mitre_mapping.csv keyed on the RF-predicted label (deployed)")
     ap.add_argument("--variant", help="suffix the raw/metrics/report filenames, so a run cannot "
                                       "overwrite the deployed numbers")
     args = ap.parse_args()
-    global NO_RAG, TECHNIQUE_SOURCE, RAW_PATH, METRICS_PATH, REPORT_PATH
     NO_RAG = args.no_rag
     TECHNIQUE_SOURCE = args.technique_source
     if args.variant:

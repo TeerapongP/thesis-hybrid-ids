@@ -19,12 +19,23 @@ ENV_PATH = ROOT / ".env"
 KB_PATH = ROOT / "data" / "knowledge_base" / "mitre_techniques.json"
 MAPPING_PATH = ROOT / "config" / "mitre_mapping.csv"
 MAPPING_DATASET = "cicids2017"
-# Where the technique named in FACTS comes from. "rag" is the deployed behaviour: a 2-of-3
-# vote over the retrieved hits. "mapping" looks the RF-predicted label up in the MITRE table.
+# Where the technique named in FACTS comes from. "rag" takes a 2-of-3 vote over the retrieved
+# hits. "mapping" looks the RF-predicted label up in the MITRE table, which is not label
+# leakage: it consumes the model's own prediction, downstream of the detection decision, the
+# way a deployed IDS translates a classifier verdict into ATT&CK terms.
+#
+# "mapping" is deployed as of 2026-11-08, chosen on the measured ablation in CLAUDE.md
+# ("Technique source ablation"), not on preference. It names a technique on 86 of 100 alerts
+# against the vote's 50, agrees with the table on 99 of 100, and raises every diversity figure
+# (45 distinct explanations against 41, echo 0.646 against 0.68). It lowers entity_pass from
+# 0.96 to 0.838, and all 16 of those failures are the prose omitting a technique it was given,
+# with no foreign or altered entity anywhere. Carrying a technique on 36 more alerts is
+# 36 more chances to drop it. Read entity_pass beside entity_corruption_free, which stays 1.000.
+#
 # Kept as a named set rather than a boolean so a third source does not change signatures.
 TechniqueSource = Literal["rag", "mapping"]
 TECHNIQUE_SOURCES: tuple[TechniqueSource, ...] = ("rag", "mapping")
-DEFAULT_TECHNIQUE_SOURCE: TechniqueSource = "rag"
+DEFAULT_TECHNIQUE_SOURCE: TechniqueSource = "mapping"
 REQUIRED_ENV_KEYS = (
     "LLM_BACKEND", "LLM_BASE_URL", "LLM_MODEL", "LLM_TIMEOUT_S", "LLM_MAX_TOKENS", "LLM_TEMPERATURE",
 )
