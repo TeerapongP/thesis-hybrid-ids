@@ -3,6 +3,7 @@ import json
 import unittest
 from pathlib import Path
 
+from src.evaluation import compare_llm_runs
 from src.evaluation import eval_llm_faithfulness as m2
 
 FIXTURE = json.loads((Path(__file__).parent / "fixtures" / "llm_faithfulness_records.json").read_text(encoding="utf-8"))
@@ -249,6 +250,40 @@ class RetrievalContextScoringTests(unittest.TestCase):
             m2.write_metrics_csv(s, path)
             rows = list(csv.reader(path.read_text(encoding="utf-8").splitlines()))
         self.assertEqual({r[0]: r for r in rows if r}["# retrieval_context"][1], "technique_kb")
+
+
+class RunComparisonTests(unittest.TestCase):
+    def record(self, explanation, remediation):
+        rec = mapping_run_record()
+        rec["priority"] = "HIGH"
+        rec["output"]["explanation_th"] = explanation
+        rec["output"]["remediation"] = remediation
+        return rec
+
+    def test_diversity_counts_exact_strings_and_the_most_repeated(self):
+        ok = [self.record("a", ["x", "y"]), self.record("a", ["x", "y"]), self.record("b", ["z"])]
+        d = compare_llm_runs.diversity(ok)
+        self.assertEqual((d["distinct_explanations"], d["top_explanation_count"]), (2, 2))
+        self.assertEqual((d["distinct_remediation_lists"], d["top_remediation_count"]), (2, 2))
+
+    def test_a_remediation_list_equal_to_a_rendered_example_is_counted(self):
+        rec = self.record("a", ["z"])
+        shot = sorted(compare_llm_runs.rendered_remediations(rec))[0]
+        copied = self.record("b", list(shot))
+        d = compare_llm_runs.diversity([rec, copied])
+        self.assertEqual(d["remediation_equals_rendered_example"], 1)
+
+    def test_entity_failures_separate_omission_from_foreign_or_altered(self):
+        omitted = finished(mapping_run_record())
+        omitted["output"]["explanation_th"] = "พบ 172.16.0.1 ไปยัง 192.168.10.50 ที่พอร์ต 80"
+        omitted["checks"] = m2.score_record(omitted, KB)
+        altered = finished(mapping_run_record())
+        altered["output"]["explanation_th"] += " และ 10.9.9.9"
+        altered["checks"] = m2.score_record(altered, KB)
+        f = compare_llm_runs.entity_failures([omitted, altered])
+        self.assertEqual((f["entity_fail"], f["fail_omission_only"], f["fail_with_foreign_or_altered"]),
+                         (2, 1, 1))
+        self.assertEqual(f["omitted_by_type"], {"technique_id": 1})
 
 
 if __name__ == "__main__":
