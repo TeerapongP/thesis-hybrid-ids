@@ -52,3 +52,19 @@ reports/e2e_replay_events.jsonl
 reports/e2e_produce_receipt.json
 reports/e2e_enriched_events.jsonl
 reports/e2e_last_run.json
+reports/pipeline_last_run.json
+
+# Transient and regenerable run output, not measurement evidence.
+# Ollama server log (0.79 MB of request lines from one machine's session; the faithfulness
+# run logs and raw.jsonl are the actual evidence).
+reports/ollama_serve.log
+# Per-fold split-robustness score checkpoints (about 112 MB across 10 folds). They exist so a
+# run can resume; the summary, folds and per-class files next to them are the results and stay
+# tracked, as with the LOAO checkpoint directories above.
+reports/split_robustness_checkpoints/
+# Smoke runs check that a harness executes; their numbers are on a subsample and would sit
+# beside the real report and be mistaken for it.
+reports/*smoke*
+# Notebook autosave and editor shadow copies.
+.ipynb_checkpoints/
+.virtual_documents/
