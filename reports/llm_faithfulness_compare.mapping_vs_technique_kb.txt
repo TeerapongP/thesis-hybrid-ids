@@ -1,0 +1,23 @@
+metric                               llm_faithfulness_raw.mapping.jsonl  llm_faithfulness_raw.technique_kb.jsonl
+n_total                              100  100
+n_ok                                 99  100
+distinct_explanations                45  39
+top_explanation_count                10  27
+distinct_remediation_lists           33  31
+top_remediation_count                24  52
+top3_remediation_counts              [24, 17, 12]  [52, 7, 7]
+remediation_equals_rendered_example  60  95
+example_echo_alerts                  64/99  95/100
+example_echo_ratio_mean              0.8722  0.9487
+entity_pass                          83/99  100/100
+entity_fail                          16  0
+fail_omission_only                   16  0
+fail_with_foreign_or_altered         0  0
+omitted_by_type                      {'technique_id': 16}  {}
+entity_corruption_free               99/99  100/100
+alerts_with_bad_claim                0/99  0/100
+hallucination_lower_bound            0.0  0.0
+undecidable_share                    0.0  0.0025
+alerts_with_technique                86  87
+prose_technique_mention_alerts       70  87
+prompt_tokens_mean                   2223.7  1323.2
