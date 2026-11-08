@@ -16,7 +16,7 @@ PHASE 2 (train): diagnostic outer join -- ตรวจก่อน join จร�
 ======================================================================
 PHASE 3 (train): join จริง (validate='1:1') + drop แถว BENIGN ที่ไม่ match
 ======================================================================
-  train: join แล้ว drop แถว BENIGN ที่ไม่ match 296,307 แถว (1,512,478 -> 1,216,171 แถว)
+  train: join แล้ว drop แถว BENIGN ที่ไม่ match 296,307 แถว (1,512,478 -> 1,216,171 แถว), rolling windows rebuilt within this split
   เซฟไว้ที่ ./data/processed/behavioral\cicids2017_behavioral_train.parquet (1,216,171 แถว, 92 คอลัมน์)
 ======================================================================
 PHASE 2 (val): diagnostic outer join -- ตรวจก่อน join จริงเสมอ
@@ -27,7 +27,7 @@ PHASE 2 (val): diagnostic outer join -- ตรวจก่อน join จริ�
 ======================================================================
 PHASE 3 (val): join จริง (validate='1:1') + drop แถว BENIGN ที่ไม่ match
 ======================================================================
-  val: join แล้ว drop แถว BENIGN ที่ไม่ match 99,075 แถว (504,160 -> 405,085 แถว)
+  val: join แล้ว drop แถว BENIGN ที่ไม่ match 99,075 แถว (504,160 -> 405,085 แถว), rolling windows rebuilt within this split
   เซฟไว้ที่ ./data/processed/behavioral\cicids2017_behavioral_val.parquet (405,085 แถว, 92 คอลัมน์)
 ======================================================================
 PHASE 2 (test): diagnostic outer join -- ตรวจก่อน join จริงเสมอ
@@ -38,7 +38,7 @@ PHASE 2 (test): diagnostic outer join -- ตรวจก่อน join จริ
 ======================================================================
 PHASE 3 (test): join จริง (validate='1:1') + drop แถว BENIGN ที่ไม่ match
 ======================================================================
-  test: join แล้ว drop แถว BENIGN ที่ไม่ match 99,018 แถว (504,160 -> 405,142 แถว)
+  test: join แล้ว drop แถว BENIGN ที่ไม่ match 99,018 แถว (504,160 -> 405,142 แถว), rolling windows rebuilt within this split
   เซฟไว้ที่ ./data/processed/behavioral\cicids2017_behavioral_test.parquet (405,142 แถว, 92 คอลัมน์)
 ======================================================================
 สรุปผลลัพธ์
@@ -46,6 +46,7 @@ PHASE 3 (test): join จริง (validate='1:1') + drop แถว BENIGN ท�
 Phase 1 ของ Option A (row-hash join validation) เสร็จสมบูรณ์:
   - ทุก attack category match 100% ระหว่างสอง distribution (ไม่มีแถว attack ถูก drop เลย)
   - แถว BENIGN ที่ไม่ match (~23.6%) ถูก drop ออกตามนโยบายที่ตกลงไว้ ดูตัวเลขจริงต่อ split ด้านบน
+  - rolling behavioral features คำนวณใหม่ภายในแต่ละ split เพื่อไม่ใช้ event จาก split อื่น
   - ผลลัพธ์: data/processed/behavioral/cicids2017_behavioral_{train,val,test}.parquet
   - ยังไม่ scale/SMOTE/impute -- นั่นคือ Phase 2 (แผนแยกต่างหาก ยังไม่เริ่ม)
   - ข้อจำกัดที่ต้อง carry ไป Phase 2: Autoencoder BENIGN training population ลดลง ~23.6%;

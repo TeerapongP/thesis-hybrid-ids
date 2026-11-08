@@ -19,15 +19,9 @@ STEP 3: impute คอลัมน์ sentinel (fit median จาก train เท
   Init_Win_bytes_forward: median (จาก train) = 1024.0
   Init_Win_bytes_backward: median (จาก train) = 235.0
 ======================================================================
-STEP 4: CTI features (fit encoding จาก train เท่านั้น)
-======================================================================
-  technique_id_encoded mapping (7 ค่า, null->0): {'T1046': 1, 'T1071.001': 2, 'T1110': 3, 'T1110.001': 4, 'T1190': 5, 'T1498': 6, 'T1499.002': 7}
-  tactic_encoded mapping (5 ค่า, null->0): {'Command and Control': 1, 'Credential Access': 2, 'Discovery': 3, 'Impact': 4, 'Initial Access': 5}
-  mapping_confidence_encoded mapping (ตายตัว): {'n/a': 0, 'low': 1, 'medium': 2, 'high': 3}
-======================================================================
 STEP 5: MinMaxScaler (fit บน train เท่านั้น, เฉพาะ network features)
 ======================================================================
-  fit บน train เท่านั้น: 90 คอลัมน์ (ไม่แตะ ['Init_Win_bytes_forward_missing', 'Init_Win_bytes_backward_missing', 'technique_id_encoded', 'tactic_encoded', 'mapping_confidence_encoded', 'is_known_technique', 'orig_row_index'])
+  fit บน train เท่านั้น: 90 คอลัมน์ (ไม่แตะ ['Init_Win_bytes_forward_missing', 'Init_Win_bytes_backward_missing', 'orig_row_index'])
 ======================================================================
 STEP 6: SMOTE (train เท่านั้น)
 ======================================================================
@@ -52,11 +46,12 @@ STEP 7: เซฟผลลัพธ์
 ======================================================================
   network features: 90
   sentinel missing-flag features: 2 ['Init_Win_bytes_forward_missing', 'Init_Win_bytes_backward_missing']
-  CTI features: 4 ['technique_id_encoded', 'tactic_encoded', 'mapping_confidence_encoded', 'is_known_technique']
-  รวม feature columns ทั้งหมดต่อแถว (ไม่รวม reference/label/orig_row_index): 96
-  เซฟ cicids2017/train -> ./data/features/behavioral\cicids2017_behavioral_features_train.parquet  shape=(1483957, 102)
-  เซฟ cicids2017/val -> ./data/features/behavioral\cicids2017_behavioral_features_val.parquet  shape=(405085, 102)
-  เซฟ cicids2017/test -> ./data/features/behavioral\cicids2017_behavioral_features_test.parquet  shape=(405142, 102)
+  label-derived CTI encodings ไม่ถูกสร้างเป็น model input
+  รวม feature columns ทั้งหมดต่อแถว (ไม่รวม reference/label/orig_row_index): 92
+  เซฟ cicids2017/train -> data\features\behavioral\cicids2017_behavioral_features_train.parquet  shape=(1483957, 98)
+  เซฟ cicids2017/val -> data\features\behavioral\cicids2017_behavioral_features_val.parquet  shape=(405085, 98)
+  เซฟ cicids2017/test -> data\features\behavioral\cicids2017_behavioral_features_test.parquet  shape=(405142, 98)
+  provenance manifest: data\features\behavioral\provenance\cicids2017_behavioral_20261025T093515564065Z_af6073e9.json
 ======================================================================
 สรุปผลลัพธ์
 ======================================================================

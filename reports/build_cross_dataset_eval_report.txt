@@ -1,33 +1,17 @@
 ======================================================================
-STEP 1 — โหลด train ของทั้งสอง dataset เพื่อหา shared column names (intersection)
+STEP 1 — สร้าง target test ด้วย scaler ที่ fit จาก source train ในแต่ละทิศทาง
 ======================================================================
-  cicids2017_features_train.parquet columns: 89
-  unswnb15_features_train.parquet columns: 86
-  shared columns (intersection, ตัดออกจากไฟล์ crossdataset ทั้งสองฝั่ง = ไม่ตัด, เก็บไว้): 85
-  ตัดออกจากฝั่ง cicids2017 เท่านั้น (ไม่มีใน unsw): ['Destination Port', 'Fwd Header Length.1', 'Init_Win_bytes_forward_missing', 'Init_Win_bytes_backward_missing']
-  ตัดออกจากฝั่ง unswnb15 เท่านั้น (ไม่มีใน cicids): ['attack_cat']
+  cicids2017 -> unswnb15: source-train scaler fit on 76 model features; wrote target test (61235, 81) to ./data/features\crossdataset_eval\cicids2017_to_unswnb15_test.parquet
+  unswnb15 -> cicids2017: source-train scaler fit on 76 model features; wrote target test (504160, 81) to ./data/features\crossdataset_eval\unswnb15_to_cicids2017_test.parquet
 ======================================================================
-STEP 2 — เขียน {dataset}_features_{split}_crossdataset.parquet (คอลัมน์/ลำดับเดียวกันทุกไฟล์)
+STEP 2 — ตรวจคอลัมน์ model input ทั้งสองทิศทาง
 ======================================================================
-  เซฟ cicids2017/train -> ./data/features\cicids2017_features_train_crossdataset.parquet  shape=(1780264, 85)  (input ./data/features\cicids2017_features_train.parquet ไม่ถูกแก้ไข)
-  เซฟ cicids2017/val -> ./data/features\cicids2017_features_val_crossdataset.parquet  shape=(504160, 85)  (input ./data/features\cicids2017_features_val.parquet ไม่ถูกแก้ไข)
-  เซฟ cicids2017/test -> ./data/features\cicids2017_features_test_crossdataset.parquet  shape=(504160, 85)  (input ./data/features\cicids2017_features_test.parquet ไม่ถูกแก้ไข)
-  เซฟ unswnb15/train -> ./data/features\unswnb15_features_train_crossdataset.parquet  shape=(185001, 85)  (input ./data/features\unswnb15_features_train.parquet ไม่ถูกแก้ไข)
-  เซฟ unswnb15/val -> ./data/features\unswnb15_features_val_crossdataset.parquet  shape=(61235, 85)  (input ./data/features\unswnb15_features_val.parquet ไม่ถูกแก้ไข)
-  เซฟ unswnb15/test -> ./data/features\unswnb15_features_test_crossdataset.parquet  shape=(61235, 85)  (input ./data/features\unswnb15_features_test.parquet ไม่ถูกแก้ไข)
-======================================================================
-STEP 3 — ยืนยัน column names/order ตรงกัน 100% ระหว่าง train ของทั้งสอง dataset (crossdataset)
-======================================================================
-  cicids2017_features_train_crossdataset.parquet columns (85):
-    ['Flow Duration', 'Total Fwd Packets', 'Total Backward Packets', 'Total Length of Fwd Packets', 'Total Length of Bwd Packets', 'Fwd Packet Length Max', 'Fwd Packet Length Min', 'Fwd Packet Length Mean', 'Fwd Packet Length Std', 'Bwd Packet Length Max', 'Bwd Packet Length Min', 'Bwd Packet Length Mean', 'Bwd Packet Length Std', 'Flow Bytes/s', 'Flow Packets/s', 'Flow IAT Mean', 'Flow IAT Std', 'Flow IAT Max', 'Flow IAT Min', 'Fwd IAT Total', 'Fwd IAT Mean', 'Fwd IAT Std', 'Fwd IAT Max', 'Fwd IAT Min', 'Bwd IAT Total', 'Bwd IAT Mean', 'Bwd IAT Std', 'Bwd IAT Max', 'Bwd IAT Min', 'Fwd PSH Flags', 'Bwd PSH Flags', 'Fwd URG Flags', 'Bwd URG Flags', 'Fwd Header Length', 'Bwd Header Length', 'Fwd Packets/s', 'Bwd Packets/s', 'Min Packet Length', 'Max Packet Length', 'Packet Length Mean', 'Packet Length Std', 'Packet Length Variance', 'FIN Flag Count', 'SYN Flag Count', 'RST Flag Count', 'PSH Flag Count', 'ACK Flag Count', 'URG Flag Count', 'CWE Flag Count', 'ECE Flag Count', 'Down/Up Ratio', 'Average Packet Size', 'Avg Fwd Segment Size', 'Avg Bwd Segment Size', 'Fwd Avg Bytes/Bulk', 'Fwd Avg Packets/Bulk', 'Fwd Avg Bulk Rate', 'Bwd Avg Bytes/Bulk', 'Bwd Avg Packets/Bulk', 'Bwd Avg Bulk Rate', 'Subflow Fwd Packets', 'Subflow Fwd Bytes', 'Subflow Bwd Packets', 'Subflow Bwd Bytes', 'Init_Win_bytes_forward', 'Init_Win_bytes_backward', 'act_data_pkt_fwd', 'min_seg_size_forward', 'Active Mean', 'Active Std', 'Active Max', 'Active Min', 'Idle Mean', 'Idle Std', 'Idle Max', 'Idle Min', 'technique_id_encoded', 'tactic_encoded', 'mapping_confidence_encoded', 'is_known_technique', 'technique_id', 'technique_name', 'tactic', 'mapping_confidence', 'Label']
-  unswnb15_features_train_crossdataset.parquet columns (85):
-    ['Flow Duration', 'Total Fwd Packets', 'Total Backward Packets', 'Total Length of Fwd Packets', 'Total Length of Bwd Packets', 'Fwd Packet Length Max', 'Fwd Packet Length Min', 'Fwd Packet Length Mean', 'Fwd Packet Length Std', 'Bwd Packet Length Max', 'Bwd Packet Length Min', 'Bwd Packet Length Mean', 'Bwd Packet Length Std', 'Flow Bytes/s', 'Flow Packets/s', 'Flow IAT Mean', 'Flow IAT Std', 'Flow IAT Max', 'Flow IAT Min', 'Fwd IAT Total', 'Fwd IAT Mean', 'Fwd IAT Std', 'Fwd IAT Max', 'Fwd IAT Min', 'Bwd IAT Total', 'Bwd IAT Mean', 'Bwd IAT Std', 'Bwd IAT Max', 'Bwd IAT Min', 'Fwd PSH Flags', 'Bwd PSH Flags', 'Fwd URG Flags', 'Bwd URG Flags', 'Fwd Header Length', 'Bwd Header Length', 'Fwd Packets/s', 'Bwd Packets/s', 'Min Packet Length', 'Max Packet Length', 'Packet Length Mean', 'Packet Length Std', 'Packet Length Variance', 'FIN Flag Count', 'SYN Flag Count', 'RST Flag Count', 'PSH Flag Count', 'ACK Flag Count', 'URG Flag Count', 'CWE Flag Count', 'ECE Flag Count', 'Down/Up Ratio', 'Average Packet Size', 'Avg Fwd Segment Size', 'Avg Bwd Segment Size', 'Fwd Avg Bytes/Bulk', 'Fwd Avg Packets/Bulk', 'Fwd Avg Bulk Rate', 'Bwd Avg Bytes/Bulk', 'Bwd Avg Packets/Bulk', 'Bwd Avg Bulk Rate', 'Subflow Fwd Packets', 'Subflow Fwd Bytes', 'Subflow Bwd Packets', 'Subflow Bwd Bytes', 'Init_Win_bytes_forward', 'Init_Win_bytes_backward', 'act_data_pkt_fwd', 'min_seg_size_forward', 'Active Mean', 'Active Std', 'Active Max', 'Active Min', 'Idle Mean', 'Idle Std', 'Idle Max', 'Idle Min', 'technique_id_encoded', 'tactic_encoded', 'mapping_confidence_encoded', 'is_known_technique', 'technique_id', 'technique_name', 'tactic', 'mapping_confidence', 'Label']
-  ชื่อคอลัมน์และลำดับตรงกันทุกตำแหน่งหรือไม่: True
+  cicids2017 -> unswnb15: 76 aligned model input columns
+  unswnb15 -> cicids2017: 76 aligned model input columns
 ======================================================================
 สรุป
 ======================================================================
-  รวมคอลัมน์ในไฟล์ crossdataset ทุกไฟล์: 85
-    - model-input feature จริง (network + CTI, ไม่รวม label/reference): 80
-    - reference columns (MITRE, เก็บไว้อ้างอิง ไม่ใช่ input ให้โมเดล): 4 ['technique_id', 'technique_name', 'tactic', 'mapping_confidence']
-    - label column: 1 ['Label']
-  ไฟล์ input เดิมทั้ง 6 ไฟล์ (cicids2017_features_*.parquet 84 คอลัมน์ / unswnb15_features_*.parquet 80 คอลัมน์) ไม่ถูกแก้ไข — สคริปต์นี้เปิดอ่านอย่างเดียว แล้วเขียนไฟล์ใหม่แยกต่างหากเท่านั้น
+  model input features (network only): 76
+  label-derived CTI fields excluded from detector input: ['technique_id_encoded', 'tactic_encoded', 'mapping_confidence_encoded', 'is_known_technique']
+  target outputs: ./data/features\crossdataset_eval\cicids2017_to_unswnb15_test.parquet, ./data/features\crossdataset_eval\unswnb15_to_cicids2017_test.parquet
+  crossdataset artifacts from the previous implementation remain untouched

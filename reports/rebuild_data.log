@@ -1,0 +1,362 @@
+=== START cicids_driver 16:30:57 ===
+=== STEP label_builder (cicids2017 only) ===
+  mitre_mapping shape=(24, 6)
+  cicids2017_clean shape=(2520798, 79)
+======================================================================
+apply_mitre_mapping: dataset='cicids2017'  label_col='Label'
+======================================================================
+  แถวทั้งหมด: 2520798
+  แถวที่ไม่มี label ให้ map (เช่น normal traffic ที่ไม่มี attack_cat): 0
+  แถวที่มี label และ match กับ mitre_mapping.csv สำเร็จ (mapped): 2520798
+  แถวที่มี label แต่หา match ใน mitre_mapping.csv ไม่เจอ (unmapped): 0
+  ยืนยัน: ไม่มี label ไหนหลุด mapping (unmapped=0) — mitre_mapping.csv ครอบคลุมครบ
+  --- breakdown mapping_confidence (รวมแถวไม่มี label เป็น NaN) ---
+    n/a                                 n=  2095057
+    high                                n=   423105
+    medium                              n=     1984
+    low                                 n=      652
+  wrote ./data/processed\cicids2017_labeled.parquet
+=== STEP feature_extractor (cicids2017 only) ===
+======================================================================
+=== dataset: cicids2017 ===
+======================================================================
+  โหลด ./data/processed\cicids2017_labeled.parquet  shape=(2520798, 83)
+======================================================================
+cicids2017: STEP 1 — join คอลัมน์ MITRE กลับเข้า train/val/test
+======================================================================
+  cicids2017/train: join label กลับเข้า split สำเร็จ 100% (1,512,478 แถว)
+  cicids2017/val: join label กลับเข้า split สำเร็จ 100% (504,160 แถว)
+  cicids2017/test: join label กลับเข้า split สำเร็จ 100% (504,160 แถว)
+======================================================================
+cicids2017: STEP 2 — network feature columns (numeric dtype, ไม่รวม identifier/label)
+======================================================================
+  network feature columns (78): ['Destination Port', 'Flow Duration', 'Total Fwd Packets', 'Total Backward Packets', 'Total Length of Fwd Packets', 'Total Length of Bwd Packets', 'Fwd Packet Length Max', 'Fwd Packet Length Min', 'Fwd Packet Length Mean', 'Fwd Packet Length Std', 'Bwd Packet Length Max', 'Bwd Packet Length Min', 'Bwd Packet Length Mean', 'Bwd Packet Length Std', 'Flow Bytes/s', 'Flow Packets/s', 'Flow IAT Mean', 'Flow IAT Std', 'Flow IAT Max', 'Flow IAT Min', 'Fwd IAT Total', 'Fwd IAT Mean', 'Fwd IAT Std', 'Fwd IAT Max', 'Fwd IAT Min', 'Bwd IAT Total', 'Bwd IAT Mean', 'Bwd IAT Std', 'Bwd IAT Max', 'Bwd IAT Min', 'Fwd PSH Flags', 'Bwd PSH Flags', 'Fwd URG Flags', 'Bwd URG Flags', 'Fwd Header Length', 'Bwd Header Length', 'Fwd Packets/s', 'Bwd Packets/s', 'Min Packet Length', 'Max Packet Length', 'Packet Length Mean', 'Packet Length Std', 'Packet Length Variance', 'FIN Flag Count', 'SYN Flag Count', 'RST Flag Count', 'PSH Flag Count', 'ACK Flag Count', 'URG Flag Count', 'CWE Flag Count', 'ECE Flag Count', 'Down/Up Ratio', 'Average Packet Size', 'Avg Fwd Segment Size', 'Avg Bwd Segment Size', 'Fwd Header Length.1', 'Fwd Avg Bytes/Bulk', 'Fwd Avg Packets/Bulk', 'Fwd Avg Bulk Rate', 'Bwd Avg Bytes/Bulk', 'Bwd Avg Packets/Bulk', 'Bwd Avg Bulk Rate', 'Subflow Fwd Packets', 'Subflow Fwd Bytes', 'Subflow Bwd Packets', 'Subflow Bwd Bytes', 'Init_Win_bytes_forward', 'Init_Win_bytes_backward', 'act_data_pkt_fwd', 'min_seg_size_forward', 'Active Mean', 'Active Std', 'Active Max', 'Active Min', 'Idle Mean', 'Idle Std', 'Idle Max', 'Idle Min']
+======================================================================
+cicids2017: STEP 3 — impute คอลัมน์ sentinel (fit median จาก train เท่านั้น)
+======================================================================
+  Init_Win_bytes_forward: median (จาก train) = 1024.0
+  Init_Win_bytes_backward: median (จาก train) = 235.0
+======================================================================
+cicids2017: STEP 5 — MinMaxScaler (fit บน train เท่านั้น, เฉพาะ network features)
+======================================================================
+  fit บน train เท่านั้น: 78 คอลัมน์ (ไม่แตะ ['Init_Win_bytes_forward_missing', 'Init_Win_bytes_backward_missing'])
+  scale แล้ว: train, val, test (ใช้ scaler ตัวเดียวกันที่ fit จาก train)
+======================================================================
+cicids2017: STEP 6 — SMOTE (train เท่านั้น)
+======================================================================
+  cicids2017: SMOTE sampling_strategy ต่อ class ที่จะถูกขยาย (เพดาน = min(majority, 20x ของเดิม, 50,000)):
+    DoS GoldenEye                           6,172 ->    50,000
+    FTP-Patator                             3,559 ->    50,000
+    DoS slowloris                           3,231 ->    50,000
+    DoS Slowhttptest                        3,137 ->    50,000
+    SSH-Patator                             1,931 ->    38,620
+    Bot                                     1,169 ->    23,380
+    Web Attack - Brute Force                  882 ->    17,640
+    Web Attack - XSS                          391 ->     7,820
+    Infiltration                               22 ->       440
+    Web Attack - Sql Injection                 13 ->       260
+    Heartbleed                                  7 ->       140
+  cicids2017: SMOTE k_neighbors=5  แถวก่อน=1,512,478  แถวหลัง=1,780,264  (เพิ่มขึ้น 267,786)
+  cicids2017/val: ไม่ถูก SMOTE แตะ (504,160 แถว เท่ากับก่อน SMOTE)
+  cicids2017/test: ไม่ถูก SMOTE แตะ (504,160 แถว เท่ากับก่อน SMOTE)
+======================================================================
+cicids2017: STEP 7 — เซฟผลลัพธ์
+======================================================================
+  network features: 78
+  sentinel missing-flag features (เพิ่มจาก impute STEP 3): 2 ['Init_Win_bytes_forward_missing', 'Init_Win_bytes_backward_missing']
+  label-derived CTI encodings ไม่ถูกสร้างเป็น model input
+  รวม feature columns ทั้งหมดต่อแถว (ไม่รวม reference/label): 80
+  เซฟ cicids2017/train -> data\features\cicids2017_features_train.parquet  shape=(1780264, 85)
+  เซฟ cicids2017/val -> data\features\cicids2017_features_val.parquet  shape=(504160, 85)
+  เซฟ cicids2017/test -> data\features\cicids2017_features_test.parquet  shape=(504160, 85)
+  provenance manifest: data\features\provenance\cicids2017_20261025T093151244219Z_ba82994c.json
+  preserved previous outputs: data\features\history\cicids2017_20261025T093151244219Z_ba82994c
+  features=80 train 1,512,478 -> 1,780,264  val=504,160 test=504,160
+=== CICIDS REBUILD DRIVER COMPLETE ===
+=== DONE cicids_driver 16:32:01 ===
+=== START src.features.behavioral_feature_extractor 16:32:01 ===
+======================================================================
+PHASE 1: โหลดไฟล์ทั้งหมดจาก data/raw/GeneratedLabelledFlows/TrafficLabelling  + per-file fixes
+======================================================================
+  โหลด Monday-WorkingHours.pcap_ISCX.csv                            encoding=utf-8-sig  shape=(529918, 85)
+  โหลด Tuesday-WorkingHours.pcap_ISCX.csv                           encoding=utf-8-sig  shape=(445909, 85)
+  โหลด Wednesday-workingHours.pcap_ISCX.csv                         encoding=utf-8-sig  shape=(692703, 85)
+  โหลด Thursday-WorkingHours-Morning-WebAttacks.pcap_ISCX.csv       encoding=cp1252     shape=(458968, 85)
+    ตัด blank filler rows (Label เป็น NaN): 288602 แถว -> เหลือ 170366 แถว
+  โหลด Thursday-WorkingHours-Afternoon-Infilteration.pcap_ISCX.csv  encoding=utf-8-sig  shape=(288602, 85)
+  โหลด Friday-WorkingHours-Morning.pcap_ISCX.csv                    encoding=utf-8-sig  shape=(191033, 85)
+  โหลด Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv         encoding=utf-8-sig  shape=(286467, 85)
+  โหลด Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv             encoding=utf-8-sig  shape=(225745, 85)
+รวมทั้งหมด shape = (2830743, 86)
+คอลัมน์ร่วมกับ cicids2017_clean.parquet (ใช้เป็น dedup subset ใน PHASE 4): 79 คอลัมน์
+======================================================================
+PHASE 1b: แก้ mojibake ใน Label (normalize_label_dashes)
+======================================================================
+======================================================================
+PHASE 1c: แก้ sentinel -1 ใน Init_Win_bytes_forward/backward (fix_init_win_bytes_sentinel)
+======================================================================
+--- CICIDS-2017: แก้ sentinel -1 ใน Init_Win_bytes_forward/backward ---
+  Init_Win_bytes_forward       NaN ก่อนแก้=       0  พบ -1 (sentinel)= 1001189  NaN หลังแก้= 1001189
+  Init_Win_bytes_backward      NaN ก่อนแก้=       0  พบ -1 (sentinel)= 1441552  NaN หลังแก้= 1441552
+======================================================================
+PHASE 1d: ตรวจสอบผล Timestamp parse (parse จริงทำต่อไฟล์ใน load_file() ก่อนหน้านี้แล้ว)
+======================================================================
+  Timestamp parse fail รวมทุกไฟล์: 0
+======================================================================
+PHASE 2: Day-grouping — concat ไฟล์ในวันเดียวกัน แล้ว sort ตาม Timestamp (stable)
+======================================================================
+  Monday     rows=  529918  range=[2017-07-03 01:00:01 .. 2017-07-03 12:59:58]
+  Tuesday    rows=  445909  range=[2017-07-04 01:00:00 .. 2017-07-04 12:59:00]
+  Wednesday  rows=  692703  range=[2017-07-05 01:00:00 .. 2017-07-05 12:59:00]
+  Thursday   rows=  458968  range=[2017-07-06 01:00:00 .. 2017-07-06 12:59:00]
+  Friday     rows=  703245  range=[2017-07-07 01:00:00 .. 2017-07-07 12:59:00]
+======================================================================
+PHASE 3: Rolling behavioral features ต่อ source IP (per day-group, causal, หน้าต่าง 1/3/5 นาที)
+======================================================================
+  Monday     shape=(529918, 98)  unique source IPs=8239
+  Tuesday    shape=(445909, 98)  unique source IPs=7192
+  Wednesday  shape=(692703, 98)  unique source IPs=7689
+  Thursday   shape=(458968, 98)  unique source IPs=7232
+  Friday     shape=(703245, 98)  unique source IPs=7099
+รวมทุก day-group แล้ว shape = (2830743, 98)
+======================================================================
+PHASE 4: ทำความสะอาดทั่วไป + ลบ duplicate (subset=79 คอลัมน์เดิม, หลัง behavioral columns แล้ว)
+======================================================================
+  Inf values พบและแปลงเป็น NaN: {'Flow Bytes/s': 1509, 'Flow Packets/s': 2867}
+  Duplicate rows ที่ลบ (subset=79 คอลัมน์เดิม ไม่รวม ID/behavioral ใหม่): 308218
+  คอลัมน์ที่ยกเว้นจาก dropna (sentinel, คง NaN ไว้ ไม่ drop แถว): ['Init_Win_bytes_forward', 'Init_Win_bytes_backward']
+  แถวก่อน dropna ทั่วไป: 2522525
+  แถวหลัง dropna ทั่วไป: 2520961 (ลดลง 1564)
+  รวมแถวที่หายไปจาก clean_common_behavioral(): 309782 จาก 2830743 แถวเดิม (10.94%)
+  เทียบ ballpark: cicids2017_clean.parquet มี 2,520,798 แถว (ต่างกันได้เล็กน้อยจาก ~163-row duplicate-count discrepancy ระหว่างสอง distribution ตามที่ recon เจอ) — ได้จริง 2520961 แถว
+======================================================================
+PHASE 5: MITRE ATT&CK label join (label_builder.apply_mitre_mapping, dataset='cicids2017')
+======================================================================
+======================================================================
+apply_mitre_mapping: dataset='cicids2017'  label_col='Label'
+======================================================================
+  แถวทั้งหมด: 2520961
+  แถวที่ไม่มี label ให้ map (เช่น normal traffic ที่ไม่มี attack_cat): 0
+  แถวที่มี label และ match กับ mitre_mapping.csv สำเร็จ (mapped): 2520961
+  แถวที่มี label แต่หา match ใน mitre_mapping.csv ไม่เจอ (unmapped): 0
+  ยืนยัน: ไม่มี label ไหนหลุด mapping (unmapped=0) — mitre_mapping.csv ครอบคลุมครบ
+  --- breakdown mapping_confidence (รวมแถวไม่มี label เป็น NaN) ---
+    n/a                                 n=  2095220
+    high                                n=   423105
+    medium                              n=     1984
+    low                                 n=      652
+======================================================================
+PHASE 5b: Spot-check — behavioral feature แยกตาม BENIGN vs attack category ที่คาดว่าจะเห็นสัญญาณชัด
+======================================================================
+--- BENIGN (n=2095220) mean/median (baseline) ---
+                           mean      median
+conn_count_1m        311.377771  141.000000
+uniq_dport_count_1m   59.181900    4.000000
+fail_ratio_1m          0.001313    0.000000
+repeat_ratio_1m       59.226511   28.000000
+conn_count_3m        601.552415  287.000000
+uniq_dport_count_3m  102.893321    6.000000
+fail_ratio_3m          0.001266    0.000000
+repeat_ratio_3m       73.451022   37.666667
+conn_count_5m        875.878932  438.000000
+uniq_dport_count_5m  138.764178    8.000000
+fail_ratio_5m          0.001248    0.000000
+repeat_ratio_5m       82.055242   45.583333
+--- PortScan (n=90694, unique source IPs=1) เทียบกับ BENIGN ---
+                     benign_median  PortScan_median  median_ratio_vs_benign  benign_mean  PortScan_mean
+conn_count_1m           141.000000     25142.500000              178.315603   311.377771   27983.942819
+uniq_dport_count_1m       4.000000       997.000000              249.250000    59.181900     983.445278
+fail_ratio_1m             0.000000         0.000000                     NaN     0.001313       0.000285
+repeat_ratio_1m          28.000000        25.207017                0.900251    59.226511      28.112614
+conn_count_3m           287.000000     58244.500000              202.942509   601.552415   53883.792787
+uniq_dport_count_3m       6.000000       998.000000              166.333333   102.893321     983.801861
+fail_ratio_3m             0.000000         0.000034                     NaN     0.001266       0.000290
+repeat_ratio_3m          37.666667        58.361222                1.549413    73.451022      54.084379
+conn_count_5m           438.000000     58244.500000              132.978311   875.878932   56445.551668
+uniq_dport_count_5m       8.000000       998.000000              124.750000   138.764178     984.024202
+fail_ratio_5m             0.000000         0.000034                     NaN     0.001248       0.000294
+repeat_ratio_5m          45.583333        58.361222                1.280319    82.055242      56.639820
+--- FTP-Patator (n=5931, unique source IPs=1) เทียบกับ BENIGN ---
+                     benign_median  FTP-Patator_median  median_ratio_vs_benign  benign_mean  FTP-Patator_mean
+conn_count_1m           141.000000               194.0                1.375887   311.377771        193.875400
+uniq_dport_count_1m       4.000000                 1.0                0.250000    59.181900          1.000000
+fail_ratio_1m             0.000000                 0.0                     NaN     0.001313          0.000000
+repeat_ratio_1m          28.000000               194.0                6.928571    59.226511        193.875400
+conn_count_3m           287.000000               453.0                1.578397   601.552415        443.061710
+uniq_dport_count_3m       6.000000                 1.0                0.166667   102.893321          1.000000
+fail_ratio_3m             0.000000                 0.0                     NaN     0.001266          0.000000
+repeat_ratio_3m          37.666667               453.0               12.026549    73.451022        443.061710
+conn_count_5m           438.000000               712.0                1.625571   875.878932        683.704097
+uniq_dport_count_5m       8.000000                 1.0                0.125000   138.764178          1.000000
+fail_ratio_5m             0.000000                 0.0                     NaN     0.001248          0.000000
+repeat_ratio_5m          45.583333               712.0               15.619744    82.055242        683.704097
+--- SSH-Patator (n=3219, unique source IPs=1) เทียบกับ BENIGN ---
+                     benign_median  SSH-Patator_median  median_ratio_vs_benign  benign_mean  SSH-Patator_mean
+conn_count_1m           141.000000               141.0                1.000000   311.377771        139.826033
+uniq_dport_count_1m       4.000000                 1.0                0.250000    59.181900          1.923889
+fail_ratio_1m             0.000000                 0.0                     NaN     0.001313          0.000000
+repeat_ratio_1m          28.000000               138.0                4.928571    59.226511        132.434486
+conn_count_3m           287.000000               328.0                1.142857   601.552415        317.661696
+uniq_dport_count_3m       6.000000                 1.0                0.166667   102.893321          2.771358
+fail_ratio_3m             0.000000                 0.0                     NaN     0.001266          0.000000
+repeat_ratio_3m          37.666667               327.0                8.681416    73.451022        301.131221
+conn_count_5m           438.000000               517.0                1.180365   875.878932        489.510407
+uniq_dport_count_5m       8.000000                 1.0                0.125000   138.764178          2.843119
+fail_ratio_5m             0.000000                 0.0                     NaN     0.001248          0.000000
+repeat_ratio_5m          45.583333               516.0               11.319927    82.055242        462.217795
+--- DDoS (n=128014, unique source IPs=2) เทียบกับ BENIGN ---
+                     benign_median  DDoS_median  median_ratio_vs_benign  benign_mean     DDoS_mean
+conn_count_1m           141.000000       9508.0               67.432624   311.377771   9389.155678
+uniq_dport_count_1m       4.000000          1.0                0.250000    59.181900      1.044042
+fail_ratio_1m             0.000000          0.0                     NaN     0.001313      0.000000
+repeat_ratio_1m          28.000000       9508.0              339.571429    59.226511   9352.578945
+conn_count_3m           287.000000      22015.0               76.707317   601.552415  20666.635915
+uniq_dport_count_3m       6.000000          1.0                0.166667   102.893321      1.100380
+fail_ratio_3m             0.000000          0.0                     NaN     0.001266      0.000000
+repeat_ratio_3m          37.666667      22015.0              584.469027    73.451022  20562.403278
+conn_count_5m           438.000000      34342.0               78.406393   875.878932  30610.310466
+uniq_dport_count_5m       8.000000          1.0                0.125000   138.764178      1.155428
+fail_ratio_5m             0.000000          0.0                     NaN     0.001248      0.000000
+repeat_ratio_5m          45.583333      34342.0              753.389397    82.055242  30438.351237
+======================================================================
+สรุปผลลัพธ์
+======================================================================
+Output สุดท้าย: 2520961 แถว, 102 คอลัมน์
+ข้อจำกัดที่บันทึกไว้ (ดูรายละเอียดเต็มใน docstring ของสคริปต์นี้):
+  1) Timestamp ระดับนาทีเท่านั้นใน 7/8 ไฟล์ -> เลือกหน้าต่าง 1/3/5 นาที ไม่ใช่ 10/30/60 วินาที
+  2) หน้าต่างเวลาไม่ carry ข้ามวัน (แต่ละ day-group เป็น timeline ของตัวเอง)
+  3) fail_ratio เป็น proxy จาก flow-level aggregate ไม่ใช่ ground truth จาก raw packet trace
+     (ยืนยันจากรันจริง: จับ FTP/SSH-Patator ไม่ได้เลย เพราะ brute force ผ่าน TCP handshake สำเร็จปกติ)
+  3b) repeat_ratio_{w}m (=conn_count/uniq_dport_count) เพิ่มมาปิด gap ของข้อ 3 -- ยืนยันจากรันจริง:
+      median สูงกว่า BENIGN ~5-7 เท่าสำหรับ FTP/SSH-Patator (ดูตัวเลขเต็มใน PHASE 5b)
+  4) ยังไม่ยืนยัน row-for-row join กับ cicids2017_clean.parquet เดิม (~163-row discrepancy ที่ recon เจอ)
+  5) สคริปต์นี้หยุดที่ 'engineered feature ครบ ทั้ง population เดียว ยังไม่ split' -- ไม่มี scale/SMOTE/train-val-test/LOAO
+เซฟข้อมูลไว้ที่ ./data/processed/behavioral\cicids2017_behavioral_labeled.parquet
+
+[บันทึกไฟล์] เซฟรายงานฉบับเต็มไว้ที่ ./reports/behavioral_feature_extractor_report.txt
+=== DONE src.features.behavioral_feature_extractor 16:33:16 ===
+=== START src.features.validate_behavioral_join 16:33:16 ===
+======================================================================
+PHASE 1: โหลดไฟล์ split เดิม + behavioral labeled
+======================================================================
+behavioral_labeled shape = (2520961, 102)
+cicids2017_train.parquet shape = (1512478, 79)
+cicids2017_val.parquet shape = (504160, 79)
+cicids2017_test.parquet shape = (504160, 79)
+
+join key: 79 คอลัมน์ (คาดว่า 79)
+======================================================================
+PHASE 2 (train): diagnostic outer join -- ตรวจก่อน join จริงเสมอ
+======================================================================
+  total=1,512,478  matched=1,216,171  unmatched=296,307 (19.59%)
+  BENIGN: total=1,257,033  unmatched=296,307 (23.57%)  |  non-BENIGN unmatched=0
+  drift check: total_unmatched 19.59% (baseline 19.59%, drift 0.00pp)  |  benign_unmatched 23.57% (baseline 23.57%, drift 0.00pp)
+======================================================================
+PHASE 3 (train): join จริง (validate='1:1') + drop แถว BENIGN ที่ไม่ match
+======================================================================
+  train: join แล้ว drop แถว BENIGN ที่ไม่ match 296,307 แถว (1,512,478 -> 1,216,171 แถว), rolling windows rebuilt within this split
+  เซฟไว้ที่ ./data/processed/behavioral\cicids2017_behavioral_train.parquet (1,216,171 แถว, 92 คอลัมน์)
+======================================================================
+PHASE 2 (val): diagnostic outer join -- ตรวจก่อน join จริงเสมอ
+======================================================================
+  total=504,160  matched=405,085  unmatched=99,075 (19.65%)
+  BENIGN: total=419,012  unmatched=99,075 (23.64%)  |  non-BENIGN unmatched=0
+  drift check: total_unmatched 19.65% (baseline 19.65%, drift 0.00pp)  |  benign_unmatched 23.64% (baseline 23.64%, drift 0.00pp)
+======================================================================
+PHASE 3 (val): join จริง (validate='1:1') + drop แถว BENIGN ที่ไม่ match
+======================================================================
+  val: join แล้ว drop แถว BENIGN ที่ไม่ match 99,075 แถว (504,160 -> 405,085 แถว), rolling windows rebuilt within this split
+  เซฟไว้ที่ ./data/processed/behavioral\cicids2017_behavioral_val.parquet (405,085 แถว, 92 คอลัมน์)
+======================================================================
+PHASE 2 (test): diagnostic outer join -- ตรวจก่อน join จริงเสมอ
+======================================================================
+  total=504,160  matched=405,142  unmatched=99,018 (19.64%)
+  BENIGN: total=419,012  unmatched=99,018 (23.63%)  |  non-BENIGN unmatched=0
+  drift check: total_unmatched 19.64% (baseline 19.64%, drift 0.00pp)  |  benign_unmatched 23.63% (baseline 23.63%, drift 0.00pp)
+======================================================================
+PHASE 3 (test): join จริง (validate='1:1') + drop แถว BENIGN ที่ไม่ match
+======================================================================
+  test: join แล้ว drop แถว BENIGN ที่ไม่ match 99,018 แถว (504,160 -> 405,142 แถว), rolling windows rebuilt within this split
+  เซฟไว้ที่ ./data/processed/behavioral\cicids2017_behavioral_test.parquet (405,142 แถว, 92 คอลัมน์)
+======================================================================
+สรุปผลลัพธ์
+======================================================================
+Phase 1 ของ Option A (row-hash join validation) เสร็จสมบูรณ์:
+  - ทุก attack category match 100% ระหว่างสอง distribution (ไม่มีแถว attack ถูก drop เลย)
+  - แถว BENIGN ที่ไม่ match (~23.6%) ถูก drop ออกตามนโยบายที่ตกลงไว้ ดูตัวเลขจริงต่อ split ด้านบน
+  - rolling behavioral features คำนวณใหม่ภายในแต่ละ split เพื่อไม่ใช้ event จาก split อื่น
+  - ผลลัพธ์: data/processed/behavioral/cicids2017_behavioral_{train,val,test}.parquet
+  - ยังไม่ scale/SMOTE/impute -- นั่นคือ Phase 2 (แผนแยกต่างหาก ยังไม่เริ่ม)
+  - ข้อจำกัดที่ต้อง carry ไป Phase 2: Autoencoder BENIGN training population ลดลง ~23.6%;
+    04_fusion_layer.ipynb row_index positional-alignment assumption ต้อง re-derive สำหรับ
+    การเทียบ fusion ในอนาคตกับ Random Forest (ซึ่งยังใช้ population เดิมไม่ลด)
+
+[บันทึกไฟล์] เซฟรายงานฉบับเต็มไว้ที่ ./reports/behavioral_join_validation_report.txt
+=== DONE src.features.validate_behavioral_join 16:34:36 ===
+=== START src.features.feature_extractor_behavioral 16:34:36 ===
+======================================================================
+PHASE 1: โหลด labeled + split (จาก Phase 1 ของ Option A: validate_behavioral_join.py)
+======================================================================
+  โหลด ./data/processed\cicids2017_labeled.parquet  shape=(2520798, 83)
+  join key (79 คอลัมน์เดิม, ไม่รวม behavioral/orig_row_index/MITRE): 79 คอลัมน์
+======================================================================
+STEP 1: join คอลัมน์ MITRE กลับเข้า train/val/test (behavioral)
+======================================================================
+  cicids2017/train: join label กลับเข้า split สำเร็จ 100% (1,216,171 แถว)
+  cicids2017/val: join label กลับเข้า split สำเร็จ 100% (405,085 แถว)
+  cicids2017/test: join label กลับเข้า split สำเร็จ 100% (405,142 แถว)
+======================================================================
+STEP 2: network feature columns (numeric, ไม่รวม identifier/label/orig_row_index)
+======================================================================
+  network feature columns (90) -- คาดว่า 90 (78 raw + 12 behavioral): ['Destination Port', 'Flow Duration', 'Total Fwd Packets', 'Total Backward Packets', 'Total Length of Fwd Packets', 'Total Length of Bwd Packets', 'Fwd Packet Length Max', 'Fwd Packet Length Min', 'Fwd Packet Length Mean', 'Fwd Packet Length Std', 'Bwd Packet Length Max', 'Bwd Packet Length Min', 'Bwd Packet Length Mean', 'Bwd Packet Length Std', 'Flow Bytes/s', 'Flow Packets/s', 'Flow IAT Mean', 'Flow IAT Std', 'Flow IAT Max', 'Flow IAT Min', 'Fwd IAT Total', 'Fwd IAT Mean', 'Fwd IAT Std', 'Fwd IAT Max', 'Fwd IAT Min', 'Bwd IAT Total', 'Bwd IAT Mean', 'Bwd IAT Std', 'Bwd IAT Max', 'Bwd IAT Min', 'Fwd PSH Flags', 'Bwd PSH Flags', 'Fwd URG Flags', 'Bwd URG Flags', 'Fwd Header Length', 'Bwd Header Length', 'Fwd Packets/s', 'Bwd Packets/s', 'Min Packet Length', 'Max Packet Length', 'Packet Length Mean', 'Packet Length Std', 'Packet Length Variance', 'FIN Flag Count', 'SYN Flag Count', 'RST Flag Count', 'PSH Flag Count', 'ACK Flag Count', 'URG Flag Count', 'CWE Flag Count', 'ECE Flag Count', 'Down/Up Ratio', 'Average Packet Size', 'Avg Fwd Segment Size', 'Avg Bwd Segment Size', 'Fwd Header Length.1', 'Fwd Avg Bytes/Bulk', 'Fwd Avg Packets/Bulk', 'Fwd Avg Bulk Rate', 'Bwd Avg Bytes/Bulk', 'Bwd Avg Packets/Bulk', 'Bwd Avg Bulk Rate', 'Subflow Fwd Packets', 'Subflow Fwd Bytes', 'Subflow Bwd Packets', 'Subflow Bwd Bytes', 'Init_Win_bytes_forward', 'Init_Win_bytes_backward', 'act_data_pkt_fwd', 'min_seg_size_forward', 'Active Mean', 'Active Std', 'Active Max', 'Active Min', 'Idle Mean', 'Idle Std', 'Idle Max', 'Idle Min', 'conn_count_1m', 'uniq_dport_count_1m', 'fail_ratio_1m', 'repeat_ratio_1m', 'conn_count_3m', 'uniq_dport_count_3m', 'fail_ratio_3m', 'repeat_ratio_3m', 'conn_count_5m', 'uniq_dport_count_5m', 'fail_ratio_5m', 'repeat_ratio_5m']
+======================================================================
+STEP 3: impute คอลัมน์ sentinel (fit median จาก train เท่านั้น)
+======================================================================
+  Init_Win_bytes_forward: median (จาก train) = 1024.0
+  Init_Win_bytes_backward: median (จาก train) = 235.0
+======================================================================
+STEP 5: MinMaxScaler (fit บน train เท่านั้น, เฉพาะ network features)
+======================================================================
+  fit บน train เท่านั้น: 90 คอลัมน์ (ไม่แตะ ['Init_Win_bytes_forward_missing', 'Init_Win_bytes_backward_missing', 'orig_row_index'])
+======================================================================
+STEP 6: SMOTE (train เท่านั้น)
+======================================================================
+  cicids2017: SMOTE sampling_strategy ต่อ class ที่จะถูกขยาย (เพดาน = min(majority, 20x ของเดิม, 50,000)):
+    DoS GoldenEye                           6,172 ->    50,000
+    FTP-Patator                             3,559 ->    50,000
+    DoS slowloris                           3,231 ->    50,000
+    DoS Slowhttptest                        3,137 ->    50,000
+    SSH-Patator                             1,931 ->    38,620
+    Bot                                     1,169 ->    23,380
+    Web Attack - Brute Force                  882 ->    17,640
+    Web Attack - XSS                          391 ->     7,820
+    Infiltration                               22 ->       440
+    Web Attack - Sql Injection                 13 ->       260
+    Heartbleed                                  7 ->       140
+  cicids2017: SMOTE k_neighbors=5  แถวก่อน=1,216,171  แถวหลัง=1,483,957  (เพิ่มขึ้น 267,786)
+  orig_row_index: 267,786 แถว synthetic ได้ sentinel=-1 (ไม่มีตัวตนจริงใน cicids2017_val/test.parquet ให้ join)
+  cicids2017/val: ไม่ถูก SMOTE แตะ (405,085 แถว เท่ากับก่อน SMOTE, orig_row_index ทุกแถวเป็นค่าจริง)
+  cicids2017/test: ไม่ถูก SMOTE แตะ (405,142 แถว เท่ากับก่อน SMOTE, orig_row_index ทุกแถวเป็นค่าจริง)
+======================================================================
+STEP 7: เซฟผลลัพธ์
+======================================================================
+  network features: 90
+  sentinel missing-flag features: 2 ['Init_Win_bytes_forward_missing', 'Init_Win_bytes_backward_missing']
+  label-derived CTI encodings ไม่ถูกสร้างเป็น model input
+  รวม feature columns ทั้งหมดต่อแถว (ไม่รวม reference/label/orig_row_index): 92
+  เซฟ cicids2017/train -> data\features\behavioral\cicids2017_behavioral_features_train.parquet  shape=(1483957, 98)
+  เซฟ cicids2017/val -> data\features\behavioral\cicids2017_behavioral_features_val.parquet  shape=(405085, 98)
+  เซฟ cicids2017/test -> data\features\behavioral\cicids2017_behavioral_features_test.parquet  shape=(405142, 98)
+  provenance manifest: data\features\behavioral\provenance\cicids2017_behavioral_20261025T093515564065Z_af6073e9.json
+======================================================================
+สรุปผลลัพธ์
+======================================================================
+  SMOTE ถูกเรียกใช้จริงหรือไม่: True
+  train rows: ก่อน SMOTE=1,216,171  หลัง SMOTE=1,483,957
+  val rows=405,085  test rows=405,142 (ไม่ถูก SMOTE แตะเลย)
+  ยังไม่ retrain Isolation Forest/Autoencoder -- นั่นคือ phase ถัดไป (แผนแยกต่างหาก ยังไม่เริ่ม)
+  orig_row_index carry ผ่านมาถึง output แล้ว (sentinel=-1 สำหรับแถว synthetic ใน train เท่านั้น) สำหรับ Fusion Layer ในอนาคต join คะแนน IF/AE (val/test เท่านั้น ไม่มี SMOTE) กับคะแนน RF ผ่าน orig_row_index <-> row_index แทนตำแหน่ง (position) เฉยๆ
+
+[บันทึกไฟล์] เซฟรายงานฉบับเต็มไว้ที่ ./reports/feature_extractor_behavioral_report.txt
+=== DONE src.features.feature_extractor_behavioral 16:35:24 ===
+=== ALL REBUILD STEPS COMPLETE ===

@@ -18,15 +18,9 @@ cicids2017: STEP 3 — impute คอลัมน์ sentinel (fit median จา�
   Init_Win_bytes_forward: median (จาก train) = 1024.0
   Init_Win_bytes_backward: median (จาก train) = 235.0
 ======================================================================
-cicids2017: STEP 4 — CTI features (fit encoding จาก train เท่านั้น)
-======================================================================
-  technique_id_encoded mapping (7 ค่า, null->0): {'T1046': 1, 'T1071.001': 2, 'T1110': 3, 'T1110.001': 4, 'T1190': 5, 'T1498': 6, 'T1499.002': 7}
-  tactic_encoded mapping (5 ค่า, null->0): {'Command and Control': 1, 'Credential Access': 2, 'Discovery': 3, 'Impact': 4, 'Initial Access': 5}
-  mapping_confidence_encoded mapping (ตายตัว): {'n/a': 0, 'low': 1, 'medium': 2, 'high': 3}
-======================================================================
 cicids2017: STEP 5 — MinMaxScaler (fit บน train เท่านั้น, เฉพาะ network features)
 ======================================================================
-  fit บน train เท่านั้น: 78 คอลัมน์ (ไม่แตะ ['Init_Win_bytes_forward_missing', 'Init_Win_bytes_backward_missing', 'technique_id_encoded', 'tactic_encoded', 'mapping_confidence_encoded', 'is_known_technique'])
+  fit บน train เท่านั้น: 78 คอลัมน์ (ไม่แตะ ['Init_Win_bytes_forward_missing', 'Init_Win_bytes_backward_missing'])
   scale แล้ว: train, val, test (ใช้ scaler ตัวเดียวกันที่ fit จาก train)
 ======================================================================
 cicids2017: STEP 6 — SMOTE (train เท่านั้น)
@@ -51,11 +45,13 @@ cicids2017: STEP 7 — เซฟผลลัพธ์
 ======================================================================
   network features: 78
   sentinel missing-flag features (เพิ่มจาก impute STEP 3): 2 ['Init_Win_bytes_forward_missing', 'Init_Win_bytes_backward_missing']
-  CTI features: 4 ['technique_id_encoded', 'tactic_encoded', 'mapping_confidence_encoded', 'is_known_technique']
-  รวม feature columns ทั้งหมดต่อแถว (ไม่รวม reference/label): 84
-  เซฟ cicids2017/train -> ./data/features\cicids2017_features_train.parquet  shape=(1780264, 89)
-  เซฟ cicids2017/val -> ./data/features\cicids2017_features_val.parquet  shape=(504160, 89)
-  เซฟ cicids2017/test -> ./data/features\cicids2017_features_test.parquet  shape=(504160, 89)
+  label-derived CTI encodings ไม่ถูกสร้างเป็น model input
+  รวม feature columns ทั้งหมดต่อแถว (ไม่รวม reference/label): 80
+  เซฟ cicids2017/train -> data\features\cicids2017_features_train.parquet  shape=(1780264, 85)
+  เซฟ cicids2017/val -> data\features\cicids2017_features_val.parquet  shape=(504160, 85)
+  เซฟ cicids2017/test -> data\features\cicids2017_features_test.parquet  shape=(504160, 85)
+  provenance manifest: data\features\provenance\cicids2017_20261025T094140796657Z_d88ec640.json
+  preserved previous outputs: data\features\history\cicids2017_20261025T094140796657Z_d88ec640
 ======================================================================
 === dataset: unswnb15 ===
 ======================================================================
@@ -74,15 +70,9 @@ unswnb15: STEP 2 — network feature columns (numeric dtype, ไม่รวม 
 unswnb15: STEP 3 — impute คอลัมน์ sentinel (fit median จาก train เท่านั้น)
 ======================================================================
 ======================================================================
-unswnb15: STEP 4 — CTI features (fit encoding จาก train เท่านั้น)
-======================================================================
-  technique_id_encoded mapping (5 ค่า, null->0): {'T1059': 1, 'T1210': 2, 'T1498': 3, 'T1505.003': 4, 'T1595': 5}
-  tactic_encoded mapping (5 ค่า, null->0): {'Execution': 1, 'Impact': 2, 'Lateral Movement': 3, 'Persistence': 4, 'Reconnaissance': 5}
-  mapping_confidence_encoded mapping (ตายตัว): {'n/a': 0, 'low': 1, 'medium': 2, 'high': 3}
-======================================================================
 unswnb15: STEP 5 — MinMaxScaler (fit บน train เท่านั้น, เฉพาะ network features)
 ======================================================================
-  fit บน train เท่านั้น: 76 คอลัมน์ (ไม่แตะ ['technique_id_encoded', 'tactic_encoded', 'mapping_confidence_encoded', 'is_known_technique'])
+  fit บน train เท่านั้น: 76 คอลัมน์ (ไม่แตะ [])
   scale แล้ว: train, val, test (ใช้ scaler ตัวเดียวกันที่ fit จาก train)
 ======================================================================
 unswnb15: STEP 6 — SMOTE (train เท่านั้น)
@@ -98,21 +88,22 @@ unswnb15: STEP 7 — เซฟผลลัพธ์
 ======================================================================
   network features: 76
   sentinel missing-flag features (เพิ่มจาก impute STEP 3): 0 []
-  CTI features: 4 ['technique_id_encoded', 'tactic_encoded', 'mapping_confidence_encoded', 'is_known_technique']
-  รวม feature columns ทั้งหมดต่อแถว (ไม่รวม reference/label): 80
-  เซฟ unswnb15/train -> ./data/features\unswnb15_features_train.parquet  shape=(185001, 86)
-  เซฟ unswnb15/val -> ./data/features\unswnb15_features_val.parquet  shape=(61235, 86)
-  เซฟ unswnb15/test -> ./data/features\unswnb15_features_test.parquet  shape=(61235, 86)
+  label-derived CTI encodings ไม่ถูกสร้างเป็น model input
+  รวม feature columns ทั้งหมดต่อแถว (ไม่รวม reference/label): 76
+  เซฟ unswnb15/train -> data\features\unswnb15_features_train.parquet  shape=(185001, 82)
+  เซฟ unswnb15/val -> data\features\unswnb15_features_val.parquet  shape=(61235, 82)
+  เซฟ unswnb15/test -> data\features\unswnb15_features_test.parquet  shape=(61235, 82)
+  provenance manifest: data\features\provenance\unswnb15_20261025T094157306046Z_3efa0415.json
 ======================================================================
 สรุปผลรวมทุก dataset
 ======================================================================
 --- cicids2017 ---
-  feature count: network=78  sentinel_missing_flags=2  cti=4  รวม=84
+  feature count: network=78  sentinel_missing_flags=2  cti=0  รวม=80
   SMOTE ถูกเรียกใช้จริงหรือไม่ (มี class ต่ำกว่าเพดาน): True
   train rows: ก่อน SMOTE=1,512,478  หลัง SMOTE=1,780,264
   val rows=504,160  test rows=504,160 (ไม่ถูก SMOTE แตะเลย)
 --- unswnb15 ---
-  feature count: network=76  sentinel_missing_flags=0  cti=4  รวม=80
+  feature count: network=76  sentinel_missing_flags=0  cti=0  รวม=76
   SMOTE ถูกเรียกใช้จริงหรือไม่ (มี class ต่ำกว่าเพดาน): True
   train rows: ก่อน SMOTE=183,703  หลัง SMOTE=185,001
   val rows=61,235  test rows=61,235 (ไม่ถูก SMOTE แตะเลย)
