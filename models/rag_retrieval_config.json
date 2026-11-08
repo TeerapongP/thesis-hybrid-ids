@@ -4,6 +4,7 @@
   "collection_name": "mitre_attack_kb",
   "chroma_deployment": {
     "mode": "embedded_persistent_client",
+    "network_exposure_control": "The application uses chromadb.PersistentClient and starts no Chroma server or host port; do not switch to a server/HttpClient deployment without reviewing current Chroma server API advisories.",
     "reasoning": "No ChromaDB docker-compose exists anywhere in this repo (unlike opencti/observability/grafana, which each have one), nothing listens on localhost:8000, and Docker Desktop is not running on this machine. Uses chromadb.PersistentClient(path='data/chroma_db/') -- no server process, no Docker. This was a pre-resolved decision per HANDOFF_RAG_PHASE3.md, not made independently in this phase.",
     "persistent_client_path": "data/chroma_db/",
     "env_host_port_status": "CHROMA_HOST/CHROMA_PORT are still read from .env (load_env_config() asserts they exist) but are UNUSED in this phase -- vestigial until/unless a future phase runs Chroma as an actual server."
