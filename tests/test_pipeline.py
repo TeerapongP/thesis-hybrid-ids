@@ -285,7 +285,8 @@ class TestStagesNeedingTheOtherInterpreter(unittest.TestCase):
         pipeline.llm_stage  # noqa: B018 -- presence only; a live run needs Ollama too
 
     @unittest.skip("dispatch_stage imports alert_dispatcher -> pika/elasticsearch/influxdb_client, "
-                   "which only the uv .venv has; covered there by tests/test_alert_dispatcher.py")
+                   "which only the uv .venv has; no automated test covers it, see the manual "
+                   "tests/verify_dispatch_live.py")
     def test_dispatch_stage_against_a_broker(self):
         raise AssertionError("not runnable here")
 

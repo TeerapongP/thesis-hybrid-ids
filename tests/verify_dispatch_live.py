@@ -1,12 +1,36 @@
 """
-test_alert_dispatcher.py
-=========================
-Hand-written fixture-driven exercise of `src/alert_dispatcher.dispatch_alert(...)` -- this repo
-has no pytest/test-framework precedent (pyproject.toml declares only `ipykernel`), so this
-mirrors `src/evaluation/eval_rag_precision.py`'s shape instead: a plain runnable script that calls the
-module under test against a fixed fixture set and prints pass/fail per case, run via
+verify_dispatch_live.py
+=======================
+NOT A TEST. This script sends real notifications and writes to the live stack.
 
-    python -m tests.test_alert_dispatcher
+It was named `test_alert_dispatcher.py` until 2026-11-08. It has no `unittest.TestCase`, so
+`unittest discover` collected 0 tests from it and `ci.yml` listed it while running nothing. It
+now sits outside the `test_` namespace so no discovery pattern or CI list can pick it up.
+
+What one run does, with the live `.env`:
+
+- Calls `alert_dispatcher.dispatch_alert(...)` five times. Two cases are HIGH, and each sends a
+  real LINE broadcast to every friend of the channel. LINE allows 300 messages a month on this
+  channel and quota is consumed per recipient, so one run spends several of them.
+- Dispatches one MEDIUM case. With the four `GMAIL_*` keys populated this MAILS A REAL ADDRESS,
+  the sender's own inbox, through the Gmail API.
+- Flushes the LOW-priority digest, which mails a real digest of every pending LOW alert.
+- Writes to RabbitMQ, InfluxDB and Elasticsearch. Nothing consumes the RabbitMQ publish.
+- Then asserts the MEDIUM and digest results are `dry_run`, which they no longer are, and
+  reports a failure for correct behaviour.
+
+To run it deliberately, from the repo root:
+
+    uv run python -m tests.verify_dispatch_live --send-for-real
+
+Without `--send-for-real` it exits before sending anything. Do not run it from a test runner,
+a CI job, or a loop. Fixtures live in `tests/fixtures/`, shared with real tests, so they stay put.
+
+Original description, kept for the fixture and verification detail below.
+
+Hand-written fixture-driven exercise of `src/notifications/alert_dispatcher.dispatch_alert(...)`.
+It mirrors `src/evaluation/eval_rag_precision.py`'s shape: a plain runnable script that calls the
+module under test against a fixed fixture set and prints pass/fail per case.
 
 Fixtures (tests/fixtures/) match HANDOFF_LLM_LAYER.md's exact "Output schema reconciliation"
 JSON shape -- `alert_context_high_portscan.json` / `llm_output_high_portscan.json` are that
@@ -35,12 +59,11 @@ exercised):
   were configured. notify_line.py has since gained `LINE_DELIVERY_MODE=broadcast`, which needs no
   recipient, so with a valid token this script's HIGH cases send REAL LINE messages and consume
   channel quota. The request contract is covered by `test_fixed_contracts.py`.
-- Gmail: `GMAIL_*` are blank placeholders (per the resolved stub/mock-only decision -- this
-  channel replaced the original Outlook/Microsoft Graph API design 2026-07-18, see
-  HANDOFF_OUTPUT_LAYER.md) -- every MEDIUM/LOW send in this script is expected to come back
-  `status="dry_run"`. This held while the four `GMAIL_*` values were blank. Once they are
-  populated, the MEDIUM case sends a REAL email and the dry_run assertion in `run_case` reports a
-  failure, so this script is only safe to run with the `GMAIL_*` values blank or overridden.
+- Gmail: written while the `GMAIL_*` keys were blank placeholders (this channel replaced the
+  original Outlook/Microsoft Graph API design 2026-07-18, see HANDOFF_OUTPUT_LAYER.md), so every
+  MEDIUM/LOW send was expected to come back `status="dry_run"`. Once the keys are populated the
+  MEDIUM case sends a REAL email and the dry_run assertion in `run_case` reports a failure, so
+  this script is only safe to run with the `GMAIL_*` values blank or overridden.
 - Grafana/Kibana UI: this script queries InfluxDB/Elasticsearch directly with the SAME Flux/ES
   queries `grafana/dashboards/soc-overview.json` / the Kibana saved search use, and confirms
   non-empty results -- it does NOT open a browser against the live Grafana/Kibana UI (no browser
@@ -50,10 +73,12 @@ exercised):
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = ROOT / "tests" / "fixtures"
+SEND_FLAG = "--send-for-real"
 
 from src.modeling.fusion_layer import CONFIDENCE_THRESHOLD
 from src.notifications import alert_dispatcher
@@ -157,9 +182,13 @@ def run_case(case: dict) -> tuple[bool, dict]:
     return ok, {"receipt": receipt, "problems": problems}
 
 
-def main() -> int:
-    print(f"[test_alert_dispatcher] fusion_layer.CONFIDENCE_THRESHOLD = {CONFIDENCE_THRESHOLD} (model_used gate, reused not duplicated)")
-    print(f"[test_alert_dispatcher] running {len(FIXTURE_CASES)} fixture cases against a LIVE dispatch_alert(...)\n")
+def main(argv: list[str] | None = None) -> int:
+    if SEND_FLAG not in (sys.argv[1:] if argv is None else argv):
+        print("[verify_dispatch_live] refusing to run: this sends real LINE and Gmail messages.")
+        print(f"    Read the module docstring, then run: uv run python -m tests.verify_dispatch_live {SEND_FLAG}")
+        return 2
+    print(f"[verify_dispatch_live] fusion_layer.CONFIDENCE_THRESHOLD = {CONFIDENCE_THRESHOLD} (model_used gate, reused not duplicated)")
+    print(f"[verify_dispatch_live] running {len(FIXTURE_CASES)} fixture cases against a LIVE dispatch_alert(...)\n")
 
     all_ok = True
     for case in FIXTURE_CASES:
@@ -178,7 +207,7 @@ def main() -> int:
         print()
 
     # --- LOW-priority digest flush ---
-    print("[test_alert_dispatcher] flushing LOW-priority digest (exercises flush_low_priority_digest)...")
+    print("[verify_dispatch_live] flushing LOW-priority digest (exercises flush_low_priority_digest)...")
     flush_result = alert_dispatcher.flush_low_priority_digest()
     print(f"    flush status={flush_result['status']} count={flush_result.get('count')}")
     if flush_result["status"] == "dry_run":

@@ -53,7 +53,6 @@ jobs:
       - name: Run unit tests (service half)
         run: >
           uv run python -m unittest
-          tests.test_alert_dispatcher
           tests.test_ci_test_split
           tests.test_compose_security
           tests.test_digest_regression

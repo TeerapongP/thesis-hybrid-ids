@@ -11,9 +11,10 @@ This is the acceptance test HANDOFF_OUTPUT_LAYER.md's Conventions section descri
 query in this file can't return data from what the dispatcher wrote, the dispatcher's schema is
 wrong, not the dashboard") -- run via direct API calls, not by opening a browser against the
 live Grafana/Kibana UI (no browser tool available in this environment; that gap is disclosed,
-not silently skipped -- see tests/test_alert_dispatcher.py's summary).
+not silently skipped -- see tests/verify_dispatch_live.py's summary).
 
-Run AFTER tests/test_alert_dispatcher.py (needs data already written).
+Run AFTER a dispatch has written data, for example tests/verify_dispatch_live.py, which sends
+real notifications (read its docstring first).
 """
 
 from __future__ import annotations
