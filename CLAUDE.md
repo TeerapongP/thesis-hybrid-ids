@@ -208,20 +208,22 @@ M1c is **not** unblocked by this. CIC-UNSW-NB15's `Data.csv` carries no `Source 
 
 **The exposure.** The deployed 60/20/20 stratified split assigns rows at random, and CICIDS-2017 flows are not independent: the same source IP in the same 5-minute window produces many near-identical rows. Measured, **96.36% of test rows belong to a group that also appears in train** (93.50% for test-val and train-val). A grouped split puts 0.00% by construction. A reader who knows this dataset will ask about it, and in-dataset F1 near 0.9996 is exactly the figure that invites the question.
 
-**Pooled over the identical 2,520,961-row set** (the summary records `comparison_valid: true`, `"both schemes cover the identical row set"`, and the same `row_id_set_hash` for both schemes, so this is a controlled comparison rather than two separate runs):
+**Pooled over the identical row set** (the summary records `comparison_valid: true`, `"both schemes cover the identical row set"`, and the same `row_id_set_hash` for both schemes, so this is a controlled comparison rather than two separate runs). **Read the `_seen` columns, which the report says in its own words to use: "The leakage effect is read from delta_seen, not delta."** They drop the same 6,185 rows from both schemes, which is the exclusion described below, over a seen population of 2,514,776 rows each:
 
-| model | random split | grouped split | delta |
+| model | random (`_seen`) | grouped (`_seen`) | `delta_seen` |
 |---|---|---|---|
-| Random Forest | **0.9996** | **0.9535** | −0.0461 |
-| **fused cascade** | 0.9967 | **0.9747** | −0.0220 |
-| Autoencoder | 0.8902 | 0.8766 | −0.0136 |
-| Isolation Forest | 0.5594 | 0.5632 | +0.0038 |
+| Random Forest | **0.9995** | **0.9593** | −0.0403 |
+| **fused cascade** | 0.9966 | **0.9744** | −0.0222 |
+| Autoencoder | 0.8940 | 0.8802 | −0.0138 |
+| Isolation Forest | 0.5587 | 0.5626 | +0.0039 |
 
-**This is the only in-dataset measurement in the thesis where the deployed cascade beats Random Forest solo**, by 2.12pp, and it is the strongest available answer to "why not just use Random Forest". The supervised member is the one that leans on the leakage; the cascade degrades half as much.
+**This first recorded the all-rows `delta` column by mistake** (RF 0.9996 → 0.9535, fused 0.9967 → 0.9747, cascade margin 2.12pp), which was internally inconsistent: it described the 6,185-row exclusion as what makes the comparison fair and then quoted the table that does not apply it. Caught 2026-11-08 by the agent writing §3.3.5, which chased the discrepancy to the report's own reading instruction instead of transcribing the table. The direction and the conclusion are unchanged; the margin is smaller.
+
+**This is the only in-dataset measurement in the thesis where the deployed cascade beats Random Forest solo**, by **1.51pp** (0.9744 against 0.9593), and it is the strongest available answer to "why not just use Random Forest". The supervised member is the one that leans on the leakage: it drops 4.03pp against the cascade's 2.22pp.
 
 **Report the variance, not only the mean, because it is the sharper finding.** Across the five grouped folds RF's F1 is 0.9260 ± **0.1195** against 0.9996 ± 0.0001 on the random split, and one grouped fold drops RF to recall 0.5665 / F1 0.7154. The cascade holds 0.9751 ± 0.0176. So grouping does not merely lower RF's score, it makes it unstable, which matters more for a deployment than a mean does.
 
-**Two honesty notes.** 6,185 rows are excluded from **both** schemes so the comparison stays fair, because grouped folds can leave a class entirely absent from train (DoS GoldenEye 6,164 rows, Web Attack - Sql Injection 21). And this does not retract the in-dataset result reported elsewhere in this file: on a random split RF solo really does beat the cascade by 0.29pp. **The honest position is three-part and must be written as one** — zero-day LOAO favours the cascade by 0.45pp, in-dataset on a random split favours RF solo, in-dataset on a group-aware split favours the cascade by 2.12pp. Any one of the three quoted alone over- or under-claims.
+**Two honesty notes.** 6,185 rows are excluded from **both** schemes so the comparison stays fair, because grouped folds can leave a class entirely absent from train (DoS GoldenEye 6,164 rows, Web Attack - Sql Injection 21). And this does not retract the in-dataset result reported elsewhere in this file: on a random split RF solo really does beat the cascade by 0.29pp. **The honest position is three-part and must be written as one** — zero-day LOAO favours the cascade by 0.45pp, in-dataset on a random split favours RF solo, in-dataset on a group-aware split favours the cascade by 1.51pp. Any one of the three quoted alone over- or under-claims.
 
 **Not in chapter 3.** §3.3.4 presents the split with no mention of group overlap, and the word "group" appears there once, inside the `day_group` exclusion list. This is the chapter's largest gap and its strongest unused argument at the same time.
 
