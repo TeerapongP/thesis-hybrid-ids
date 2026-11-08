@@ -1,49 +1,13 @@
-"""
-feature_extractor.py
-======================
-สร้าง feature matrix พร้อมใช้กับโมเดล ML (Isolation Forest / Autoencoder / Random Forest)
-จากผลลัพธ์ของ preprocess_pipeline.py (*_train/val/test.parquet ที่ split ไว้แล้ว) และ
-label_builder.py (*_labeled.parquet ที่มีคอลัมน์ MITRE: technique_id, technique_name, tactic,
-mapping_confidence ต่อกับข้อมูล full clean ไว้แล้ว) — ไม่แตะ/ไม่เรียกใช้ฟังก์ชันใดใน
-preprocess_pipeline.py หรือ label_builder.py เลย อ่านแค่ไฟล์ parquet ผลลัพธ์ของทั้งสองไฟล์
-เป็น input เท่านั้น
 
-ขั้นตอนหลัก:
-  1) join คอลัมน์ MITRE (technique_id ฯลฯ) จาก *_labeled.parquet กลับเข้าไปใน
-     *_train/val/test.parquet ที่ split ไว้แล้ว (ไม่ split ใหม่) — split_train_val_test()
-     ของ preprocess_pipeline.py ทำ reset_index(drop=True) ก่อนเซฟไฟล์ ทำให้ index เดิมที่จะ
-     ใช้ join แบบตรงไปตรงมาหายไป จึง join ด้วยการจับคู่ "ค่าทุกคอลัมน์ดั้งเดิม" แทน (พิสูจน์ได้ว่า
-     unique ต่อแถวเสมอ เพราะ clean_common() ของ preprocess_pipeline.py ทำ drop_duplicates()
-     ด้วยคอลัมน์ครบชุดไปแล้ว) — เพื่อความเร็ว ใช้ pd.util.hash_pandas_object() แฮชคอลัมน์
-     ทั้งหมดเป็นคอลัมน์เดียวก่อน join (แทนการ join ด้วยหลายสิบคอลัมน์พร้อมกันตรงๆ) แล้วตรวจสอบ
-     ด้วย merge(validate="1:1", indicator=True) ว่า join สำเร็จ 100% เสมอ — pandas merge จับคู่
-     NaN กับ NaN ว่า "เท่ากัน" ได้เอง (ทดสอบแล้ว) จึงไม่ต้องกันคอลัมน์ sentinel (NaN โดยการ
-     ออกแบบ) ออกจาก join key เป็นพิเศษ
-  2) network features = คอลัมน์ตัวเลข (numeric dtype) ทั้งหมดที่มีอยู่แล้วในข้อมูล ไม่ hand-pick
-     ยกเว้นคอลัมน์ identifier/label (Label, attack_cat, technique_id, technique_name, tactic,
-     mapping_confidence)
-  3) คอลัมน์ sentinel ที่มี NaN โดยการออกแบบ (Init_Win_bytes_forward/backward ของ CICIDS,
-     is_ftp_login/ct_flw_http_mthd ของ UNSW — ดู preprocess_pipeline.py) ยังไม่เคย impute มา
-     ก่อนหน้านี้เลย ต้อง impute ที่นี่ก่อนถึงจะเข้า MinMaxScaler/SMOTE ได้ (ทั้งสองอย่างต้องการ
-     ข้อมูลตัวเลขที่ไม่มี NaN) — impute ด้วยค่า median ที่ fit จาก train เท่านั้น พร้อมเพิ่ม
-     คอลัมน์ flag คู่กัน (<col>_missing) เพื่อไม่ให้ข้อมูล "ไม่ได้วัดค่า" หายไปเฉยๆ ตามที่
-     preprocess_pipeline.py ระบุไว้ว่าให้ "impute/flag" ในไฟล์นี้
-  4) CTI features (4 คอลัมน์ใหม่): technique_id_encoded, tactic_encoded,
-     mapping_confidence_encoded, is_known_technique — encoding ของ technique_id/tactic fit
-     จาก train เท่านั้น แล้วใช้ mapping เดียวกันกับ val/test
-  5) MinMaxScaler fit บน train เท่านั้น สเกลเฉพาะ network features (รวมคอลัมน์ sentinel ที่
-     impute แล้ว) ไม่สเกลคอลัมน์ CTI ที่เข้ารหัส/flag คอลัมน์ missing (เป็น categorical/binary)
-  6) SMOTE (fit บน train เท่านั้น ไม่แตะ val/test เด็ดขาด) — ใช้ sampling_strategy แบบมีเพดาน
-     (ดู SMOTE_FLAT_CAP/SMOTE_TARGET_MULTIPLIER) แทน 'auto' เต็มรูปแบบ เพราะ class ใหญ่สุด
-     (BENIGN ของ CICIDS-2017 train ~1.26M แถว) กับเล็กสุด (Heartbleed 7 แถว) ต่างกันมาก
-     ~180,000 เท่า — SMOTE แบบ auto จะขยาย train จาก ~1.5M เป็น ~18.9M แถว ซึ่งหนักเกินจำเป็น
-     และสร้าง synthetic sample จาก sample จริงแค่ 7-13 ตัวจำนวนมหาศาล (ตัดสินใจร่วมกับผู้ใช้แล้ว)
-  7) เซฟผลลัพธ์เป็น {dataset}_features_{split}.parquet ไปที่ data/features/ (คนละโฟลเดอร์กับ
-     input ที่อ่านจาก data/processed/)
-"""
-
+import hashlib
+import json
 import os
+import shutil
 import sys
+import tempfile
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
@@ -52,20 +16,12 @@ from imblearn.over_sampling import SMOTE
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-# ----------------------------------------------------------------------------
-# CONFIG — สคริปต์นี้อยู่ใน src/features/ แต่ยังต้องรันจาก repo root เสมอ (เช่น
-# `python -m src.features.feature_extractor`) path ด้านล่างจึงอ้างอิงจาก repo root
-# PROCESSED_DATA_DIR = input (labeled + train/val/test จาก preprocess_pipeline.py/label_builder.py)
-# FEATURES_DATA_DIR = output ของไฟล์นี้เอง (คนละโฟลเดอร์กับ input โดยตั้งใจ)
-# ----------------------------------------------------------------------------
 PROCESSED_DATA_DIR = "./data/processed"
 FEATURES_DATA_DIR = "./data/features"
 SPLIT_NAMES = ["train", "val", "test"]
 
 MAPPING_CONFIDENCE_ENCODING = {"n/a": 0, "low": 1, "medium": 2, "high": 3}
 
-# เพดาน SMOTE: ไม่แตะ class ที่ >= SMOTE_FLAT_CAP อยู่แล้ว, ที่เหลือขยายไปที่
-# min(majority_count, ขนาดเดิม x SMOTE_TARGET_MULTIPLIER, SMOTE_FLAT_CAP)
 SMOTE_FLAT_CAP = 50_000
 SMOTE_TARGET_MULTIPLIER = 20
 SMOTE_RANDOM_STATE = 42
@@ -77,12 +33,7 @@ DATASETS = {
         "output_paths": {s: os.path.join(FEATURES_DATA_DIR, f"cicids2017_features_{s}.parquet") for s in SPLIT_NAMES},
         "label_col": "Label",
         "exclude_from_features": ["Label", "technique_id", "technique_name", "tactic", "mapping_confidence"],
-        # reference_cols: คอลัมน์ MITRE ที่ label_builder.py เพิ่มเข้ามา ต้อง join จาก
-        # *_labeled.parquet กลับเข้ามา (ไม่มีอยู่ใน *_train/val/test.parquet เดิม)
         "reference_cols": ["technique_id", "technique_name", "tactic", "mapping_confidence"],
-        # extra_output_cols: คอลัมน์ที่มีอยู่ใน *_train/val/test.parquet อยู่แล้ว (ไม่ต้อง join)
-        # แค่พกไปกับ output ด้วยเฉยๆ เพื่อการอ้างอิง — CICIDS ไม่มีคอลัมน์แบบนี้เพิ่มเติม (Label
-        # ทำหน้าที่ทั้ง label หลักและ attack category อยู่แล้วในคอลัมน์เดียว)
         "extra_output_cols": [],
         "sentinel_cols": ["Init_Win_bytes_forward", "Init_Win_bytes_backward"],
     },
@@ -93,10 +44,6 @@ DATASETS = {
         "label_col": "Label",
         "exclude_from_features": ["Label", "attack_cat", "technique_id", "technique_name", "tactic", "mapping_confidence"],
         "reference_cols": ["technique_id", "technique_name", "tactic", "mapping_confidence"],
-        # attack_cat มีอยู่ใน unswnb15_{train,val,test}.parquet อยู่แล้ว (ไม่ใช่คอลัมน์ที่
-        # label_builder.py เพิ่ม) ถ้าใส่ไว้ใน reference_cols ด้วยจะทำให้ตอน join เกิดคอลัมน์
-        # "attack_cat" ซ้ำ 2 ตัว (จาก key_cols และจาก reference_cols) และทำให้ join พังทั้งหมด
-        # (แถวหา match ไม่เจอเลยสักแถว) — ต้องแยกไว้เป็น extra_output_cols แทน
         "extra_output_cols": ["attack_cat"],
         "sentinel_cols": [],
     },
@@ -104,9 +51,6 @@ DATASETS = {
 
 REPORT_PATH = "./reports/feature_extractor_report.txt"
 
-# ----------------------------------------------------------------------------
-# ตัวช่วยเก็บ output
-# ----------------------------------------------------------------------------
 _REPORT_LINES = []
 
 
@@ -130,9 +74,6 @@ def safe_read_parquet(path):
     return pd.read_parquet(path)
 
 
-# ----------------------------------------------------------------------------
-# STEP 1: join คอลัมน์ MITRE จาก labeled_df กลับเข้า split_df (ไม่ split ใหม่)
-# ----------------------------------------------------------------------------
 def compute_row_hash(df, key_cols):
     return pd.util.hash_pandas_object(df[key_cols], index=False)
 
@@ -162,18 +103,11 @@ def join_labels_onto_split(split_df, labeled_df, reference_cols, dataset_name, s
     return merged
 
 
-# ----------------------------------------------------------------------------
-# STEP 2: network feature columns = numeric dtype ทั้งหมด ไม่รวม identifier/label
-# ----------------------------------------------------------------------------
 def get_network_feature_cols(df, exclude_cols):
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     return [c for c in numeric_cols if c not in exclude_cols]
 
 
-# ----------------------------------------------------------------------------
-# STEP 3: impute คอลัมน์ sentinel (NaN โดยการออกแบบ) ด้วย median ที่ fit จาก train เท่านั้น
-# พร้อมเพิ่มคอลัมน์ <col>_missing (1 = เดิมเป็น NaN, 0 = มีค่าจริง) กันข้อมูล "ไม่ได้วัดค่า" หาย
-# ----------------------------------------------------------------------------
 def fit_sentinel_imputation(train_df, sentinel_cols):
     return {c: train_df[c].median(skipna=True) for c in sentinel_cols}
 
@@ -186,12 +120,7 @@ def apply_sentinel_imputation(df, sentinel_cols, medians):
     return df
 
 
-# ----------------------------------------------------------------------------
-# STEP 4: CTI features
-# ----------------------------------------------------------------------------
 def fit_integer_encoding(train_series):
-    """null -> 0 (ไม่ต้องเก็บใน mapping) ค่าที่ไม่ null แต่ละค่าที่ไม่ซ้ำใน train (sort ตาม
-    ตัวอักษรเพื่อให้ reproducible) -> 1, 2, 3, ... ตามลำดับ"""
     uniques = sorted(train_series.dropna().unique().tolist())
     return {val: i + 1 for i, val in enumerate(uniques)}
 
@@ -221,9 +150,6 @@ def build_is_known_technique(technique_id_series):
     return technique_id_series.notna().astype(int)
 
 
-# ----------------------------------------------------------------------------
-# STEP 5: MinMaxScaler fit บน train เท่านั้น เฉพาะ network feature columns
-# ----------------------------------------------------------------------------
 def fit_scaler(train_df, feature_cols):
     scaler = MinMaxScaler()
     scaler.fit(train_df[feature_cols])
@@ -236,9 +162,119 @@ def apply_scaler(df, feature_cols, scaler):
     return df
 
 
-# ----------------------------------------------------------------------------
-# STEP 6: SMOTE (train เท่านั้น) แบบมีเพดาน (ดู docstring ด้านบนของไฟล์)
-# ----------------------------------------------------------------------------
+def model_input_feature_cols(network_feature_cols, missing_flag_cols):
+    return list(network_feature_cols) + list(missing_flag_cols)
+
+
+def _sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def write_feature_outputs(dataset_key, final_dfs, cfg, run_details):
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + "_" + uuid.uuid4().hex[:8]
+    artifact_root = Path(cfg.get("artifact_root", FEATURES_DATA_DIR))
+    history_dir = artifact_root / "history" / f"{dataset_key}_{run_id}"
+    manifest_dir = artifact_root / "provenance"
+    output_paths = {split: Path(path) for split, path in cfg["output_paths"].items()}
+    source_paths = (
+        cfg["source_paths"]
+        if "source_paths" in cfg
+        else [cfg["labeled_path"], *cfg["split_paths"].values()]
+    )
+    source_code_paths = [Path(__file__), *map(Path, cfg.get("source_code_paths", []))]
+    source_manifest = {
+        str(path): {
+            "sha256": _sha256_file(path),
+            "size_bytes": Path(path).stat().st_size,
+        }
+        for path in source_paths
+    }
+
+    staged_paths = {}
+    try:
+        for split_name, path in output_paths.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(
+                dir=path.parent,
+                prefix=f".{path.name}.",
+                suffix=".parquet",
+                delete=False,
+            ) as handle:
+                staged = Path(handle.name)
+            staged_paths[split_name] = staged
+            final_dfs[split_name].to_parquet(staged, index=False)
+
+        existing_paths = [path for path in output_paths.values() if path.exists()]
+        if existing_paths:
+            history_dir.mkdir(parents=True, exist_ok=False)
+            for path in existing_paths:
+                shutil.copy2(path, history_dir / path.name)
+
+        promoted = []
+        try:
+            for split_name, path in output_paths.items():
+                os.replace(staged_paths[split_name], path)
+                promoted.append(path)
+        except Exception:
+            for path in reversed(promoted):
+                backup_path = history_dir / path.name
+                if backup_path.exists():
+                    shutil.copy2(backup_path, path)
+                else:
+                    path.unlink(missing_ok=True)
+            raise
+
+        manifest = {
+            "run_id": run_id,
+            "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+            "dataset": dataset_key,
+            "inputs": source_manifest,
+            "source_code_sha256": {
+                str(path): _sha256_file(path) for path in source_code_paths
+            },
+            "dependency_lock_sha256": _sha256_file(Path(__file__).resolve().parents[2] / "uv.lock"),
+            "settings": run_details,
+            "outputs": {
+                split: {
+                    "path": str(path),
+                    "sha256": _sha256_file(path),
+                    "size_bytes": path.stat().st_size,
+                }
+                for split, path in output_paths.items()
+            },
+            "preserved_previous_outputs": {
+                split: str(history_dir / path.name)
+                for split, path in output_paths.items()
+                if (history_dir / path.name).exists()
+            },
+        }
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+        manifest_path = manifest_dir / f"{dataset_key}_{run_id}.json"
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=manifest_dir,
+            prefix=f".{manifest_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temp_manifest = Path(handle.name)
+            json.dump(manifest, handle, indent=2, ensure_ascii=False)
+            handle.flush()
+        os.replace(temp_manifest, manifest_path)
+    finally:
+        for staged in staged_paths.values():
+            staged.unlink(missing_ok=True)
+        if "temp_manifest" in locals():
+            temp_manifest.unlink(missing_ok=True)
+
+    return output_paths, manifest_path, history_dir if existing_paths else None
+
+
 def build_smote_sampling_strategy(y):
     counts = y.value_counts()
     majority_count = int(counts.max())
@@ -283,10 +319,6 @@ def apply_smote(X, y, dataset_name):
 
 
 def build_label_reference_map(df, label_col, reference_cols):
-    """คืน (ref_map, non_deterministic_labels) — ref_map: label value -> dict ของ
-    reference_cols เฉพาะ label ที่ map ไปที่ชุดค่า reference_cols เดียวกันเสมอ (deterministic
-    1:1) เท่านั้น ถ้า label ใดมีหลายชุดค่า reference_cols ปนกัน (เช่น UNSW ที่ Label ไบนารี
-    ครอบคลุมหลาย attack_cat) จะไม่ใส่ label นั้นไว้ใน ref_map เลย ให้ caller เติม NaN แทนการเดา"""
     ref_map = {}
     non_deterministic_labels = []
     for label_val, group in df.groupby(label_col, dropna=False)[reference_cols]:
@@ -309,9 +341,6 @@ def attach_reference_columns(y_series, ref_map, reference_cols, non_deterministi
     return pd.DataFrame.from_records(records, columns=reference_cols)
 
 
-# ----------------------------------------------------------------------------
-# ประมวลผลทั้ง 1 dataset ครบวงจร (join -> impute -> CTI encode -> scale -> SMOTE -> เซฟ)
-# ----------------------------------------------------------------------------
 def process_dataset(dataset_key, cfg):
     section(f"=== dataset: {dataset_key} ===")
 
@@ -345,34 +374,14 @@ def process_dataset(dataset_key, cfg):
     for split_name in SPLIT_NAMES:
         split_dfs[split_name] = apply_sentinel_imputation(split_dfs[split_name], sentinel_cols, sentinel_medians)
 
-    section(f"{dataset_key}: STEP 4 — CTI features (fit encoding จาก train เท่านั้น)")
-    technique_id_map = fit_integer_encoding(split_dfs["train"]["technique_id"])
-    tactic_map = fit_integer_encoding(split_dfs["train"]["tactic"])
-    log(f"  technique_id_encoded mapping ({len(technique_id_map)} ค่า, null->0): {technique_id_map}")
-    log(f"  tactic_encoded mapping ({len(tactic_map)} ค่า, null->0): {tactic_map}")
-    log(f"  mapping_confidence_encoded mapping (ตายตัว): {MAPPING_CONFIDENCE_ENCODING}")
-
-    for split_name in SPLIT_NAMES:
-        df = split_dfs[split_name]
-        df["technique_id_encoded"] = apply_integer_encoding(
-            df["technique_id"], technique_id_map, dataset_key, "technique_id", split_name
-        )
-        df["tactic_encoded"] = apply_integer_encoding(
-            df["tactic"], tactic_map, dataset_key, "tactic", split_name
-        )
-        df["mapping_confidence_encoded"] = apply_mapping_confidence_encoding(df["mapping_confidence"])
-        df["is_known_technique"] = build_is_known_technique(df["technique_id"])
-
-    cti_cols = ["technique_id_encoded", "tactic_encoded", "mapping_confidence_encoded", "is_known_technique"]
-
     section(f"{dataset_key}: STEP 5 — MinMaxScaler (fit บน train เท่านั้น, เฉพาะ network features)")
     scaler = fit_scaler(split_dfs["train"], network_feature_cols)
-    log(f"  fit บน train เท่านั้น: {len(network_feature_cols)} คอลัมน์ (ไม่แตะ {missing_flag_cols + cti_cols})")
+    log(f"  fit บน train เท่านั้น: {len(network_feature_cols)} คอลัมน์ (ไม่แตะ {missing_flag_cols})")
     for split_name in SPLIT_NAMES:
         split_dfs[split_name] = apply_scaler(split_dfs[split_name], network_feature_cols, scaler)
     log(f"  scale แล้ว: {', '.join(SPLIT_NAMES)} (ใช้ scaler ตัวเดียวกันที่ fit จาก train)")
 
-    final_feature_cols = network_feature_cols + missing_flag_cols + cti_cols
+    final_feature_cols = model_input_feature_cols(network_feature_cols, missing_flag_cols)
 
     section(f"{dataset_key}: STEP 6 — SMOTE (train เท่านั้น)")
     train_df = split_dfs["train"]
@@ -415,22 +424,38 @@ def process_dataset(dataset_key, cfg):
     section(f"{dataset_key}: STEP 7 — เซฟผลลัพธ์")
     log(f"  network features: {len(network_feature_cols)}")
     log(f"  sentinel missing-flag features (เพิ่มจาก impute STEP 3): {len(missing_flag_cols)} {missing_flag_cols}")
-    log(f"  CTI features: {len(cti_cols)} {cti_cols}")
+    log("  label-derived CTI encodings ไม่ถูกสร้างเป็น model input")
     log(f"  รวม feature columns ทั้งหมดต่อแถว (ไม่รวม reference/label): {len(final_feature_cols)}")
 
-    os.makedirs(FEATURES_DATA_DIR, exist_ok=True)
-    for split_name in SPLIT_NAMES:
-        path = cfg["output_paths"][split_name]
-        final_dfs[split_name].to_parquet(path, index=False)
+    output_paths, manifest_path, history_dir = write_feature_outputs(
+        dataset_key,
+        final_dfs,
+        cfg,
+        {
+            "model_input_feature_columns": final_feature_cols,
+            "network_feature_columns": network_feature_cols,
+            "missing_flag_columns": missing_flag_cols,
+            "sentinel_medians": {
+                column: float(value) if pd.notna(value) else None
+                for column, value in sentinel_medians.items()
+            },
+            "smote_applied": bool(smote_applied),
+            "smote_flat_cap": SMOTE_FLAT_CAP,
+            "smote_target_multiplier": SMOTE_TARGET_MULTIPLIER,
+            "smote_random_state": SMOTE_RANDOM_STATE,
+        },
+    )
+    for split_name, path in output_paths.items():
         log(f"  เซฟ {dataset_key}/{split_name} -> {path}  shape={final_dfs[split_name].shape}")
+    log(f"  provenance manifest: {manifest_path}")
+    if history_dir is not None:
+        log(f"  preserved previous outputs: {history_dir}")
 
     return {
         "network_feature_count": len(network_feature_cols),
         "missing_flag_count": len(missing_flag_cols),
-        "cti_feature_count": len(cti_cols),
+        "cti_feature_count": 0,
         "total_feature_count": len(final_feature_cols),
-        "technique_id_map": technique_id_map,
-        "tactic_map": tactic_map,
         "smote_applied": smote_applied,
         "train_rows_before_smote": len(train_df),
         "train_rows_after_smote": len(train_features_df),
@@ -439,9 +464,6 @@ def process_dataset(dataset_key, cfg):
     }
 
 
-# ----------------------------------------------------------------------------
-# MAIN
-# ----------------------------------------------------------------------------
 def main():
     results = {}
     for dataset_key, cfg in DATASETS.items():
