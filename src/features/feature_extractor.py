@@ -1,3 +1,52 @@
+"""
+feature_extractor.py
+======================
+สร้าง feature matrix พร้อมใช้กับโมเดล ML (Isolation Forest / Autoencoder / Random Forest)
+จากผลลัพธ์ของ preprocess_pipeline.py (*_train/val/test.parquet ที่ split ไว้แล้ว) และ
+label_builder.py (*_labeled.parquet ที่มีคอลัมน์ MITRE: technique_id, technique_name, tactic,
+mapping_confidence ต่อกับข้อมูล full clean ไว้แล้ว) — ไม่แตะ/ไม่เรียกใช้ฟังก์ชันใดใน
+preprocess_pipeline.py หรือ label_builder.py เลย อ่านแค่ไฟล์ parquet ผลลัพธ์ของทั้งสองไฟล์
+เป็น input เท่านั้น
+
+ขั้นตอนหลัก:
+  1) join คอลัมน์ MITRE (technique_id ฯลฯ) จาก *_labeled.parquet กลับเข้าไปใน
+     *_train/val/test.parquet ที่ split ไว้แล้ว (ไม่ split ใหม่) — split_train_val_test()
+     ของ preprocess_pipeline.py ทำ reset_index(drop=True) ก่อนเซฟไฟล์ ทำให้ index เดิมที่จะ
+     ใช้ join แบบตรงไปตรงมาหายไป จึง join ด้วยการจับคู่ "ค่าทุกคอลัมน์ดั้งเดิม" แทน (พิสูจน์ได้ว่า
+     unique ต่อแถวเสมอ เพราะ clean_common() ของ preprocess_pipeline.py ทำ drop_duplicates()
+     ด้วยคอลัมน์ครบชุดไปแล้ว) — เพื่อความเร็ว ใช้ pd.util.hash_pandas_object() แฮชคอลัมน์
+     ทั้งหมดเป็นคอลัมน์เดียวก่อน join (แทนการ join ด้วยหลายสิบคอลัมน์พร้อมกันตรงๆ) แล้วตรวจสอบ
+     ด้วย merge(validate="1:1", indicator=True) ว่า join สำเร็จ 100% เสมอ — pandas merge จับคู่
+     NaN กับ NaN ว่า "เท่ากัน" ได้เอง (ทดสอบแล้ว) จึงไม่ต้องกันคอลัมน์ sentinel (NaN โดยการ
+     ออกแบบ) ออกจาก join key เป็นพิเศษ
+  2) network features = คอลัมน์ตัวเลข (numeric dtype) ทั้งหมดที่มีอยู่แล้วในข้อมูล ไม่ hand-pick
+     ยกเว้นคอลัมน์ identifier/label (Label, attack_cat, technique_id, technique_name, tactic,
+     mapping_confidence)
+  3) คอลัมน์ sentinel ที่มี NaN โดยการออกแบบ (Init_Win_bytes_forward/backward ของ CICIDS —
+     ดู preprocess_pipeline.py; CIC-UNSW-NB15 ไม่มีคอลัมน์ sentinel จึง sentinel_cols = [])
+     ยังไม่เคย impute มาก่อนหน้านี้เลย ต้อง impute ที่นี่ก่อนถึงจะเข้า MinMaxScaler/SMOTE ได้
+     (ทั้งสองอย่างต้องการข้อมูลตัวเลขที่ไม่มี NaN) — impute ด้วยค่า median ที่ fit จาก train
+     เท่านั้น พร้อมเพิ่มคอลัมน์ flag คู่กัน (<col>_missing) เพื่อไม่ให้ข้อมูล "ไม่ได้วัดค่า"
+     หายไปเฉยๆ ตามที่ preprocess_pipeline.py ระบุไว้ว่าให้ "impute/flag" ในไฟล์นี้
+  4) (ไม่ทำที่นี่แล้ว) CTI features 4 คอลัมน์ — technique_id_encoded, tactic_encoded,
+     mapping_confidence_encoded, is_known_technique — เป็นฟังก์ชันของ label จริงผ่าน
+     config/mitre_mapping.csv จึงไม่ใช่ข้อมูลที่รู้ได้ ณ เวลา detect และไม่ถูกสร้างเป็น model
+     input อีก ฟังก์ชัน fit_integer_encoding/apply_integer_encoding/
+     apply_mapping_confidence_encoding/build_is_known_technique ยังอยู่ในไฟล์นี้เพราะ
+     build_unified_population.py เรียกใช้ เพื่อเก็บเป็นคอลัมน์อ้างอิงสำหรับชั้น LLM
+  5) MinMaxScaler fit บน train เท่านั้น สเกลเฉพาะ network features (รวมคอลัมน์ sentinel ที่
+     impute แล้ว) ไม่สเกลคอลัมน์ flag คอลัมน์ missing (เป็น binary)
+  6) SMOTE (fit บน train เท่านั้น ไม่แตะ val/test เด็ดขาด) — ใช้ sampling_strategy แบบมีเพดาน
+     (ดู SMOTE_FLAT_CAP/SMOTE_TARGET_MULTIPLIER) แทน 'auto' เต็มรูปแบบ เพราะ class ใหญ่สุด
+     (BENIGN ของ CICIDS-2017 train ~1.26M แถว) กับเล็กสุด (Heartbleed 7 แถว) ต่างกันมาก
+     ~180,000 เท่า — SMOTE แบบ auto จะขยาย train จาก ~1.5M เป็น ~18.9M แถว ซึ่งหนักเกินจำเป็น
+     และสร้าง synthetic sample จาก sample จริงแค่ 7-13 ตัวจำนวนมหาศาล (ตัดสินใจร่วมกับผู้ใช้แล้ว)
+  7) เซฟผลลัพธ์เป็น {dataset}_features_{split}.parquet ไปที่ data/features/ (คนละโฟลเดอร์กับ
+     input ที่อ่านจาก data/processed/) ผ่าน write_feature_outputs(): เขียนไฟล์ชั่วคราวข้าง
+     ปลายทางก่อน คัดลอก output เดิมไว้ใน data/features/history/ แล้วจึง os.replace (ถ้า
+     promote ไม่สำเร็จจะ rollback) และเขียน manifest ใน data/features/provenance/ (sha256
+     ของ input, source code, uv.lock และ output)
+"""
 
 import hashlib
 import json
@@ -16,12 +65,20 @@ from imblearn.over_sampling import SMOTE
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+# ----------------------------------------------------------------------------
+# CONFIG — สคริปต์นี้อยู่ใน src/features/ แต่ยังต้องรันจาก repo root เสมอ (เช่น
+# `python -m src.features.feature_extractor`) path ด้านล่างจึงอ้างอิงจาก repo root
+# PROCESSED_DATA_DIR = input (labeled + train/val/test จาก preprocess_pipeline.py/label_builder.py)
+# FEATURES_DATA_DIR = output ของไฟล์นี้เอง (คนละโฟลเดอร์กับ input โดยตั้งใจ)
+# ----------------------------------------------------------------------------
 PROCESSED_DATA_DIR = "./data/processed"
 FEATURES_DATA_DIR = "./data/features"
 SPLIT_NAMES = ["train", "val", "test"]
 
 MAPPING_CONFIDENCE_ENCODING = {"n/a": 0, "low": 1, "medium": 2, "high": 3}
 
+# เพดาน SMOTE: ไม่แตะ class ที่ >= SMOTE_FLAT_CAP อยู่แล้ว, ที่เหลือขยายไปที่
+# min(majority_count, ขนาดเดิม x SMOTE_TARGET_MULTIPLIER, SMOTE_FLAT_CAP)
 SMOTE_FLAT_CAP = 50_000
 SMOTE_TARGET_MULTIPLIER = 20
 SMOTE_RANDOM_STATE = 42
@@ -33,7 +90,12 @@ DATASETS = {
         "output_paths": {s: os.path.join(FEATURES_DATA_DIR, f"cicids2017_features_{s}.parquet") for s in SPLIT_NAMES},
         "label_col": "Label",
         "exclude_from_features": ["Label", "technique_id", "technique_name", "tactic", "mapping_confidence"],
+        # reference_cols: คอลัมน์ MITRE ที่ label_builder.py เพิ่มเข้ามา ต้อง join จาก
+        # *_labeled.parquet กลับเข้ามา (ไม่มีอยู่ใน *_train/val/test.parquet เดิม)
         "reference_cols": ["technique_id", "technique_name", "tactic", "mapping_confidence"],
+        # extra_output_cols: คอลัมน์ที่มีอยู่ใน *_train/val/test.parquet อยู่แล้ว (ไม่ต้อง join)
+        # แค่พกไปกับ output ด้วยเฉยๆ เพื่อการอ้างอิง — CICIDS ไม่มีคอลัมน์แบบนี้เพิ่มเติม (Label
+        # ทำหน้าที่ทั้ง label หลักและ attack category อยู่แล้วในคอลัมน์เดียว)
         "extra_output_cols": [],
         "sentinel_cols": ["Init_Win_bytes_forward", "Init_Win_bytes_backward"],
     },
@@ -44,6 +106,10 @@ DATASETS = {
         "label_col": "Label",
         "exclude_from_features": ["Label", "attack_cat", "technique_id", "technique_name", "tactic", "mapping_confidence"],
         "reference_cols": ["technique_id", "technique_name", "tactic", "mapping_confidence"],
+        # attack_cat มีอยู่ใน unswnb15_{train,val,test}.parquet อยู่แล้ว (ไม่ใช่คอลัมน์ที่
+        # label_builder.py เพิ่ม) ถ้าใส่ไว้ใน reference_cols ด้วยจะทำให้ตอน join เกิดคอลัมน์
+        # "attack_cat" ซ้ำ 2 ตัว (จาก key_cols และจาก reference_cols) และทำให้ join พังทั้งหมด
+        # (แถวหา match ไม่เจอเลยสักแถว) — ต้องแยกไว้เป็น extra_output_cols แทน
         "extra_output_cols": ["attack_cat"],
         "sentinel_cols": [],
     },
@@ -51,6 +117,9 @@ DATASETS = {
 
 REPORT_PATH = "./reports/feature_extractor_report.txt"
 
+# ----------------------------------------------------------------------------
+# ตัวช่วยเก็บ output
+# ----------------------------------------------------------------------------
 _REPORT_LINES = []
 
 
@@ -74,6 +143,9 @@ def safe_read_parquet(path):
     return pd.read_parquet(path)
 
 
+# ----------------------------------------------------------------------------
+# STEP 1: join คอลัมน์ MITRE จาก labeled_df กลับเข้า split_df (ไม่ split ใหม่)
+# ----------------------------------------------------------------------------
 def compute_row_hash(df, key_cols):
     return pd.util.hash_pandas_object(df[key_cols], index=False)
 
@@ -103,11 +175,18 @@ def join_labels_onto_split(split_df, labeled_df, reference_cols, dataset_name, s
     return merged
 
 
+# ----------------------------------------------------------------------------
+# STEP 2: network feature columns = numeric dtype ทั้งหมด ไม่รวม identifier/label
+# ----------------------------------------------------------------------------
 def get_network_feature_cols(df, exclude_cols):
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     return [c for c in numeric_cols if c not in exclude_cols]
 
 
+# ----------------------------------------------------------------------------
+# STEP 3: impute คอลัมน์ sentinel (NaN โดยการออกแบบ) ด้วย median ที่ fit จาก train เท่านั้น
+# พร้อมเพิ่มคอลัมน์ <col>_missing (1 = เดิมเป็น NaN, 0 = มีค่าจริง) กันข้อมูล "ไม่ได้วัดค่า" หาย
+# ----------------------------------------------------------------------------
 def fit_sentinel_imputation(train_df, sentinel_cols):
     return {c: train_df[c].median(skipna=True) for c in sentinel_cols}
 
@@ -120,7 +199,12 @@ def apply_sentinel_imputation(df, sentinel_cols, medians):
     return df
 
 
+# ----------------------------------------------------------------------------
+# STEP 4: CTI features — ไม่ถูกเรียกใน process_dataset() แล้ว (ดู docstring ด้านบน) ฟังก์ชันด้านล่างเก็บไว้ให้ build_unified_population.py ใช้
+# ----------------------------------------------------------------------------
 def fit_integer_encoding(train_series):
+    """null -> 0 (ไม่ต้องเก็บใน mapping) ค่าที่ไม่ null แต่ละค่าที่ไม่ซ้ำใน train (sort ตาม
+    ตัวอักษรเพื่อให้ reproducible) -> 1, 2, 3, ... ตามลำดับ"""
     uniques = sorted(train_series.dropna().unique().tolist())
     return {val: i + 1 for i, val in enumerate(uniques)}
 
@@ -150,6 +234,9 @@ def build_is_known_technique(technique_id_series):
     return technique_id_series.notna().astype(int)
 
 
+# ----------------------------------------------------------------------------
+# STEP 5: MinMaxScaler fit บน train เท่านั้น เฉพาะ network feature columns
+# ----------------------------------------------------------------------------
 def fit_scaler(train_df, feature_cols):
     scaler = MinMaxScaler()
     scaler.fit(train_df[feature_cols])
@@ -275,6 +362,9 @@ def write_feature_outputs(dataset_key, final_dfs, cfg, run_details):
     return output_paths, manifest_path, history_dir if existing_paths else None
 
 
+# ----------------------------------------------------------------------------
+# STEP 6: SMOTE (train เท่านั้น) แบบมีเพดาน (ดู docstring ด้านบนของไฟล์)
+# ----------------------------------------------------------------------------
 def build_smote_sampling_strategy(y):
     counts = y.value_counts()
     majority_count = int(counts.max())
@@ -319,6 +409,10 @@ def apply_smote(X, y, dataset_name):
 
 
 def build_label_reference_map(df, label_col, reference_cols):
+    """คืน (ref_map, non_deterministic_labels) — ref_map: label value -> dict ของ
+    reference_cols เฉพาะ label ที่ map ไปที่ชุดค่า reference_cols เดียวกันเสมอ (deterministic
+    1:1) เท่านั้น ถ้า label ใดมีหลายชุดค่า reference_cols ปนกัน (เช่น UNSW ที่ Label ไบนารี
+    ครอบคลุมหลาย attack_cat) จะไม่ใส่ label นั้นไว้ใน ref_map เลย ให้ caller เติม NaN แทนการเดา"""
     ref_map = {}
     non_deterministic_labels = []
     for label_val, group in df.groupby(label_col, dropna=False)[reference_cols]:
@@ -341,6 +435,9 @@ def attach_reference_columns(y_series, ref_map, reference_cols, non_deterministi
     return pd.DataFrame.from_records(records, columns=reference_cols)
 
 
+# ----------------------------------------------------------------------------
+# ประมวลผลทั้ง 1 dataset ครบวงจร (join -> impute -> scale -> SMOTE -> เซฟ)
+# ----------------------------------------------------------------------------
 def process_dataset(dataset_key, cfg):
     section(f"=== dataset: {dataset_key} ===")
 
@@ -464,6 +561,9 @@ def process_dataset(dataset_key, cfg):
     }
 
 
+# ----------------------------------------------------------------------------
+# MAIN
+# ----------------------------------------------------------------------------
 def main():
     results = {}
     for dataset_key, cfg in DATASETS.items():

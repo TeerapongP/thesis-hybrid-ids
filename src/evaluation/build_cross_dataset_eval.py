@@ -1,3 +1,36 @@
+"""
+build_cross_dataset_eval.py
+============================
+สร้าง feature matrix สำหรับ M1c (cross-dataset evaluation) เท่านั้น — ไม่แตะ/ไม่เขียนทับ
+cicids2017_features_{train,val,test}.parquet หรือ unswnb15_features_{train,val,test}.parquet
+ที่ feature_extractor.py เซฟไว้ ไฟล์เหล่านั้นยังเป็นชุด feature เต็มที่ใช้เทรน/ประเมินภายใน
+dataset เดิม (M1a, M1b, LOAO) เหมือนเดิมทุกประการ ไฟล์ *_features_{split}_crossdataset.parquet
+ชุดเดิมจากวิธีเก่า (intersection ของชื่อคอลัมน์บนไฟล์ที่ scale แล้ว) ก็ไม่ถูกแตะเช่นกัน
+
+วิธีที่ใช้ตอนนี้ต่างจากวิธีเก่า: เดิมแค่หา intersection ของชื่อคอลัมน์ใน train ของสอง dataset
+แล้วตัดไฟล์ที่ MinMaxScaler ของแต่ละ dataset scale ไว้ด้วยตัวเอง — ทำให้ flow เดียวกันได้ค่าต่างกัน
+ในสองฝั่ง ชื่อคอลัมน์ตรงกันแต่ค่าไม่ได้อยู่บนสเกลเดียวกัน สคริปต์นี้จึงอ่าน split ดิบจาก
+data/processed/ แล้วในแต่ละทิศทาง (cicids2017->unswnb15 และ unswnb15->cicids2017) fit
+sentinel imputation และ MinMaxScaler บน train ของ SOURCE แล้วใช้ transform เดียวกันกับ test
+ของ TARGET ผ่านฟังก์ชันของ feature_extractor.py เอง (fit_sentinel_imputation, fit_scaler ฯลฯ)
+เพื่อให้ได้ model input ชุดเดียวกัน ลำดับเดียวกัน ทั้งสองทิศทาง
+
+คอลัมน์ที่เป็น model input = ชื่อคอลัมน์ที่ทั้งสอง dataset มีร่วมกัน ลบคอลัมน์ label/อ้างอิง MITRE,
+attack_cat, CTI encodings 4 คอลัมน์ที่เป็นฟังก์ชันของ label จริง และ row_index/orig_row_index
+ออก ดังนั้น Destination Port, Fwd Header Length.1 และ flag Init_Win_bytes_*_missing (มีแต่ใน
+CICIDS-2017) ไม่อยู่ในชุดร่วม (76 คอลัมน์ตามที่วัดไว้ใน reports/build_cross_dataset_eval_report.txt)
+ลำดับคอลัมน์มีผลกับโมเดลที่เทรนจาก dataset หนึ่งแล้วเอาไปสกอร์อีก dataset หนึ่ง จึงตรวจว่า
+ชื่อและลำดับตรงกันทั้งสองทิศทางก่อนจบ
+
+Output: data/features/crossdataset_eval/{source}_to_{target}_test.parquet (ไฟล์ test ของ target
+ที่ scale ด้วย scaler ของ source + คอลัมน์ Label/อ้างอิง MITRE ไว้ map label) ผู้ใช้หลักคือ
+eval_cross_dataset.py
+
+รันหลัง feature_extractor.py (ต้องมี *_features_{train,val,test}.parquet และ
+data/processed/{dataset}_{split}.parquet, *_labeled.parquet):
+    python -m src.evaluation.build_cross_dataset_eval
+"""
+
 import os
 import sys
 

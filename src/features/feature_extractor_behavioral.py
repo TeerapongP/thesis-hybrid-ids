@@ -1,3 +1,59 @@
+"""
+feature_extractor_behavioral.py
+================================
+Phase 2 ของ Option A (behavioral feature integration) — สคริปต์แยกต่างหาก (ไม่แก้
+feature_extractor.py เดิม ไม่แตะ output เดิมของมันเลย: data/features/cicids2017_features_*.parquet
+ยังคงอยู่ตามเดิม โดย ณ ตอนที่เขียน เป็น input ของ Random Forest ตามที่ตกลงกัน — ต่อมา Random Forest
+ย้ายไปใช้ unified population แล้ว ดู build_unified_population.py) ที่ย้าย logic ของ
+feature_extractor.py (join MITRE -> impute sentinel -> MinMaxScaler -> SMOTE) มาใช้กับข้อมูลที่ผ่าน
+Phase 1 (validate_behavioral_join.py) แล้ว: data/processed/behavioral/cicids2017_behavioral_{train,val,test}.parquet
+(92 คอลัมน์: 79 เดิม + orig_row_index + 12 behavioral, แถว BENIGN ที่ไม่ match ~23.6% ถูก drop ไปแล้ว)
+ไม่สร้าง CTI encodings 4 คอลัมน์ (technique_id_encoded ฯลฯ) เป็น model input อีกแล้ว เหมือน
+feature_extractor.py เพราะเป็นฟังก์ชันของ label จริง
+
+Reuse จาก feature_extractor.py (copy มาแบบตรงไปตรงมา ยกเว้น write_feature_outputs ที่ import มา
+จาก feature_extractor.py ตัวเดียว — ฟังก์ชันที่เหลือยัง copy เหตุผลเดียวกับที่
+behavioral_feature_extractor.py ทำ: ไม่อยากผูก import-order กับ main()/DATASETS config ของไฟล์นั้น):
+  - fit_sentinel_imputation / apply_sentinel_imputation
+  - fit_integer_encoding / apply_integer_encoding / apply_mapping_confidence_encoding /
+    build_is_known_technique (ยังอยู่ในไฟล์นี้แต่ไม่ถูกเรียกใน main() แล้ว)
+  - fit_scaler / apply_scaler (MinMaxScaler)
+  - build_smote_sampling_strategy / apply_smote (SMOTE, capped, สูตรเดียวกันเป๊ะ ไม่ปรับ
+    SMOTE_FLAT_CAP/SMOTE_TARGET_MULTIPLIER ให้ประชากรที่เล็กลง ตามที่ user ขอ "migrate logic"
+    ไม่ใช่ "redesign logic")
+  - build_label_reference_map / attach_reference_columns (สำหรับ MITRE reference columns ของแถว
+    synthetic ที่ SMOTE สร้างขึ้น)
+
+จุดที่ต่างจาก feature_extractor.py (นอกเหนือจาก input/output path):
+  1) join คอลัมน์ MITRE กลับเข้า split ด้วย key_cols แบบ "ระบุชัดเจน" (79 คอลัมน์เดิมของ
+     cicids2017_clean.parquet) แทนที่จะใช้ list(split_df.columns) แบบ feature_extractor.py เดิม —
+     เพราะตอนนี้ split_df มีคอลัมน์เพิ่ม (orig_row_index + 12 behavioral) ที่ไม่มีใน labeled_df
+     ถ้าใช้ key_cols ทั้งหมดของ split_df จะ hash ไม่ตรงกับ labeled_df เลย (join พังทันที) — การ join
+     นี้ยังคงเป็น join แบบ "รอบ process เดียวกัน" (labeled_df มาจาก clean_df เดียวกับที่
+     cicids2017_behavioral_train.parquet's 79 คอลัมน์เดิมสืบทอดมาแบบไม่เปลี่ยนค่าเลยจาก Phase 1)
+     จึงคาดว่า match 100% เหมือน feature_extractor.py เดิม ไม่ใช่ join แบบข้าม distribution แบบ
+     Phase 1 — ยืนยันด้วย validate="1:1" + indicator เหมือนเดิม ไม่ใช่แค่สมมติ
+  2) orig_row_index (คอลัมน์ที่ validate_behavioral_join.py เพิ่มมา — ตำแหน่งเดิมใน
+     cicids2017_{split}.parquet ก่อน drop แถว BENIGN ที่ไม่ match, คือ space เดียวกับ row_index ที่
+     Random Forest ใช้อยู่) ต้องกันออกจาก feature columns (ไม่ scale ไม่ป้อนเข้า SMOTE เพราะไม่ใช่
+     network feature จริง เป็นแค่ join key) แต่ต้อง carry ผ่านไปจนถึง output เพื่อให้ Fusion Layer
+     ในอนาคต join คะแนน IF/AE (ประชากรลดแล้ว) กับคะแนน RF (ประชากรเต็ม) ได้ถูกต้อง ไม่ใช้ position
+     เฉยๆ (ดูรายละเอียดเหตุผลใน docstring ของ validate_behavioral_join.py) — แถว synthetic ที่ SMOTE
+     สร้างขึ้น (เฉพาะ train) ไม่มี orig_row_index จริง ได้ sentinel = -1 (ยืนยันด้วย test เปล่าๆ นอก
+     ไฟล์นี้ก่อนเขียนโค้ด: imblearn SMOTE คืนแถวเดิมทั้งหมดเป็น len(X) แถวแรกเรียงลำดับเดิมเป๊ะ แล้ว
+     ต่อท้ายด้วยแถว synthetic เท่านั้น — ไม่ใช่การสมมติ)
+  3) มีแค่ cicids2017 (ไม่มี unswnb15) เพราะ behavioral feature มีแค่ CICIDS-2017 เท่านั้น
+     (behavioral_feature_extractor.py's docstring)
+
+Output:
+  - data/features/behavioral/cicids2017_behavioral_features_{train,val,test}.parquet (คนละโฟลเดอร์
+    กับ data/features/cicids2017_features_*.parquet เดิมโดยตั้งใจ -- แยกกันชัดเจนตามที่ user ขอ)
+    เขียนผ่าน feature_extractor.write_feature_outputs(): ไฟล์ชั่วคราว -> os.replace, เก็บ output
+    เดิมไว้ใน data/features/behavioral/history/ และเขียน manifest ใน data/features/behavioral/provenance/
+  - reports/feature_extractor_behavioral_report.txt
+
+รันจาก repo root เสมอ: `python -m src.features.feature_extractor_behavioral`
+"""
 
 import os
 import sys
@@ -11,6 +67,9 @@ from src.features import feature_extractor
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+# ----------------------------------------------------------------------------
+# CONFIG
+# ----------------------------------------------------------------------------
 PROCESSED_DATA_DIR = "./data/processed"
 BEHAVIORAL_PROCESSED_DIR = "./data/processed/behavioral"
 BEHAVIORAL_FEATURES_DIR = "./data/features/behavioral"
@@ -23,6 +82,7 @@ REPORT_PATH = "./reports/feature_extractor_behavioral_report.txt"
 
 LABEL_COL = "Label"
 REFERENCE_COLS = ["technique_id", "technique_name", "tactic", "mapping_confidence"]
+# orig_row_index กันออกจาก feature/scale/SMOTE เหมือน reference column แต่ไม่ผ่าน ref_map (ดู STEP 6b)
 EXTRA_OUTPUT_COLS = ["orig_row_index"]
 EXCLUDE_FROM_FEATURES = [LABEL_COL] + REFERENCE_COLS + EXTRA_OUTPUT_COLS
 SENTINEL_COLS = ["Init_Win_bytes_forward", "Init_Win_bytes_backward"]
@@ -30,6 +90,8 @@ ORIG_ROW_INDEX_SYNTHETIC_SENTINEL = -1
 
 MAPPING_CONFIDENCE_ENCODING = {"n/a": 0, "low": 1, "medium": 2, "high": 3}
 
+# เพดาน SMOTE เดียวกันเป๊ะกับ feature_extractor.py -- ตั้งใจไม่ปรับให้ประชากรที่เล็กลง (migrate
+# logic ไม่ใช่ redesign logic ตามที่ user ขอ)
 SMOTE_FLAT_CAP = 50_000
 SMOTE_TARGET_MULTIPLIER = 20
 SMOTE_RANDOM_STATE = 42
@@ -57,6 +119,9 @@ def safe_read_parquet(path):
     return pd.read_parquet(path)
 
 
+# ----------------------------------------------------------------------------
+# STEP 1: join คอลัมน์ MITRE กลับเข้า split -- key_cols ระบุชัดเจน (ดูเหตุผลข้อ 1 ใน docstring บนสุด)
+# ----------------------------------------------------------------------------
 def compute_row_hash(df, key_cols):
     return pd.util.hash_pandas_object(df[key_cols], index=False)
 
@@ -90,11 +155,18 @@ def join_labels_onto_split(split_df, labeled_df, key_cols, reference_cols, split
     return merged
 
 
+# ----------------------------------------------------------------------------
+# STEP 2: network feature columns = numeric dtype ทั้งหมด ไม่รวม identifier/label/orig_row_index
+# (จะรวม 12 คอลัมน์ behavioral เข้ามาโดยอัตโนมัติเพราะเป็น numeric อยู่แล้ว)
+# ----------------------------------------------------------------------------
 def get_network_feature_cols(df, exclude_cols):
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     return [c for c in numeric_cols if c not in exclude_cols]
 
 
+# ----------------------------------------------------------------------------
+# STEP 3: impute คอลัมน์ sentinel -- copy ตรงจาก feature_extractor.py
+# ----------------------------------------------------------------------------
 def fit_sentinel_imputation(train_df, sentinel_cols):
     return {c: train_df[c].median(skipna=True) for c in sentinel_cols}
 
@@ -107,6 +179,9 @@ def apply_sentinel_imputation(df, sentinel_cols, medians):
     return df
 
 
+# ----------------------------------------------------------------------------
+# STEP 4: CTI features -- copy ตรงจาก feature_extractor.py (ไม่ถูกเรียกใน main() แล้ว ดู docstring ด้านบน)
+# ----------------------------------------------------------------------------
 def fit_integer_encoding(train_series):
     uniques = sorted(train_series.dropna().unique().tolist())
     return {val: i + 1 for i, val in enumerate(uniques)}
@@ -136,6 +211,9 @@ def build_is_known_technique(technique_id_series):
     return technique_id_series.notna().astype(int)
 
 
+# ----------------------------------------------------------------------------
+# STEP 5: MinMaxScaler -- copy ตรงจาก feature_extractor.py
+# ----------------------------------------------------------------------------
 def fit_scaler(train_df, feature_cols):
     scaler = MinMaxScaler()
     scaler.fit(train_df[feature_cols])
@@ -152,6 +230,9 @@ def model_input_feature_cols(network_feature_cols, missing_flag_cols):
     return list(network_feature_cols) + list(missing_flag_cols)
 
 
+# ----------------------------------------------------------------------------
+# STEP 6: SMOTE -- copy ตรงจาก feature_extractor.py (สูตรเพดานเดียวกันเป๊ะ)
+# ----------------------------------------------------------------------------
 def build_smote_sampling_strategy(y):
     counts = y.value_counts()
     majority_count = int(counts.max())
@@ -208,6 +289,12 @@ def attach_reference_columns(y_series, ref_map, reference_cols, non_deterministi
     return pd.DataFrame.from_records(records, columns=reference_cols)
 
 
+# ----------------------------------------------------------------------------
+# STEP 6b: orig_row_index ผ่าน SMOTE -- ไม่ใช่ ref_map (ไม่ deterministic-by-label เหมือน MITRE
+# columns เพราะทุกแถวจริงมี orig_row_index ไม่ซ้ำกัน) ใช้ข้อเท็จจริงที่ยืนยันแล้วนอกไฟล์นี้ก่อนเขียน
+# โค้ด (ไม่ใช่สมมติ): imblearn SMOTE คืน len(X) แถวแรกเป็นแถวเดิมเรียงลำดับเป๊ะ แล้วต่อท้ายด้วยแถว
+# synthetic เท่านั้น จึงต่อ orig_row_index เดิม (ตามลำดับ) แล้วเติม sentinel -1 ให้ส่วนที่เหลือได้ตรงๆ
+# ----------------------------------------------------------------------------
 def attach_orig_row_index_after_smote(orig_row_index_before, n_after):
     n_before = len(orig_row_index_before)
     n_synthetic = n_after - n_before
@@ -220,6 +307,9 @@ def attach_orig_row_index_after_smote(orig_row_index_before, n_after):
     return np.concatenate([orig_row_index_before.to_numpy(), synthetic_part])
 
 
+# ----------------------------------------------------------------------------
+# MAIN
+# ----------------------------------------------------------------------------
 def main():
     section("PHASE 1: โหลด labeled + split (จาก Phase 1 ของ Option A: validate_behavioral_join.py)")
     labeled_df = safe_read_parquet(LABELED_PATH)
@@ -255,7 +345,7 @@ def main():
         split_dfs[split_name] = apply_scaler(split_dfs[split_name], network_feature_cols, scaler)
 
     final_feature_cols = model_input_feature_cols(network_feature_cols, missing_flag_cols)
-    output_reference_cols = REFERENCE_COLS
+    output_reference_cols = REFERENCE_COLS  # orig_row_index จัดการแยกใน STEP 6b ไม่ผ่าน ref_map
 
     section("STEP 6: SMOTE (train เท่านั้น)")
     train_df = split_dfs["train"]
