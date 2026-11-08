@@ -8,7 +8,7 @@ Module: src/evaluation/eval_llm_faithfulness.py. Evidence: reports/llm_faithfuln
 1. SAMPLE
 ======================================================================
 Alerts sampled: 100; LLM calls that returned a valid explanation: 100; failed: 0.
-Source: data/features/behavioral/cicids2017_behavioral_features_test.parquet (405,142 rows), seed 42.
+Source: data/features/unified/cicids2017_unified_test.parquet, seed 42.
 Stratification: up to 7 random alerts per attack category (all rows if fewer exist: Infiltration 7, Sql Injection 4, Heartbleed 2), plus 10 random BENIGN rows. Counts per true category:
   BENIGN                       sampled= 10 ok= 10
   Bot                          sampled=  7 ok=  7
@@ -61,15 +61,18 @@ Violating alerts (omitted = required but absent; foreign = present but not in th
 ======================================================================
 3. TECHNIQUE GROUNDING (measured)
 ======================================================================
+Technique source for this run: rag. technique_id and mitre_tactic come from the 2-of-3 consensus of the top-3 retrieved RAG hits (the deployed behaviour).
 The Typhoon draft schema has no technique_id or tactic field. explain_alert fills both from the RAG top-3 consensus and the
 KB, so the result-level fields cannot be hallucinated by the model by construction. Those rates are reported as a
 regression guard, not a model measurement. The model-dependent question is whether its PROSE names technique ids.
 Abstained (technique_id null):                 50/100 = 50.0% (95% Wilson CI 40.4-59.6%)
 Result technique_id present in retrieved hits: 50/50 = 100.0% (95% Wilson CI 92.9-100.0%)  (guard)
 Result mitre_tactic equals KB lowercase tactic: 50/50 = 100.0% (95% Wilson CI 92.9-100.0%)  (guard)
+Informational, not hallucination: RAG consensus technique equals MITRE mapping of the TRUE label: 42/50 = 84.0% (95% Wilson CI 71.5-91.7%)
+  (mixes retrieval error with classification error; the retrieval line below isolates retrieval)
 Alerts whose prose names any technique id:     46/100 = 46.0% (95% Wilson CI 36.6-55.7%)
-Alerts whose prose names an id NOT retrieved:   0/100 = 0.0% (95% Wilson CI 0.0-3.7%)   <- technique hallucination rate
-Informational, not hallucination: RAG consensus technique equals MITRE mapping of the true label: 42/50 = 84.0% (95% Wilson CI 71.5-91.7%)
+Alerts whose prose names an id neither supplied nor retrieved: 0/100 = 0.0% (95% Wilson CI 0.0-3.7%)   <- technique hallucination rate
+Informational retrieval accuracy, not hallucination: mapped technique of the PREDICTED label among the 3 hits' technique ids: 78/87 = 89.7% (95% Wilson CI 81.5-94.5%)
 
 ======================================================================
 4. CLAIM-LEVEL SUPPORT (approximated, partial)
@@ -120,7 +123,7 @@ The prompt only asks for the insufficiency statement when technique_id is null, 
 Alerts with Ollama timing metadata: 100.
 Generation: 15915 tokens in 235.0s of decode = 67.7 tok/s pooled (per-alert median 69.4, min 51.4, max 71.8).
 Mean prompt tokens: 2214. Mean wall time per alert: 5.37s; first alert 5.59s (may include model load).
-Total LLM wall time: 537s. Whole run including alert build and retrieval: 268s.
+Total LLM wall time: 537s.
 
 ======================================================================
 7. WHAT IS NOT MEASURED

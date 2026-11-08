@@ -669,7 +669,13 @@ def write_report(s: dict[str, Any], records: list[dict[str, Any]], path: Path | 
           "Module: src/evaluation/eval_llm_faithfulness.py. Evidence: reports/llm_faithfulness_raw.jsonl.", ""]
     L += [bar, "1. SAMPLE", bar]
     L += [f"Alerts sampled: {s['n_total']}; LLM calls that returned a valid explanation: {s['n_ok']}; failed: {s['n_error']}.",
-          f"Source: data/features/behavioral/cicids2017_behavioral_features_test.parquet (405,142 rows), seed {SEED}.",
+          # Derived from the constant the sampler actually reads. It was hardcoded to the
+          # behavioral population (405,142 rows) and kept printing that after the sampler
+          # moved to the unified split, so every regenerated report named a population the
+          # run had not touched. The row count is dropped rather than recomputed: this
+          # function runs in the uv .venv, which has no pandas, and inventing a plumbing
+          # path to carry a cosmetic number is worse than naming the file and stopping.
+          f"Source: {UNIFIED_TEST.relative_to(ROOT).as_posix()}, seed {SEED}.",
           f"Stratification: up to {PER_CATEGORY_CAP} random alerts per attack category (all rows if fewer exist: Infiltration 7, "
           f"Sql Injection 4, Heartbleed 2), plus {BENIGN_N} random BENIGN rows. Counts per true category:"]
     for cat, v in s["per_category"].items():

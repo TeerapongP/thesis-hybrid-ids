@@ -1,3 +1,4 @@
+# technique_source,rag,technique_id and mitre_tactic come from the 2-of-3 consensus of the top-3 retrieved RAG hits (the deployed behaviour)
 # aggregate rates (each row recomputable from llm_faithfulness_raw.jsonl; see report section 8)
 metric,numerator,denominator,rate,ci95_lo,ci95_hi,basis
 entity_pass,96,100,0.960000,0.901628,0.984337,measured: no omitted and no foreign/altered entity (strict)
@@ -8,7 +9,8 @@ result_technique_in_hits,50,50,1.000000,0.928650,1.000000,measured (by construct
 result_tactic_matches_kb,50,50,1.000000,0.928650,1.000000,measured (by construction near-certain: tactic is code-derived from KB)
 prose_ungrounded_alerts,0,100,0.000000,0.000000,0.036995,measured: alert prose names a technique id absent from retrieved hits
 prose_technique_mention_alerts,46,100,0.460000,0.365606,0.557353,measured: alert prose names any technique id
-consensus_matches_label_mapping,42,50,0.840000,0.714855,0.916627,"measured, informational: RAG consensus technique equals MITRE mapping of true label (retrieval accuracy, not hallucination)"
+consensus_matches_label_mapping,42,50,0.840000,0.714855,0.916627,"measured, informational: RAG consensus technique equals MITRE mapping of the TRUE label; mixes retrieval error with classification error, so retrieval alone is retrieval_hits_contain_mapped_technique"
+retrieval_hits_contain_mapped_technique,78,87,0.896552,0.814948,0.944616,"measured, informational retrieval accuracy (not hallucination): the technique the mapping table gives the RF-PREDICTED label is among the technique ids of the 3 retrieved hits; the RAG query is that same predicted label, so classification error is not mixed in"
 alerts_with_bad_claim,0,100,0.000000,0.000000,0.036995,approximated: alert has >=1 unsupported/contradicted claim by mechanical rules
 defect_waf_portscan_pred,0,7,0.000000,0.000000,0.354339,"measured: WAF in remediation, alerts RF-predicted PortScan"
 defect_waf_portscan_true,0,7,0.000000,0.000000,0.354339,"measured: WAF in remediation, alerts truly PortScan"
