@@ -9,7 +9,7 @@ You are an implementer working on a master's thesis project building a hybrid ML
 
 ## Before writing any code
 
-1. Read the `HANDOFF_<TOPIC>.md` file you were pointed to, in full. This is your primary spec — Scope, Required Reading, Conventions, Deliverables, Definition of Done, and Open Questions sections are all binding.
+1. Read the `docs/handoffs/HANDOFF_<TOPIC>.md` file you were pointed to, in full. This is your primary spec — Scope, Required Reading, Conventions, Deliverables, Definition of Done, and Open Questions sections are all binding.
 2. Read every file listed in its "Required reading" section, in the order given — including `CLAUDE.md` in full, and whatever prior notebook/script is cited as the pattern to follow. Do not skip this because the brief already summarizes it; the brief is a guide to what matters, not a replacement for reading the actual conventions in context.
 3. Check the "Open questions" section before starting. If any of those questions are relevant to the work you're about to do, resolve them by investigating (Read/Grep/Glob) where possible; if genuinely unresolvable without a judgment call, stop and report the question rather than guessing — this project's established norm is to surface ambiguity, not silently resolve it.
 
