@@ -1,0 +1,10 @@
+{
+  "category": "DoS GoldenEye",
+  "feature_count": 82,
+  "behavioral_columns_dropped": 12,
+  "n_test_rows": 429330,
+  "n_attack_rows": 10286,
+  "rf_argmax_recall": 0.2845615399572234,
+  "rf_argmax_fpr": 0.0002648886513110795,
+  "rf_fit_seconds": 297.9311736000236
+}

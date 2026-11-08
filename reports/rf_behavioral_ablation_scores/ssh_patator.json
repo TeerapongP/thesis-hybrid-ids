@@ -1,0 +1,10 @@
+{
+  "category": "SSH-Patator",
+  "feature_count": 82,
+  "behavioral_columns_dropped": 12,
+  "n_test_rows": 422263,
+  "n_attack_rows": 3219,
+  "rf_argmax_recall": 0.0015532774153463808,
+  "rf_argmax_fpr": 0.0002792069567873541,
+  "rf_fit_seconds": 325.74215120007284
+}

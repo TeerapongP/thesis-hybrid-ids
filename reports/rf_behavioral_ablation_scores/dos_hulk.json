@@ -1,0 +1,10 @@
+{
+  "category": "DoS Hulk",
+  "feature_count": 82,
+  "behavioral_columns_dropped": 12,
+  "n_test_rows": 591890,
+  "n_attack_rows": 172846,
+  "rf_argmax_recall": 0.008574106430001272,
+  "rf_argmax_fpr": 0.00013363751777856263,
+  "rf_fit_seconds": 276.78664880013093
+}

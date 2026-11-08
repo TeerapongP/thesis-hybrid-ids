@@ -1,0 +1,10 @@
+{
+  "category": "FTP-Patator",
+  "feature_count": 82,
+  "behavioral_columns_dropped": 12,
+  "n_test_rows": 424975,
+  "n_attack_rows": 5931,
+  "rf_argmax_recall": 0.057663125948406675,
+  "rf_argmax_fpr": 0.00026966141980317105,
+  "rf_fit_seconds": 280.488073799992
+}

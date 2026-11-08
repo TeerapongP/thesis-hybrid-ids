@@ -1,0 +1,10 @@
+{
+  "category": "Web Attack - Brute Force",
+  "feature_count": 82,
+  "behavioral_columns_dropped": 12,
+  "n_test_rows": 420514,
+  "n_attack_rows": 1470,
+  "rf_argmax_recall": 0.8394557823129252,
+  "rf_argmax_fpr": 0.00026966141980317105,
+  "rf_fit_seconds": 291.7263435998466
+}

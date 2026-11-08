@@ -1,0 +1,10 @@
+{
+  "category": "DoS slowloris",
+  "feature_count": 82,
+  "behavioral_columns_dropped": 12,
+  "n_test_rows": 424429,
+  "n_attack_rows": 5385,
+  "rf_argmax_recall": 0.4545961002785515,
+  "rf_argmax_fpr": 0.00024818396158875916,
+  "rf_fit_seconds": 307.90463919984177
+}

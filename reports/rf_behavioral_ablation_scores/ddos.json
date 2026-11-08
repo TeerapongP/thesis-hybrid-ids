@@ -1,0 +1,10 @@
+{
+  "category": "DDoS",
+  "feature_count": 82,
+  "behavioral_columns_dropped": 12,
+  "n_test_rows": 547058,
+  "n_attack_rows": 128014,
+  "rf_argmax_recall": 0.6187057665567829,
+  "rf_argmax_fpr": 0.00025534311432689647,
+  "rf_fit_seconds": 284.9494993998669
+}

@@ -1,0 +1,10 @@
+{
+  "category": "DoS Slowhttptest",
+  "feature_count": 82,
+  "behavioral_columns_dropped": 12,
+  "n_test_rows": 424272,
+  "n_attack_rows": 5228,
+  "rf_argmax_recall": 0.2748661055853099,
+  "rf_argmax_fpr": 0.00026966141980317105,
+  "rf_fit_seconds": 283.6519086000044
+}

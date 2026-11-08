@@ -1,0 +1,10 @@
+{
+  "category": "PortScan",
+  "feature_count": 82,
+  "behavioral_columns_dropped": 12,
+  "n_test_rows": 509738,
+  "n_attack_rows": 90694,
+  "rf_argmax_recall": 0.0013782609654442411,
+  "rf_argmax_fpr": 0.0002410248088506219,
+  "rf_fit_seconds": 281.04578020004556
+}

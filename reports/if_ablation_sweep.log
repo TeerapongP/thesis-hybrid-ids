@@ -1,0 +1,40 @@
+Using signature dir: e7d65c9e9b16cc84
+Pooled rows: 4,615,461  attack rows: 425,021
+  RF solo                          nested F1 = 0.9737   recall 0.9593  fpr 0.0011
+  AE-v2 solo                       nested F1 = 0.8736   recall 0.8176  fpr 0.0055
+  IF-v2 solo                       nested F1 = 0.4371   recall 0.4502  fpr 0.0619
+  fusion: confidence_weighted      nested F1 = 0.9782   recall 0.9635  fpr 0.0007
+  cascade, fallback = AE only (no IF) nested F1 = 0.9727   recall 0.9576  fpr 0.0012
+  cascade, fallback = IF only (no AE) nested F1 = 0.9779   recall 0.9638  fpr 0.0008
+  OR: max(RF, AE)                  nested F1 = 0.9724   recall 0.9559  fpr 0.0010
+  OR: RF or AE (2 thresholds)      nested F1 = 0.9745   recall 0.9608  fpr 0.0011
+  AND: RF and AE                   nested F1 = 0.9504   recall 0.9062  fpr 0.0001
+
+Saved: E:\thesis\reports\fusion_layer_loao_unified_or_comparison.csv
+
+=== pooled, nested selection ===
+                          candidate  precision  recall     f1    fpr
+        fusion: confidence_weighted     0.9933  0.9635 0.9782 0.0007
+cascade, fallback = IF only (no AE)     0.9924  0.9638 0.9779 0.0008
+        OR: RF or AE (2 thresholds)     0.9885  0.9608 0.9745 0.0011
+                            RF solo     0.9885  0.9593 0.9737 0.0011
+cascade, fallback = AE only (no IF)     0.9882  0.9576 0.9727 0.0012
+                    OR: max(RF, AE)     0.9895  0.9559 0.9724 0.0010
+                     AND: RF and AE     0.9990  0.9062 0.9504 0.0001
+                         AE-v2 solo     0.9379  0.8176 0.8736 0.0055
+                         IF-v2 solo     0.4247  0.4502 0.4371 0.0619
+
+=== per-category recall, nested ===
+candidate                 AE-v2 solo  AND: RF and AE  IF-v2 solo  OR: RF or AE (2 thresholds)  OR: max(RF, AE)  RF solo  cascade, fallback = AE only (no IF)  cascade, fallback = IF only (no AE)  fusion: confidence_weighted
+category                                                                                                                                                                                                                      
+Bot                            0.017           0.000       0.023                        0.003            0.001    0.003                                0.003                                0.003                        0.000
+DDoS                           0.877           0.986       0.111                        1.000            1.000    1.000                                0.984                                1.000                        1.000
+DoS GoldenEye                  0.259           0.658       0.165                        1.000            0.988    1.000                                0.838                                0.999                        0.999
+DoS Hulk                       0.940           0.983       0.987                        1.000            1.000    1.000                                0.995                                0.998                        0.998
+DoS Slowhttptest               0.241           0.736       0.265                        1.000            0.822    1.000                                0.965                                0.999                        0.998
+DoS slowloris                  0.584           0.874       0.560                        1.000            0.958    1.000                                0.945                                0.971                        0.970
+FTP-Patator                    0.000           0.001       0.000                        1.000            1.000    1.000                                0.986                                0.998                        0.996
+PortScan                       0.724           0.812       0.004                        0.838            0.831    0.831                                0.882                                0.861                        0.862
+SSH-Patator                    0.001           0.001       0.000                        0.990            0.946    0.990                                0.961                                0.924                        0.917
+Web Attack - Brute Force       0.000           0.001       0.049                        1.000            1.000    1.000                                0.939                                0.965                        0.930
+Saved: E:\thesis\reports\fusion_layer_loao_unified_or_summary.json
