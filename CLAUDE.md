@@ -490,6 +490,37 @@ Run 2026-11-08, `uv run python -m src.evaluation.eval_llm_faithfulness --no-rag 
 
 **What this does to the lookup-table proposal below.** It stops being a tidiness argument and becomes a testable prediction. RAG adds diversity only through the technique clause, and it supplies that clause on 50 of 100 alerts at 43% accuracy, while `config/mitre_mapping.csv` supplies it on 87 of 100 deterministically (the other 13 being BENIGN, which should have none). So the table should produce *more* explanation diversity than retrieval currently does, not less. Still **not implemented**, for the reasons given below, but the expected direction is now measured rather than assumed.
 
+### Retrieval context ablation — targeted KB text changes nothing, so retrieval has no measurable role left
+
+Run 2026-11-08, `--retrieval-context technique_kb --variant technique_kb`. The hypothesis was that the retrieved chunks lose to the few-shot examples because they are the wrong shape: the prompt asks for one or two Thai sentences and a short remediation list, and hands the model three entire MITRE documents. So the chunks were replaced by the KB's `detection` and `mitigations` for the single technique the table already names, bounded to at most 3 analytic lines and 3 mitigations, never cut mid-sentence, worst case about 1,750 characters. Mean prompt tokens fell 2,224 → 1,323.
+
+**The prediction on record failed, and in the worse direction.** Remediation diversity was supposed to rise from 33 and echo to fall from 0.646. Verified by recomputing both runs from their raw files myself:
+
+| | mapping (deployed) | technique_kb |
+|---|---|---|
+| distinct explanations | **45** | **39** |
+| most-repeated explanation | 10 | **27** |
+| distinct remediation lists | 33 | 31 |
+| most-repeated remediation list | 24 | **52** |
+| `example_echo_alerts` | 64/99 | **95/100** |
+| echo mean similarity | 0.872 | **0.949** |
+| `entity_pass` | 83/99 | **100/100** |
+| `entity_corruption_free` | 99/99 | 100/100 |
+| `alerts_with_bad_claim` | 0 | 0 |
+| mean prompt tokens | 2,224 | **1,323** |
+
+**`entity_pass` reached a perfect 100/100 and that is the fourth instance of the trap, not a result.** The baseline's 16 failures were all omission of the technique from the prose; here there are none, because the model copies a few-shot example almost every time and the example always names the technique. Variant C, the no-RAG run, the technique-source flip and now this: **four configurations where that metric improved because the layer said less of its own.** Treat a rise in `entity_pass` as a question about what stopped being said, every time.
+
+**The model never read the reference, measured three ways.** Of the 87 alerts whose technique has KB mitigations, **0 outputs name any mitigation the prompt showed them** (I recomputed this independently). No output carries a Latin term from the reference beyond the entity pool. Only 5 explanations fall below the echo threshold. A shorter, targeted, on-topic context was ignored exactly as three whole documents were.
+
+**So the binding constraint is the few-shot structure at 8B, not what retrieval supplies.** That is **inferred**, not tested: the two examples win whatever the context says, and no variant was run to rescue the hypothesis. `DEFAULT_RETRIEVAL_CONTEXT` stays `"hits"` and the prompt is byte-identical to before under the default, confirmed across all 100 alerts, so nothing deployed changed.
+
+**What this settles for the write-up, and it is the answer to "does RAG affect the decision".** RAG's entire measured contribution to the output was the clause naming the MITRE technique, and that clause now comes from `config/mitre_mapping.csv`. Supplying the KB's own prose instead adds nothing. So **the retrieval layer has no measurable effect on any output in the deployed configuration**, measured from two directions: removing it entirely (the M_RAG ablation) and replacing its content with better-targeted text (this one). That is a reportable negative result about retrieval for a small-model explanation layer, not a defect to hide, and it is far stronger than conceding the point under questioning.
+
+**A measurement seam found and recorded rather than fixed.** `eval_llm_faithfulness.run_llm` builds `facts_for_shots` without `priority`, so the stored `rendered_example_explanations` read "ระดับ ไม่ระบุ" where the real prompt says "ระดับ HIGH". **Absolute echo figures are therefore understated.** The bias is constant across runs, so every comparison above holds, but do not quote an echo rate as an absolute without this caveat. Also recorded: the T1190 reference text contains a literal IP, `169.254.169.254`, which the entity guard would accept if copied because it is in the shown pool. It appeared in no output here.
+
+`src/evaluation/compare_llm_runs.py` computes these comparisons (diversity, echo, and the `entity_pass` omission-versus-corruption split) and runs under uv. Output in `reports/llm_faithfulness_compare.mapping_vs_technique_kb.txt`.
+
 ### Technique source ablation — the table wins on every axis that matters, and the one it loses is omission
 
 Run 2026-11-08, `uv run python -m src.evaluation.eval_llm_faithfulness --technique-source mapping --variant mapping`. Same 100 alerts, same model, same prompt template. The only change is that `technique_id` comes from `config/mitre_mapping.csv` keyed on `rf_predicted_label` and `mitre_tactic` from the KB, instead of the 2-of-3 consensus over the retrieved hits. Outputs in `reports/llm_faithfulness_{raw,metrics,report}.mapping.*`. **`DEFAULT_TECHNIQUE_SOURCE` is still `rag`**, so nothing deployed has changed; `llm_explain.TECHNIQUE_SOURCES` is the switch and an unknown value raises rather than falling back.
@@ -498,7 +529,7 @@ Run 2026-11-08, `uv run python -m src.evaluation.eval_llm_faithfulness --techniq
 |---|---|---|---|
 | distinct explanations / 100 | 41 | 31 | **45** |
 | most-repeated explanation | 12 | 49 | **10** |
-| distinct remediation lists | 31 | 31 | **34** |
+| distinct remediation lists | 31 | 31 | **33 of 99** |
 | alerts carrying a technique | 50 | 0 | **86** |
 | `prose_technique_mention_alerts` | 0.46 | 0.00 | **0.707** |
 | `example_echo_alerts` | 0.68 | 1.00 | **0.646** |
