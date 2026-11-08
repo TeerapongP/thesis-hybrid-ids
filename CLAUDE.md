@@ -488,6 +488,34 @@ Run 2026-11-08, `uv run python -m src.evaluation.eval_llm_faithfulness --no-rag 
 
 **What this does to the lookup-table proposal below.** It stops being a tidiness argument and becomes a testable prediction. RAG adds diversity only through the technique clause, and it supplies that clause on 50 of 100 alerts at 43% accuracy, while `config/mitre_mapping.csv` supplies it on 87 of 100 deterministically (the other 13 being BENIGN, which should have none). So the table should produce *more* explanation diversity than retrieval currently does, not less. Still **not implemented**, for the reasons given below, but the expected direction is now measured rather than assumed.
 
+### Technique source ablation — the table wins on every axis that matters, and the one it loses is omission
+
+Run 2026-11-08, `uv run python -m src.evaluation.eval_llm_faithfulness --technique-source mapping --variant mapping`. Same 100 alerts, same model, same prompt template. The only change is that `technique_id` comes from `config/mitre_mapping.csv` keyed on `rf_predicted_label` and `mitre_tactic` from the KB, instead of the 2-of-3 consensus over the retrieved hits. Outputs in `reports/llm_faithfulness_{raw,metrics,report}.mapping.*`. **`DEFAULT_TECHNIQUE_SOURCE` is still `rag`**, so nothing deployed has changed; `llm_explain.TECHNIQUE_SOURCES` is the switch and an unknown value raises rather than falling back.
+
+| | deployed (rag) | no-RAG | **mapping** |
+|---|---|---|---|
+| distinct explanations / 100 | 41 | 31 | **45** |
+| most-repeated explanation | 12 | 49 | **10** |
+| distinct remediation lists | 31 | 31 | **34** |
+| alerts carrying a technique | 50 | 0 | **86** |
+| `prose_technique_mention_alerts` | 0.46 | 0.00 | **0.707** |
+| `example_echo_alerts` | 0.68 | 1.00 | **0.646** |
+| mean echo similarity | 0.878 | 0.955 | **0.872** |
+| `entity_pass` | **0.96** | 1.00 | **0.838** |
+| `entity_corruption_free` | 1.00 | 1.00 | 1.00 |
+| `alerts_with_bad_claim` | 0.000 | 0.000 | 0.000 |
+| `hallucination_lower_bound` | 0.000 | 0.000 | 0.000 |
+| `undecidable_share` | 0.000 | 0.000 | 0.000 |
+| `abstained` | 0.50 | 1.00 | 0.131 |
+
+**The prediction on record held.** Diversity rose rather than fell: 41 → 45 distinct explanations, the most-repeated sentence down from 12 to 10 of 100, echo down from 0.68 to 0.646. Remediation moved too, 31 → 34, which RAG never touched.
+
+**`entity_pass` falls 0.96 → 0.838 and that number must be decomposed, not quoted bare.** All **16 of 16** failures are omissions with no foreign or altered entity, and in **every one** the single missing entity is the technique id. `entity_corruption_free` stays 1.000, and the bad-claim, hallucination and undecidable rates stay 0.000. The check requires every entity in FACTS to appear in the prose, so giving the model a technique on 86 alerts instead of 50 creates 36 more chances to omit one. In absolute terms it delivers *more*: the prose names a technique in 71 of 100 alerts against 46. The failures concentrate on Web Attack - XSS (5), DoS Slowhttptest (4) and Bot (3). One alert is `status: error`, a transient Ollama `ReadTimeout` on a PortScan row, not a logic failure, so rates are over 99.
+
+**This is the third time in this project that the faithfulness metric improved because the layer was given less to say.** Variant C scored perfectly and was the worst configuration. The no-RAG run scored 1.000 on `entity_pass` while collapsing 49 of 100 alerts into one sentence. Now the configuration that carries the most correct information scores lowest. **Read `entity_pass` as an omission-and-corruption composite, report `entity_corruption_free` beside it, and never present a rise in it as an improvement without checking what the layer stopped saying.**
+
+**Recommendation, not yet applied.** Deploy `mapping`: it is better on diversity, on echo, on technique coverage (86 of 87 possible against 50) and on correctness of the technique itself (99 of 100 agree with the table, the exception being the errored row), and the only axis it loses is one that penalises having more to carry. The cost is real bookkeeping rather than a scientific objection — flipping `DEFAULT_TECHNIQUE_SOURCE` moves the headline M2 figures, so `docs/thesis/chapter4_results.md` §4.11.1, §4.11.3, §4.11.4, §4.11.5 and §4.13.2 all have to move with it. That is the author's call.
+
 ### RAG Layer — retrieval identifies the technique correctly on 42 of 100 alerts, and a 15-row CSV already holds the answer
 
 Root-caused 2026-11-08, after the LINE message format made the gap visible by printing the technique for the first time. **Half the alerts carry no MITRE technique, and it is deterministic per attack category rather than flaky per row.**
