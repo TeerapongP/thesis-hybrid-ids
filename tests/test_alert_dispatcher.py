@@ -31,12 +31,16 @@ exercised):
   whether Docker + the `network`/`opencti`/`observability`/`grafana` compose stacks are actually
   up right now. Check `docker ps` yourself; don't assume either this docstring's original
   2026-07-15 claim or its 2026-07-18 update still describes the present moment.
-- LINE: Messaging API calls remain dry-run until both `LINE_CHANNEL_ACCESS_TOKEN` and
-  `LINE_TO_ID` are configured. The request contract is covered by `test_fixed_contracts.py`.
+- LINE: written when LINE was dry-run until both `LINE_CHANNEL_ACCESS_TOKEN` and `LINE_TO_ID`
+  were configured. notify_line.py has since gained `LINE_DELIVERY_MODE=broadcast`, which needs no
+  recipient, so with a valid token this script's HIGH cases send REAL LINE messages and consume
+  channel quota. The request contract is covered by `test_fixed_contracts.py`.
 - Gmail: `GMAIL_*` are blank placeholders (per the resolved stub/mock-only decision -- this
   channel replaced the original Outlook/Microsoft Graph API design 2026-07-18, see
   HANDOFF_OUTPUT_LAYER.md) -- every MEDIUM/LOW send in this script is expected to come back
-  `status="dry_run"`. This is the CORRECT/expected result under the current .env, not a failure.
+  `status="dry_run"`. This held while the four `GMAIL_*` values were blank. Once they are
+  populated, the MEDIUM case sends a REAL email and the dry_run assertion in `run_case` reports a
+  failure, so this script is only safe to run with the `GMAIL_*` values blank or overridden.
 - Grafana/Kibana UI: this script queries InfluxDB/Elasticsearch directly with the SAME Flux/ES
   queries `grafana/dashboards/soc-overview.json` / the Kibana saved search use, and confirms
   non-empty results -- it does NOT open a browser against the live Grafana/Kibana UI (no browser
