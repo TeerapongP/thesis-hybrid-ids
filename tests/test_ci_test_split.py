@@ -15,11 +15,17 @@ running it. That is worse than red, because it looks like coverage.
 So the list is checked against reality here rather than trusted. This test runs in CI
 itself, under the same environment CI uses, which is the only place the check is
 meaningful.
+
+Importability alone is not enough, because a file sitting untracked in the working tree
+imports fine locally and does not exist on a fresh clone. Three modules CI named were in
+that state, so CI was green here and would have been red for anyone else. The tracking
+check below asks git directly.
 """
 from __future__ import annotations
 
 import importlib
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -89,6 +95,27 @@ class CiTestSplitTests(unittest.TestCase):
             phantom,
             "CI lists these modules but they cannot be imported in this environment, so the "
             f"job will fail on load: {phantom}",
+        )
+
+    def test_every_module_ci_names_is_tracked_by_git(self):
+        """A listed module that exists only in a working tree breaks a fresh clone's CI."""
+        probe = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"], cwd=ROOT, capture_output=True, text=True
+        )
+        if probe.returncode != 0 or probe.stdout.strip() != "true":
+            self.skipTest("not a git work tree, so tracking cannot be checked")
+        untracked = []
+        for name in sorted(modules_listed_in_ci()):
+            result = subprocess.run(
+                ["git", "ls-files", "--error-unmatch", f"tests/{name}.py"],
+                cwd=ROOT, capture_output=True, text=True,
+            )
+            if result.returncode != 0:
+                untracked.append(name)
+        self.assertFalse(
+            untracked,
+            "CI names these test modules but git does not track them, so a fresh clone fails "
+            f"on import -- git add them or drop them from ci.yml: {untracked}",
         )
 
     def test_blocked_modules_are_blocked_only_by_the_ml_dependencies(self):
