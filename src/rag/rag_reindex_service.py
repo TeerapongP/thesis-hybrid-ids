@@ -1,33 +1,12 @@
-"""
-rag_reindex_service.py
-=======================
-RAG Layer -- scheduled re-fetch service for the MITRE ATT&CK knowledge base.
-
-One-shot script (see models/rag_reindex_config.json for why one-shot rather than a
-long-running --loop process): each invocation fetches the latest STIX bundle via
-src/mitre_kb_extract.py (the validated GitHub-STIX source -- NOT OpenCTI, see CLAUDE.md's
-"RAG Layer -- knowledge base source decision," a decision this service does not re-open),
-diffs it against the on-disk data/knowledge_base/mitre_techniques.json per technique_id
-(description/detection/mitigations -- the fields that actually feed the 45-chunk index),
-and only rebuilds the ChromaDB collection (via the existing src/rag_retrieval.build_index)
-if content for at least one of the 11 techniques actually changed. Every invocation appends
-one row to reports/rag_reindex_log.csv, whether or not anything changed.
-
-Meant to be invoked on a schedule externally (Windows Task Scheduler / cron), at the
-interval given by .env's RAG_REINDEX_HOURS (168 = 7 days) -- this script reads that value
-only to log/document it, it does not sleep or loop itself. See the bottom of this file's
-__main__ block for the exact command to register with an external scheduler.
-
-This module imports nothing from opencti/ and makes no network calls other than the GitHub
-STIX bundle fetch -- it never touches the OpenCTI platform or any of its connectors.
-"""
 
 from __future__ import annotations
 
 import argparse
 import csv
 import json
+import os
 import shutil
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -54,22 +33,10 @@ LOG_FIELDS = [
     "error_message",
 ]
 
-# Fields that actually feed the 45-chunk index (docs/rag_chunking_plan.md) -- these are the
-# only fields compared to decide whether a rebuild is warranted. Metadata-only fields
-# (tactics, platforms, sub_techniques, deprecated/revoked/url/attack_version) are NOT
-# compared here: none of them are embedded into any chunk, so a change to only those would
-# not change retrieval behavior and should not trigger a re-embed.
-CONTENT_FIELDS = ["description", "detection", "mitigations"]
+CONTENT_FIELDS = ["name", "description", "detection", "mitigations"]
 
 
 def load_current_kb(path: Path | None = None) -> dict[str, Any] | None:
-    """`path` defaults to the CURRENT value of the module-level KB_PATH, read inside the
-    function body rather than as a default-argument value -- a default argument is bound
-    once at function-definition time, so a caller reassigning rag_reindex_service.KB_PATH
-    (e.g. to redirect this into a test scratch directory) would otherwise be silently
-    ignored by this function while other code in this module that references KB_PATH
-    directly would honor it, an inconsistency that was actually hit and fixed during this
-    service's own verification run."""
     if path is None:
         path = KB_PATH
     if not path.exists():
@@ -79,9 +46,6 @@ def load_current_kb(path: Path | None = None) -> dict[str, Any] | None:
 
 
 def diff_techniques(old_techniques: dict[str, Any], new_techniques: dict[str, Any]) -> list[str]:
-    """Return the technique_ids whose content-bearing fields differ between old and new.
-    A technique present in `new` but missing from `old` (or vice versa) also counts as
-    changed. Comparison is on CONTENT_FIELDS only -- see the module-level comment above."""
     changed = []
     all_ids = set(old_techniques) | set(new_techniques)
     for tid in sorted(all_ids):
@@ -96,9 +60,6 @@ def diff_techniques(old_techniques: dict[str, Any], new_techniques: dict[str, An
 
 
 def backup_current_kb(path: Path | None = None, history_dir: Path | None = None) -> Path:
-    """See load_current_kb's docstring for why `path`/`history_dir` are read from the
-    current KB_PATH/KB_HISTORY_DIR module globals inside the function body, not bound as
-    default-argument values."""
     if path is None:
         path = KB_PATH
     if history_dir is None:
@@ -110,9 +71,26 @@ def backup_current_kb(path: Path | None = None, history_dir: Path | None = None)
     return backup_path
 
 
+def write_current_kb_atomic(data: dict[str, Any], path: Path | None = None) -> None:
+    if path is None:
+        path = KB_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=path.parent,
+            prefix=f".{path.name}.", suffix=".tmp", delete=False,
+        ) as handle:
+            temp_path = Path(handle.name)
+            json.dump(data, handle, indent=2, ensure_ascii=False)
+            handle.flush()
+        os.replace(temp_path, path)
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+
+
 def _current_chroma_count() -> int | None:
-    """Read the existing collection's chunk count without triggering a build/embed -- for
-    logging visibility only. Returns None if no collection exists yet (first-ever run)."""
     try:
         config = rag_retrieval.load_env_config()
         client = rag_retrieval.get_chroma_client()
@@ -135,9 +113,6 @@ def append_log_row(row: dict[str, Any], log_path: Path | None = None) -> None:
 
 
 def check_and_reindex(dry_run: bool = False) -> dict[str, Any]:
-    """Single check-and-maybe-rebuild cycle. Always appends one row to
-    reports/rag_reindex_log.csv, whether or not anything changed, whether or not an error
-    occurred. Returns the logged row as a dict."""
     run_timestamp = datetime.now(timezone.utc).isoformat()
     row: dict[str, Any] = {f: "" for f in LOG_FIELDS}
     row["run_timestamp_utc"] = run_timestamp
@@ -158,7 +133,6 @@ def check_and_reindex(dry_run: bool = False) -> dict[str, Any]:
         row["mitre_version_changed"] = version_changed
 
         if current_kb is None:
-            # No local KB yet -- treat as fully changed (first-ever run).
             techniques_changed = sorted(new_kb["techniques"].keys())
         else:
             techniques_changed = diff_techniques(current_kb["techniques"], new_kb["techniques"])
@@ -178,23 +152,20 @@ def check_and_reindex(dry_run: bool = False) -> dict[str, Any]:
             if current_kb is not None:
                 backup_path = backup_current_kb()
                 print(f"[rag_reindex_service] backed up previous KB to {backup_path}")
-            KB_PATH.parent.mkdir(parents=True, exist_ok=True)
-            with open(KB_PATH, "w", encoding="utf-8") as f:
-                json.dump(new_kb, f, indent=2, ensure_ascii=False)
+            write_current_kb_atomic(new_kb)
             print(f"[rag_reindex_service] wrote updated KB to {KB_PATH}")
 
             print("[rag_reindex_service] content changed -- rebuilding ChromaDB index (force=True) ...")
             try:
                 collection = rag_retrieval.build_index(force=True)
             except Exception:
-                # KB_PATH was already overwritten above -- if the rebuild itself fails (e.g.
-                # verify_chunk_counts' assertion, an embedding-model error), roll it back so
-                # the file and the (unchanged) ChromaDB index stay consistent, AND so the
-                # next run's diff again sees old-vs-fetched content differ and retries the
-                # rebuild, rather than believing (wrongly) that nothing changed forever.
                 if backup_path is not None:
-                    shutil.copy2(backup_path, KB_PATH)
+                    write_current_kb_atomic(current_kb)
                     print(f"[rag_reindex_service] rebuild failed -- rolled back {KB_PATH} from backup")
+                    try:
+                        rag_retrieval.build_index(force=True)
+                    except Exception as rollback_exc:
+                        raise RuntimeError(f"index rebuild failed and previous index restoration failed: {rollback_exc}") from rollback_exc
                 else:
                     KB_PATH.unlink(missing_ok=True)
                     print(
@@ -213,7 +184,7 @@ def check_and_reindex(dry_run: bool = False) -> dict[str, Any]:
         row["status"] = "ok"
         row["error_message"] = ""
 
-    except Exception as exc:  # noqa: BLE001 -- must still log a row before propagating
+    except Exception as exc:
         row["status"] = "error"
         row["error_message"] = str(exc)
         append_log_row(row)
