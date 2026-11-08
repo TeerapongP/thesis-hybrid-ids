@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 from html import escape
 import logging
+from email.errors import MessageError
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
@@ -70,7 +71,7 @@ def _send_html_email(config: dict[str, Any], subject: str, html_body: str, dry_r
     except ImportError as exc:
         logger.warning("[notify_gmail] Gmail API send failed: %s", type(exc).__name__)
         return {"status": "error", "error": f"{type(exc).__name__}: {exc}"}
-    except (HttpError, GoogleAuthError, httplib2.HttpLib2Error, OSError, TimeoutError, ValueError, KeyError) as exc:
+    except (HttpError, GoogleAuthError, httplib2.HttpLib2Error, MessageError, OSError, TimeoutError, ValueError, KeyError) as exc:
         logger.warning("[notify_gmail] Gmail API send failed: %s", type(exc).__name__)
         return {"status": "error", "error": f"{type(exc).__name__}: {exc}"}
 

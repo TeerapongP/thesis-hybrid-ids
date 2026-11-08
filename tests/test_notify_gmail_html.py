@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from src.notifications import notify_gmail
 from src.notifications.notify_gmail import build_digest_email_html, build_immediate_email_html
@@ -12,6 +12,21 @@ class GmailHtmlEscapingTests(unittest.TestCase):
             with patch.object(notify_gmail, "_build_gmail_service", side_effect=OSError("network unavailable")):
                 result = notify_gmail._send_html_email(config, "subject", "body", "test")
         self.assertEqual(result["status"], "error")
+
+    def test_subject_with_an_embedded_header_is_refused_without_sending(self):
+        try:
+            import googleapiclient  # noqa: F401
+        except ImportError:
+            self.skipTest("google client libraries are not installed in this interpreter")
+        config = {"gmail_sender_address": "sender@example.test"}
+        service = MagicMock()
+        subject = "[SOC ALERT] x @ 1.2.3.4" + chr(13) + chr(10) + "Bcc: other@example.test"
+        with patch.object(notify_gmail, "_gmail_creds_look_real", return_value=True):
+            with patch.object(notify_gmail, "_build_gmail_service", return_value=service):
+                result = notify_gmail._send_html_email(config, subject, "body", "test")
+        self.assertEqual(result["status"], "error")
+        self.assertIn("HeaderParseError", result["error"])
+        service.users.assert_not_called()
 
     def test_immediate_alert_values_are_rendered_as_text(self):
         html = build_immediate_email_html({
