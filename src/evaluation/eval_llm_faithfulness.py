@@ -68,6 +68,14 @@ NO_RAG = False
 # diverge would make the evaluator silently measure a configuration the system does not run.
 TECHNIQUE_SOURCE = "mapping"
 
+# Set by --retrieval-context. What retrieval contributes to the prompt: "hits" is the top-3
+# retrieved chunks pasted whole (deployed), "technique_kb" is the KB's bounded detection and
+# mitigation text for the technique that was named. Duplicates
+# llm_explain.DEFAULT_RETRIEVAL_CONTEXT for the same reason TECHNIQUE_SOURCE does, and
+# tests/test_technique_source_contract.py guards both.
+RETRIEVAL_CONTEXT = "hits"
+RETRIEVAL_CONTEXTS = ("hits", "technique_kb")
+
 SEED = 42
 PER_CATEGORY_CAP = 7
 BENIGN_N = 10
@@ -232,6 +240,14 @@ def check_entities(rec: dict[str, Any]) -> dict[str, Any]:
 
 
 def _hit_text(rec: dict[str, Any]) -> str:
+    """The grounding corpus: the text the model was shown from retrieval.
+
+    Under "technique_kb" that is the KB reference and not the retrieved hits, which never reach
+    the prompt, so a term copied from the reference is grounded and one that only appears in an
+    unshown hit is not. Records written before this field existed fall through to the hits.
+    """
+    if rec.get("prompt_retrieval_text") is not None:
+        return rec["prompt_retrieval_text"].lower()
     parts = []
     for hit in rec.get("rag_hits", []):
         meta = hit.get("metadata", {})
@@ -437,6 +453,10 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
     if len(sources) > 1:
         raise ValueError(f"records mix technique sources {sorted(sources)}; a run has exactly one")
     s["technique_source"] = sources.pop() if sources else "rag"
+    contexts = {r.get("retrieval_context", "hits") for r in records}
+    if len(contexts) > 1:
+        raise ValueError(f"records mix retrieval contexts {sorted(contexts)}; a run has exactly one")
+    s["retrieval_context"] = contexts.pop() if contexts else "hits"
     from_rag = s["technique_source"] == "rag"
 
     def count(pred, population=None):
@@ -558,6 +578,10 @@ PROVENANCE = {
     "rag": "technique_id and mitre_tactic come from the 2-of-3 consensus of the top-3 retrieved RAG hits (deployed until 2026-11-08)",
     "mapping": "technique_id comes from config/mitre_mapping.csv keyed on the RF-PREDICTED label and mitre_tactic from the KB; retrieval does not choose it (the deployed behaviour)",
 }
+RETRIEVAL_PROVENANCE = {
+    "hits": "the top-3 retrieved RAG chunks are pasted into FACTS whole (the deployed behaviour)",
+    "technique_kb": "FACTS carries the KB's bounded detection analytics and mitigations for the named technique and no retrieved chunk; the grounding corpus for the unsupported-term check is that reference text",
+}
 # What each provenance-dependent check means. Under "rag" two of them are guards that cannot
 # fail by construction; under "mapping" the same questions would silently change meaning, so
 # they are reported as n/a with the reason instead of as a number nobody can interpret.
@@ -591,6 +615,7 @@ def write_metrics_csv(s: dict[str, Any], path: Path | None = None) -> None:
     rows: list[list[Any]] = []
     source = s["technique_source"]
     rows.append(["# technique_source", source, PROVENANCE[source]])
+    rows.append(["# retrieval_context", s["retrieval_context"], RETRIEVAL_PROVENANCE[s["retrieval_context"]]])
     rows.append(["# aggregate rates (each row recomputable from llm_faithfulness_raw.jsonl; see report section 8)"])
     rows.append(["metric", "numerator", "denominator", "rate", "ci95_lo", "ci95_hi", "basis"])
     basis = {
@@ -717,7 +742,8 @@ def write_report(s: dict[str, Any], records: list[dict[str, Any]], path: Path | 
     L.append("")
     src = s["technique_source"]
     L += [bar, "3. TECHNIQUE GROUNDING (measured)", bar,
-          f"Technique source for this run: {src}. {PROVENANCE[src]}."]
+          f"Technique source for this run: {src}. {PROVENANCE[src]}.",
+          f"Retrieval context for this run: {s['retrieval_context']}. {RETRIEVAL_PROVENANCE[s['retrieval_context']]}."]
     if src == "rag":
         L += ["The Typhoon draft schema has no technique_id or tactic field. explain_alert fills both from the RAG top-3 consensus and the",
               "KB, so the result-level fields cannot be hallucinated by the model by construction. Those rates are reported as a",
@@ -996,6 +1022,11 @@ def run_llm(limit: int | None) -> float:
             hits = [] if NO_RAG else alert["rag_hits"]
             tech_id, tactic = llm_explain.resolve_technique(TECHNIQUE_SOURCE, ctx, hits)
             rec["technique_source"] = TECHNIQUE_SOURCE
+            rec["retrieval_context"] = RETRIEVAL_CONTEXT
+            if RETRIEVAL_CONTEXT != "hits":
+                shown = llm_explain.retrieval_facts(RETRIEVAL_CONTEXT, tech_id, hits)
+                rec["prompt_retrieval_text"] = (
+                    "" if not any(shown.values()) else json.dumps(shown, ensure_ascii=False))
             rec["ctx_technique_id"], rec["ctx_tactic"] = tech_id, tactic
             rec["rag_consensus_technique_id"] = llm_explain._technique_context(hits)[0]
             rec["pred_label_mapping_technique_id"] = llm_explain.technique_from_label(ctx["rf_predicted_label"])[0]
@@ -1012,7 +1043,8 @@ def run_llm(limit: int | None) -> float:
                     sh["output"]["explanation_th"] for sh in llm_explain.render_few_shots(facts_for_shots)
                 ]
                 output = llm_explain.explain_alert(ctx, hits, ctx["fused_score"], ctx["fused_prediction"], ctx["confidence"], config,
-                                                  technique_source=TECHNIQUE_SOURCE)
+                                                  technique_source=TECHNIQUE_SOURCE,
+                                                  retrieval_context=RETRIEVAL_CONTEXT)
                 rec.update(status="ok", error=None, output=output)
             except Exception as exc:
                 rec.update(status="error", error=f"{type(exc).__name__}: {exc}", output=None)
@@ -1061,7 +1093,7 @@ def main() -> int:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     # Declared before the first mention of TECHNIQUE_SOURCE: Python rejects a name used
     # earlier in a scope that later declares it global.
-    global NO_RAG, TECHNIQUE_SOURCE, RAW_PATH, METRICS_PATH, REPORT_PATH
+    global NO_RAG, TECHNIQUE_SOURCE, RETRIEVAL_CONTEXT, RAW_PATH, METRICS_PATH, REPORT_PATH
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", choices=["alerts", "all"], default="all")
     ap.add_argument("--limit", type=int)
@@ -1073,11 +1105,19 @@ def main() -> int:
     ap.add_argument("--technique-source", choices=("rag", "mapping"), default=TECHNIQUE_SOURCE,
                     help="where technique_id comes from: the RAG top-3 consensus or "
                          "config/mitre_mapping.csv keyed on the RF-predicted label (deployed)")
+    ap.add_argument("--retrieval-context", choices=RETRIEVAL_CONTEXTS, default=RETRIEVAL_CONTEXT,
+                    help="what retrieval puts in the prompt: the top-3 retrieved chunks (hits, "
+                         "deployed) or the KB's detection and mitigation text for the named "
+                         "technique (technique_kb)")
     ap.add_argument("--variant", help="suffix the raw/metrics/report filenames, so a run cannot "
                                       "overwrite the deployed numbers")
     args = ap.parse_args()
     NO_RAG = args.no_rag
     TECHNIQUE_SOURCE = args.technique_source
+    RETRIEVAL_CONTEXT = args.retrieval_context
+    if NO_RAG and RETRIEVAL_CONTEXT != "hits":
+        ap.error("--no-rag removes every retrieved input; it cannot be combined with "
+                 "--retrieval-context technique_kb, which is a different ablation")
     if args.variant:
         RAW_PATH = RAW_PATH.with_suffix(f".{args.variant}.jsonl")
         METRICS_PATH = METRICS_PATH.with_suffix(f".{args.variant}.csv")

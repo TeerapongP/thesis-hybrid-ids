@@ -44,12 +44,41 @@ def accepted_technique_sources() -> tuple[str, ...]:
     return tuple(re.findall(r'"([a-z]+)"', body))
 
 
+def evaluator_retrieval_context() -> str:
+    return literal(EVALUATOR, r'^RETRIEVAL_CONTEXT = "([a-z_]+)"', "module-level RETRIEVAL_CONTEXT")
+
+
+def deployed_retrieval_context() -> str:
+    return literal(DEPLOYED, r'^DEFAULT_RETRIEVAL_CONTEXT[^=\n]*= "([a-z_]+)"',
+                   "DEFAULT_RETRIEVAL_CONTEXT")
+
+
+def accepted_retrieval_contexts(path: Path, name: str) -> tuple[str, ...]:
+    body = literal(path, rf"^{name}[^=\n]*= \(([^)]*)\)", name)
+    return tuple(re.findall(r'"([a-z_]+)"', body))
+
+
 class TechniqueSourceContract(unittest.TestCase):
     def test_evaluator_default_equals_the_deployed_default(self):
         self.assertEqual(evaluator_technique_source(), deployed_technique_source())
 
     def test_the_value_is_one_the_resolver_accepts(self):
         self.assertIn(evaluator_technique_source(), accepted_technique_sources())
+
+
+class RetrievalContextContract(unittest.TestCase):
+    """Same arrangement as the technique source: the evaluator keeps its own copy."""
+
+    def test_evaluator_default_equals_the_deployed_default(self):
+        self.assertEqual(evaluator_retrieval_context(), deployed_retrieval_context())
+
+    def test_the_value_is_one_the_prompt_builder_accepts(self):
+        self.assertIn(evaluator_retrieval_context(),
+                      accepted_retrieval_contexts(DEPLOYED, "RETRIEVAL_CONTEXTS"))
+
+    def test_both_sides_offer_the_same_choices(self):
+        self.assertEqual(accepted_retrieval_contexts(EVALUATOR, "RETRIEVAL_CONTEXTS"),
+                         accepted_retrieval_contexts(DEPLOYED, "RETRIEVAL_CONTEXTS"))
 
 
 if __name__ == "__main__":

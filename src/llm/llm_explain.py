@@ -36,6 +36,22 @@ MAPPING_DATASET = "cicids2017"
 TechniqueSource = Literal["rag", "mapping"]
 TECHNIQUE_SOURCES: tuple[TechniqueSource, ...] = ("rag", "mapping")
 DEFAULT_TECHNIQUE_SOURCE: TechniqueSource = "mapping"
+# What retrieval contributes to FACTS. "hits" pastes the top-3 retrieved chunks, whole, which is
+# what the layer has always done and is still the deployed behaviour. "technique_kb" replaces
+# them with the KB's detection analytics and mitigations for the one technique
+# `resolve_technique` named, and nothing else from retrieval enters the prompt.
+#
+# Added to test one hypothesis: the chunks lose to the few-shot examples because they are the
+# wrong shape, three whole technique documents handed to a model asked for two sentences and a
+# short list. The default stays "hits" until a measurement says otherwise.
+RetrievalContext = Literal["hits", "technique_kb"]
+RETRIEVAL_CONTEXTS: tuple[RetrievalContext, ...] = ("hits", "technique_kb")
+DEFAULT_RETRIEVAL_CONTEXT: RetrievalContext = "hits"
+# Bounds on the KB text. Whole items only: an analytic line or a mitigation's first sentence is
+# included complete or not at all, never cut at a character count.
+MAX_DETECTION_ANALYTICS = 3
+MAX_KB_MITIGATIONS = 3
+MAX_MITIGATION_SUMMARY_CHARS = 240
 REQUIRED_ENV_KEYS = (
     "LLM_BACKEND", "LLM_BASE_URL", "LLM_MODEL", "LLM_TIMEOUT_S", "LLM_MAX_TOKENS", "LLM_TEMPERATURE",
 )
@@ -358,6 +374,72 @@ def resolve_technique(
     raise ValueError(f"unknown technique_source {technique_source!r}; expected one of {TECHNIQUE_SOURCES}")
 
 
+_ANALYTIC_RE = re.compile(r"^-\s*Analytic\s+\d+:\s*(.+)$")
+_SENTENCE_BREAK_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z(])")
+
+
+def _detection_analytics(detection: str) -> list[str]:
+    """Up to MAX_DETECTION_ANALYTICS analytic lines, network telemetry first.
+
+    The KB's detection field opens with a title line, which is dropped: it repeats the
+    technique name and carries a corrupted dash from the source extraction. Analytics that
+    read NSM (network security monitoring) logs come first because the alerts are flow records,
+    so a Sysmon or macOS analytic is the least usable one to show. The sort is stable, so
+    otherwise the KB's own order holds.
+    """
+    analytics = []
+    for line in detection.splitlines():
+        match = _ANALYTIC_RE.match(line.strip())
+        if match:
+            analytics.append(match.group(1).strip())
+    analytics.sort(key=lambda text: "NSM:" not in text)
+    return analytics[:MAX_DETECTION_ANALYTICS]
+
+
+def _first_sentence(description: str) -> str | None:
+    """A mitigation's opening sentence, or None when it is not short and clean enough to quote.
+
+    None means the mitigation is shown by name alone. That is deliberate: a sentence cut at a
+    character count reads as a claim the KB never made, which is worse than a bare name.
+    """
+    first = _SENTENCE_BREAK_RE.split(" ".join(description.split()), maxsplit=1)[0]
+    if not first.endswith(".") or len(first) > MAX_MITIGATION_SUMMARY_CHARS or "�" in first:
+        return None
+    return first
+
+
+def technique_reference(technique_id: str | None) -> dict[str, Any] | None:
+    """The bounded detection and mitigation text the KB holds for one technique."""
+    entry = _kb_techniques().get(technique_id or "")
+    if not entry:
+        return None
+    mitigations = []
+    for item in (entry.get("mitigations") or [])[:MAX_KB_MITIGATIONS]:
+        shown = {"name": item["name"]}
+        summary = _first_sentence(item.get("description") or "")
+        if summary:
+            shown["summary"] = summary
+        mitigations.append(shown)
+    detection = _detection_analytics(entry.get("detection") or "")
+    if not detection and not mitigations:
+        return None
+    return {"detection": detection, "mitigations": mitigations}
+
+
+def retrieval_facts(
+    retrieval_context: RetrievalContext,
+    technique_id: str | None,
+    rag_hits: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """The FACTS entry holding whatever retrieval contributes under the chosen context."""
+    if retrieval_context == "hits":
+        return {"rag_hits": rag_hits}
+    if retrieval_context == "technique_kb":
+        return {"technique_reference": technique_reference(technique_id)}
+    raise ValueError(
+        f"unknown retrieval_context {retrieval_context!r}; expected one of {RETRIEVAL_CONTEXTS}")
+
+
 def build_prompt(
     alert_context: dict[str, Any],
     rag_hits: list[dict[str, Any]],
@@ -365,6 +447,7 @@ def build_prompt(
     fused_prediction: int,
     confidence: float,
     technique_source: TechniqueSource = DEFAULT_TECHNIQUE_SOURCE,
+    retrieval_context: RetrievalContext = DEFAULT_RETRIEVAL_CONTEXT,
 ) -> str:
     technique_id, tactic = resolve_technique(technique_source, alert_context, rag_hits)
     # `confidence` is |P(attack) - 0.5| * 2 -- certainty in EITHER direction, high both when
@@ -382,7 +465,7 @@ def build_prompt(
                                     alert_context.get("model_used")),
         "technique_id": technique_id,
         "mitre_tactic": tactic,
-        "rag_hits": rag_hits,
+        **retrieval_facts(retrieval_context, technique_id, rag_hits),
     }
     return (
         "คุณเป็นนักวิเคราะห์ SOC ตอบเป็น JSON เท่านั้น ห้ามแต่ง IP, port, hostname, technique_id, "
@@ -440,15 +523,16 @@ def explain_alert(
     confidence: float,
     config: dict[str, Any] | None = None,
     technique_source: TechniqueSource = DEFAULT_TECHNIQUE_SOURCE,
+    retrieval_context: RetrievalContext = DEFAULT_RETRIEVAL_CONTEXT,
 ) -> dict[str, Any]:
     technique_id, tactic = resolve_technique(technique_source, alert_context, rag_hits)
     prompt = build_prompt(alert_context, rag_hits, fused_score, fused_prediction, confidence,
-                          technique_source)
+                          technique_source, retrieval_context)
     guard_facts = {
         "alert_context": alert_context,
         "technique_id": technique_id,
         "mitre_tactic": tactic,
-        "rag_hits": rag_hits,
+        **retrieval_facts(retrieval_context, technique_id, rag_hits),
     }
     started = time.perf_counter()
     parsed = parse_llm_response(call_llm(prompt, config))

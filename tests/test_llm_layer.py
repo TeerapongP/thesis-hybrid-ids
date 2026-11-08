@@ -319,3 +319,91 @@ class TechniqueSourceTests(unittest.TestCase):
                 llm_explain.build_prompt(ctx, [], 0.9, 1, 0.9, "mappng")
             with self.assertRaises(ValueError):
                 llm_explain.explain_alert(ctx, [], 0.9, 1, 0.9, {}, technique_source="mappng")
+
+
+class RetrievalContextTests(unittest.TestCase):
+    ctx = {"rf_predicted_label": "FTP-Patator", "dst_ip": "192.0.2.10"}
+    marker_hits = [{"metadata": {"technique_id": "T1110.001"}, "document": "WHOLE-CHUNK-MARKER"}] * 3
+
+    def test_the_default_is_the_current_behaviour(self):
+        self.assertEqual(llm_explain.DEFAULT_RETRIEVAL_CONTEXT, "hits")
+
+    def test_omitting_the_context_equals_hits_and_pastes_the_chunks(self):
+        omitted = llm_explain.build_prompt(self.ctx, self.marker_hits, 0.9, 1, 0.9)
+        explicit = llm_explain.build_prompt(self.ctx, self.marker_hits, 0.9, 1, 0.9,
+                                            retrieval_context="hits")
+        self.assertEqual(omitted, explicit)
+        self.assertIn("WHOLE-CHUNK-MARKER", omitted)
+        self.assertNotIn("technique_reference", omitted)
+
+    def test_technique_kb_replaces_the_chunks_with_the_kb_text_for_the_named_technique(self):
+        prompt = llm_explain.build_prompt(self.ctx, self.marker_hits, 0.9, 1, 0.9,
+                                          retrieval_context="technique_kb")
+        self.assertNotIn("WHOLE-CHUNK-MARKER", prompt)
+        self.assertNotIn("rag_hits", prompt)
+        self.assertIn("Password Policies", prompt)
+        self.assertIn("failed SSH login attempts", prompt)
+
+    def test_technique_kb_changes_only_the_retrieval_entry_of_facts(self):
+        def facts(context):
+            prompt = llm_explain.build_prompt(self.ctx, self.marker_hits, 0.9, 1, 0.9,
+                                              retrieval_context=context)
+            return prompt, json.loads(prompt.split("FACTS=", 1)[1])
+
+        hits_prompt, hits_facts = facts("hits")
+        kb_prompt, kb_facts = facts("technique_kb")
+        for key in ("alert_context", "fused_score", "priority", "technique_id", "mitre_tactic"):
+            self.assertEqual(hits_facts[key], kb_facts[key])
+        self.assertEqual(hits_prompt.split("FACTS=", 1)[0], kb_prompt.split("FACTS=", 1)[0])
+
+    def test_technique_kb_with_no_technique_carries_no_retrieval_text(self):
+        benign = {"rf_predicted_label": "BENIGN", "dst_ip": "192.0.2.10"}
+        prompt = llm_explain.build_prompt(benign, self.marker_hits, 0.9, 1, 0.9,
+                                          retrieval_context="technique_kb")
+        self.assertIsNone(json.loads(prompt.split("FACTS=", 1)[1])["technique_reference"])
+        self.assertNotIn("WHOLE-CHUNK-MARKER", prompt)
+
+    def test_every_kb_reference_is_bounded_and_made_of_whole_items(self):
+        for technique_id, entry in llm_explain._kb_techniques().items():
+            with self.subTest(technique=technique_id):
+                ref = llm_explain.technique_reference(technique_id)
+                self.assertLessEqual(len(ref["detection"]), llm_explain.MAX_DETECTION_ANALYTICS)
+                self.assertLessEqual(len(ref["mitigations"]), llm_explain.MAX_KB_MITIGATIONS)
+                for line in ref["detection"]:
+                    self.assertIn(line, entry["detection"])
+                for item in ref["mitigations"]:
+                    summary = item.get("summary")
+                    if summary:
+                        self.assertTrue(summary.endswith("."))
+                        self.assertLessEqual(len(summary), llm_explain.MAX_MITIGATION_SUMMARY_CHARS)
+                self.assertNotIn("�", json.dumps(ref, ensure_ascii=False))
+
+    def test_network_telemetry_analytics_come_first(self):
+        detection = ("Title line\n- Analytic 1: host thing [Log sources: WinEventLog:Sysmon]\n"
+                     "- Analytic 2: flow thing [Log sources: NSM:Flow]")
+        self.assertEqual(llm_explain._detection_analytics(detection)[0],
+                         "flow thing [Log sources: NSM:Flow]")
+
+    def test_a_mitigation_without_a_short_clean_first_sentence_is_shown_by_name_only(self):
+        self.assertIsNone(llm_explain._first_sentence("No terminal punctuation here"))
+        self.assertIsNone(llm_explain._first_sentence("x" * 300 + "."))
+        self.assertEqual(llm_explain._first_sentence("Block it. Then do more."), "Block it.")
+
+    def test_unknown_context_raises_before_any_llm_call(self):
+        with patch.object(llm_explain, "call_llm", side_effect=AssertionError("LLM was called")):
+            with self.assertRaises(ValueError):
+                llm_explain.build_prompt(self.ctx, [], 0.9, 1, 0.9, retrieval_context="technique")
+            with self.assertRaises(ValueError):
+                llm_explain.explain_alert(self.ctx, [], 0.9, 1, 0.9, {}, retrieval_context="technique")
+
+    def test_the_entity_guard_allows_what_the_prompt_showed_and_nothing_more(self):
+        """powershell.exe is in T1059's KB detection text and in no retrieved chunk."""
+        hits = [{"metadata": {"technique_id": "T1059"}, "document": "plain chunk"}] * 2
+        raw = json.dumps({"explanation_th": "พบการรัน powershell.exe", "remediation": ["ตรวจสอบ"]})
+        with patch.object(llm_explain, "call_llm", return_value=raw):
+            shown = llm_explain.explain_alert(self.ctx, hits, 0.9, 1, 0.9, {},
+                                              technique_source="rag", retrieval_context="technique_kb")
+            self.assertEqual(shown["technique_id"], "T1059")
+            with self.assertRaises(ValueError):
+                llm_explain.explain_alert(self.ctx, hits, 0.9, 1, 0.9, {},
+                                          technique_source="rag", retrieval_context="hits")

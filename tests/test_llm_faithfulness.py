@@ -206,5 +206,50 @@ class TechniqueProvenanceTests(unittest.TestCase):
         self.assertIn("Technique source for this run: mapping", text)
 
 
+class RetrievalContextScoringTests(unittest.TestCase):
+    def kb_run_record(self, shown="pam_faillock locks accounts"):
+        rec = mapping_run_record()
+        rec["retrieval_context"] = "technique_kb"
+        rec["prompt_retrieval_text"] = shown
+        rec["output"]["remediation"] = ["ตั้งค่า pam_faillock ของ 192.168.10.50"]
+        return rec
+
+    def ungrounded_terms(self, rec):
+        reasons = [r for c in m2.score_record(rec, KB)["claims"] for r in c["reasons"]]
+        return [r for r in reasons if r.startswith("ungrounded_term")]
+
+    def test_a_term_copied_from_the_shown_reference_is_grounded(self):
+        self.assertEqual(self.ungrounded_terms(self.kb_run_record()), [])
+
+    def test_a_term_found_only_in_an_unshown_retrieved_hit_is_not_grounded(self):
+        rec = self.kb_run_record(shown="")
+        rec["rag_hits"][0]["document"] = "pam_faillock locks accounts"
+        self.assertEqual(self.ungrounded_terms(rec), ["ungrounded_term:pam_faillock"])
+
+    def test_records_without_the_field_still_ground_against_the_hits(self):
+        rec = self.kb_run_record()
+        del rec["prompt_retrieval_text"], rec["retrieval_context"]
+        rec["rag_hits"][0]["document"] = "pam_faillock locks accounts"
+        self.assertEqual(self.ungrounded_terms(rec), [])
+
+    def test_a_run_cannot_mix_retrieval_contexts(self):
+        mixed = [finished(mapping_run_record()), finished(self.kb_run_record())]
+        with self.assertRaises(ValueError):
+            m2.summarize(mixed)
+
+    def test_summary_and_csv_state_the_context(self):
+        import csv
+        import tempfile
+
+        s = m2.summarize([finished(self.kb_run_record())])
+        self.assertEqual(s["retrieval_context"], "technique_kb")
+        self.assertEqual(m2.summarize([finished(mapping_run_record())])["retrieval_context"], "hits")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "metrics.csv"
+            m2.write_metrics_csv(s, path)
+            rows = list(csv.reader(path.read_text(encoding="utf-8").splitlines()))
+        self.assertEqual({r[0]: r for r in rows if r}["# retrieval_context"][1], "technique_kb")
+
+
 if __name__ == "__main__":
     unittest.main()
