@@ -67,6 +67,7 @@ jobs:
           tests.test_notification_setup
           tests.test_notify_line_message
           tests.test_notify_gmail_html
+          tests.test_notify_gmail_template
           tests.test_rag_safety
           tests.test_technique_source_contract
           tests.test_threat_intel_facts

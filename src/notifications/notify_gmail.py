@@ -55,14 +55,18 @@ from __future__ import annotations
 import base64
 from html import escape
 import logging
+from email import policy
 from email.errors import MessageError
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+from email.message import EmailMessage
 from typing import Any
 
 from .config_utils import looks_real
 
 logger = logging.getLogger("alert_dispatcher.notify_gmail")
+
+# policy.SMTP defaults to 8bit, which would put raw Thai bytes on the wire. 7bit makes set_content
+# choose quoted-printable or base64, which every relay accepts.
+SEVEN_BIT_SMTP = policy.SMTP.clone(cte_type="7bit")
 
 GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send"
 
@@ -98,7 +102,35 @@ def _build_gmail_service(config: dict[str, Any]):
     return build("gmail", "v1", credentials=creds)
 
 
-def _send_html_email(config: dict[str, Any], subject: str, html_body: str, dry_run_label: str) -> dict[str, Any]:
+def build_mime_message(
+    sender: str, subject: str, *, text_body: str | None = None, html_body: str | None = None
+) -> EmailMessage:
+    """multipart/alternative when both bodies are given, a single part otherwise.
+
+    The 7-bit SMTP policy makes set_content pick a safe transfer encoding for the Thai text, and
+    EmailMessage refuses a header value that contains a line break, so a subject built from flow
+    data cannot smuggle in a Bcc header.
+    """
+    message = EmailMessage(policy=SEVEN_BIT_SMTP)
+    message["To"] = sender
+    message["From"] = sender
+    message["Subject"] = subject
+    if text_body is not None and html_body is not None:
+        message.set_content(text_body)
+        message.add_alternative(html_body, subtype="html")
+    elif html_body is not None:
+        message.set_content(html_body, subtype="html")
+    elif text_body is not None:
+        message.set_content(text_body)
+    else:
+        raise ValueError("an email needs a text body, an HTML body, or both")
+    return message
+
+
+def _send_email(
+    config: dict[str, Any], subject: str, dry_run_label: str, *,
+    html_body: str | None = None, text_body: str | None = None,
+) -> dict[str, Any]:
     """Shared send path for both the MEDIUM immediate email and the LOW daily digest -- same
     dry-run gate, same Gmail API call shape, only the subject/body differ. Recipient defaults to
     GMAIL_SENDER_ADDRESS itself (send-to-self) since no SOC email distribution list is configured
@@ -126,11 +158,9 @@ def _send_html_email(config: dict[str, Any], subject: str, html_body: str, dry_r
         from googleapiclient.errors import HttpError
 
         service = _build_gmail_service(config)
-        message = MIMEMultipart("alternative")
-        message["to"] = config["gmail_sender_address"]
-        message["from"] = config["gmail_sender_address"]
-        message["subject"] = subject
-        message.attach(MIMEText(html_body, "html", "utf-8"))
+        message = build_mime_message(
+            config["gmail_sender_address"], subject, text_body=text_body, html_body=html_body
+        )
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode("ascii")
         resp = service.users().messages().send(userId="me", body={"raw": raw}).execute()
     except ImportError as exc:
@@ -170,10 +200,10 @@ def send_immediate_email(record: dict[str, Any], config: dict[str, Any]) -> dict
     """Send (or dry-run-log) a MEDIUM-priority immediate email for one assembled alert `record`
     (see src/notifications/alert_dispatcher.py's assemble_alert_record). Called by
     src/alert_dispatcher.dispatch_alert() when priority == "MEDIUM". Same error contract as
-    _send_html_email."""
+    _send_email."""
     subject = f"[SOC ALERT - MEDIUM] {record.get('anomaly_type', '?')} @ {record.get('source_ip', '?')}"
     html = build_immediate_email_html(record)
-    return _send_html_email(config, subject, html, dry_run_label="MEDIUM immediate")
+    return _send_email(config, subject, "MEDIUM immediate", html_body=html)
 
 
 def build_digest_email_html(rows: list[dict[str, Any]], stats: dict[str, Any]) -> str:
@@ -206,7 +236,7 @@ def build_digest_email_html(rows: list[dict[str, Any]], stats: dict[str, Any]) -
 
 def send_digest_email(rows: list[dict[str, Any]], stats: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
     """Send (or dry-run-log) the once-daily LOW-priority digest email. Called by
-    src/alert_dispatcher.flush_low_priority_digest(). Same error contract as _send_html_email."""
+    src/alert_dispatcher.flush_low_priority_digest(). Same error contract as _send_email."""
     subject = f"[SOC Daily Digest] {stats.get('date', '?')} -- {stats.get('alert_count', 0)} LOW alerts"
     html = build_digest_email_html(rows, stats)
-    return _send_html_email(config, subject, html, dry_run_label="LOW digest")
+    return _send_email(config, subject, "LOW digest", html_body=html)
